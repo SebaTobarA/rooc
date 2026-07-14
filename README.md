@@ -234,7 +234,8 @@ Special Delivery). Definido en `src/app/globals.css` (variables `--accent`,
 
 - **Nombre del sitio**: editá `siteConfig.name` / `shortName` en `src/config/site.ts`.
 - **Colores**: editá las variables CSS en `src/app/globals.css` (`--accent`, `--background`, etc.).
-- **Logo**: reemplazá el bloque `<span>` con la letra "R" en `src/components/site-header.tsx` por tu propio ícono/imagen.
+- **Logo**: reemplazá el bloque `<span>` con la letra "R" en `src/components/site-sidebar.tsx` por tu propio ícono/imagen.
+- **Navegación**: el menú principal (Inicio/Ítems/Monstruos/Mapas) vive como sidebar fijo a la izquierda en desktop y como menú deslizable en mobile, ambos definidos en `src/components/site-sidebar.tsx`.
 
 Los íconos de armas (`public/icons/weapons/`) y de slots de equipo
 (`public/icons/slots/`) son arte propio (set "Dawn", variante roja) usado
