@@ -15,7 +15,7 @@ export default async function AdminMonstersPage() {
         <h2 className="text-lg font-semibold text-foreground">Monstruos ({monsters.length})</h2>
         <Link
           href="/admin/monsters/new"
-          className="rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-accent-foreground hover:bg-accent-hover"
+          className="btn-brand px-3 py-1.5 text-sm"
         >
           + Nuevo monstruo
         </Link>

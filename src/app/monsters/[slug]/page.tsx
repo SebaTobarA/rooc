@@ -63,7 +63,7 @@ export default async function MonsterDetailPage({
 
           <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-3">
             <Stat label="Nivel" value={monster.level} />
-            <Stat label="HP" value={monster.hp.toLocaleString("es-AR")} />
+            <Stat label="HP" value={monster.hp.toLocaleString("es-MX")} />
             <Stat
               label="ATK"
               value={

@@ -17,7 +17,7 @@ export default async function AdminDropsPage() {
         <h2 className="text-lg font-semibold text-foreground">Drops ({drops.length})</h2>
         <Link
           href="/admin/drops/new"
-          className="rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-accent-foreground hover:bg-accent-hover"
+          className="btn-brand px-3 py-1.5 text-sm"
         >
           + Nuevo drop
         </Link>

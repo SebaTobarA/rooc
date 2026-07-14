@@ -1,21 +1,28 @@
 @import "tailwindcss";
 
 /*
- * Identidad visual v1: tema oscuro "gamer" con acento carmesí (combina con
- * el set de íconos de armas). Es un punto de partida propio, no una copia de
- * ningún sitio existente — se puede retocar todo desde estas variables.
+ * Identidad visual: paleta y tipografía tomadas del sitio "Special Delivery"
+ * (celeste + rosa suave sobre negro, títulos en mayúsculas con degradado,
+ * botones en bloque con glow al pasar el mouse). Reutilizamos ese lenguaje
+ * visual acá, adaptado a un sitio de datos (tarjetas, tablas, filtros) en
+ * vez de una landing page.
  */
 :root {
-  --background: #0a0c11;
-  --background-elevated: #0f121a;
-  --surface: #151923;
-  --surface-hover: #1b2029;
-  --border: #262b36;
-  --foreground: #e8e9ed;
-  --muted: #8f97a3;
-  --accent: #c9333f;
-  --accent-hover: #e0424e;
-  --accent-foreground: #ffffff;
+  --background: #0a0a0d;
+  --background-elevated: #111116;
+  --surface: #17171d;
+  --surface-hover: #1d1d24;
+  --border: #26262f;
+  --foreground: #e9edf1;
+  --muted: #a3adb8;
+
+  --accent: #6fe0f5; /* celeste — igual que Special Delivery */
+  --accent-hover: #ffb3c6; /* rosa suave — el acento cambia de tono al hacer hover, como en SD */
+  --accent-foreground: #0a0a0d; /* texto oscuro sobre botones claros (celeste/rosa) */
+  --secondary: #ffb3c6;
+  --focus: #ffe27a;
+
+  --gradient-title: linear-gradient(135deg, #ffffff 15%, var(--accent) 60%, var(--secondary) 100%);
 }
 
 @theme inline {
@@ -29,16 +36,56 @@
   --color-accent: var(--accent);
   --color-accent-hover: var(--accent-hover);
   --color-accent-foreground: var(--accent-foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-secondary: var(--secondary);
+  --color-focus: var(--focus);
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
+  font-family: var(--font-sans);
 }
 
 ::selection {
   background: var(--accent);
   color: var(--accent-foreground);
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Título en mayúsculas con degradado celeste -> rosa, como en Special Delivery. */
+.heading-gradient {
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  background: var(--gradient-title);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Botón principal: bloque uppercase con glow al pasar el mouse, mismo trato que
+   los CTA de Special Delivery (ahí aplicado al botón de Discord). */
+.btn-brand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: var(--accent);
+  color: var(--accent-foreground);
+  transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.2s ease;
+}
+
+.btn-brand:hover,
+.btn-brand:focus-visible {
+  background: var(--accent-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(111, 224, 245, 0.3);
 }

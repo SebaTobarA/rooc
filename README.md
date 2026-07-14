@@ -226,8 +226,11 @@ se explica arriba.
 
 ## Identidad visual
 
-Tema oscuro con acento carmesí (`#c9333f`), definido en
-`src/app/globals.css` y `src/config/site.ts`. Para cambiar la marca:
+Tema oscuro celeste (`#6fe0f5`) + rosa (`#ffb3c6`), con títulos en
+mayúsculas y degradado (misma paleta y tratamiento tipográfico que
+Special Delivery). Definido en `src/app/globals.css` (variables `--accent`,
+`--secondary`, `--gradient-title`, clases `.heading-gradient` y
+`.btn-brand`) y `src/config/site.ts`. Para cambiar la marca:
 
 - **Nombre del sitio**: editá `siteConfig.name` / `shortName` en `src/config/site.ts`.
 - **Colores**: editá las variables CSS en `src/app/globals.css` (`--accent`, `--background`, etc.).

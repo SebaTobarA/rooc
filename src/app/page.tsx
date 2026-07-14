@@ -41,20 +41,17 @@ export default async function HomePage() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
       <section className="rounded-2xl border border-border bg-surface p-8 sm:p-12">
-        <h1 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
+        <h1 className="heading-gradient text-3xl font-extrabold sm:text-4xl">
           {siteConfig.name}
         </h1>
         <p className="mt-3 max-w-2xl text-muted">{siteConfig.description}</p>
         <div className="mt-6 flex flex-wrap gap-3">
-          <Link
-            href="/items"
-            className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground hover:bg-accent-hover"
-          >
+          <Link href="/items" className="btn-brand px-4 py-2 text-sm">
             Explorar ítems
           </Link>
           <Link
             href="/monsters"
-            className="rounded-md border border-border px-4 py-2 text-sm font-semibold text-foreground hover:bg-surface-hover"
+            className="rounded-[10px] border border-border px-4 py-2 text-sm font-semibold uppercase tracking-wide text-foreground transition-colors hover:bg-surface-hover"
           >
             Ver bestiario
           </Link>
@@ -70,7 +67,7 @@ export default async function HomePage() {
           <Link
             key={pillar.href}
             href={pillar.href}
-            className="flex flex-col gap-2 rounded-xl border border-border bg-surface p-5 transition-colors hover:border-accent/60 hover:bg-surface-hover"
+            className="flex flex-col gap-2 rounded-xl border border-border bg-surface p-5 transition-all hover:-translate-y-0.5 hover:border-accent/60 hover:bg-surface-hover hover:shadow-lg hover:shadow-accent/10"
           >
             <span className="text-2xl font-bold text-accent">{pillar.count}</span>
             <span className="text-xs uppercase tracking-wide text-muted">

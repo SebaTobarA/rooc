@@ -77,10 +77,7 @@ export default async function AdminLoginPage({
             />
           </div>
 
-          <button
-            type="submit"
-            className="w-full rounded-md bg-accent px-3 py-2 font-medium text-accent-foreground transition-colors hover:bg-accent-hover"
-          >
+          <button type="submit" className="btn-brand w-full px-3 py-2">
             Ingresar
           </button>
         </form>

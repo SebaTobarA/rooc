@@ -23,10 +23,7 @@ export const inputClass =
 
 export function SubmitButton({ children }: { children: React.ReactNode }) {
   return (
-    <button
-      type="submit"
-      className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground hover:bg-accent-hover"
-    >
+    <button type="submit" className="btn-brand px-4 py-2 text-sm">
       {children}
     </button>
   );
