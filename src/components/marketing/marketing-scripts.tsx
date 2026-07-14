@@ -365,34 +365,41 @@ export function MarketingScripts() {
           let progress = scrollable > 0 ? -rect.top / scrollable : 0;
           progress = Math.max(0, Math.min(1, progress));
 
-          // Antes el crossfade ocurría en un tramo angosto (35%-70% del
-          // scroll), lo que hacía que el título y los 5 rangos aparecieran
-          // casi todos juntos. Se ensancha a 20%-80% (+ el deck ahora mide
-          // 320vh en vez de 220vh, ver marketing.css) para darle bastante
-          // más recorrido de scroll a toda la secuencia.
-          let fade = (progress - 0.2) / 0.6;
-          fade = Math.max(0, Math.min(1, fade));
+          // Transición secuencial, no crossfade: primero se desvanece del
+          // todo la lámina 1 (mitad del tramo) y recién ahí empieza a
+          // aparecer la lámina 2 (segunda mitad) — nunca están las dos
+          // visibles al mismo tiempo, a diferencia de un fundido cruzado
+          // clásico donde ambas opacidades se superponen en el medio.
+          const windowStart = 0.2;
+          const windowEnd = 0.8;
+          const mid = (windowStart + windowEnd) / 2;
 
-          deckSlides[0].style.opacity = String(1 - fade);
-          deckSlides[1].style.opacity = String(fade);
-          deckSlides[0].setAttribute("aria-hidden", fade > 0.5 ? "true" : "false");
-          deckSlides[1].setAttribute("aria-hidden", fade <= 0.5 ? "true" : "false");
+          let fadeOut = (progress - windowStart) / (mid - windowStart);
+          fadeOut = Math.max(0, Math.min(1, fadeOut));
+
+          let fadeIn = (progress - mid) / (windowEnd - mid);
+          fadeIn = Math.max(0, Math.min(1, fadeIn));
+
+          deckSlides[0].style.opacity = String(1 - fadeOut);
+          deckSlides[1].style.opacity = String(fadeIn);
+          deckSlides[0].setAttribute("aria-hidden", fadeOut >= 1 ? "true" : "false");
+          deckSlides[1].setAttribute("aria-hidden", fadeIn <= 0 ? "true" : "false");
 
           if (timelineFill) {
-            timelineFill.style.transform = `scaleY(${fade})`;
+            timelineFill.style.transform = `scaleY(${fadeIn})`;
           }
 
           // El título entra primero (antes que el rango 01), con un umbral
           // más bajo que el del primer paso, para que la secuencia se sienta
           // título -> rango 1 -> rango 2 -> ... en vez de todo junto.
           if (leadershipTitle) {
-            leadershipTitle.classList.toggle("title-visible", fade >= 0.08);
+            leadershipTitle.classList.toggle("title-visible", fadeIn >= 0.08);
           }
 
           if (timelineSteps.length) {
             timelineSteps.forEach((step, index) => {
               const threshold = 0.18 + (index / timelineSteps.length) * 0.82;
-              step.classList.toggle("is-lit", fade >= threshold - 0.001);
+              step.classList.toggle("is-lit", fadeIn >= threshold - 0.001);
             });
           }
         };
