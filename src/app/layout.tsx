@@ -1,7 +1,4 @@
 import type { Metadata } from "next";
-import "./globals.css";
-import { SiteSidebar } from "@/components/site-sidebar";
-import { SiteFooter } from "@/components/site-footer";
 import { siteConfig } from "@/config/site";
 
 export const metadata: Metadata = {
@@ -10,6 +7,9 @@ export const metadata: Metadata = {
     template: `%s · ${siteConfig.shortName}`,
   },
   description: siteConfig.description,
+  icons: {
+    icon: "/assets/mascota-fantasma-icono.svg",
+  },
 };
 
 export default function RootLayout({
@@ -20,13 +20,7 @@ export default function RootLayout({
   return (
     <html lang="es" className="h-full antialiased">
       <body className="flex min-h-full flex-col bg-background text-foreground">
-        <div className="flex flex-1">
-          <SiteSidebar />
-          <div className="flex min-w-0 flex-1 flex-col">
-            <main className="flex-1">{children}</main>
-          </div>
-        </div>
-        <SiteFooter />
+        {children}
       </body>
     </html>
   );

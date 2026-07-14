@@ -4,15 +4,16 @@
  * final. Los placeholders entre corchetes están pensados para reemplazarse.
  */
 export const siteConfig = {
-  name: "[NOMBRE DEL SITIO]",
-  shortName: "[SITIO]",
-  tagline: "Base de datos y herramientas para Ragnarok Online Origin Classic",
+  name: "Special Delivery",
+  shortName: "Special Delivery",
+  tagline: "Base de datos y herramientas para la guild de Ragnarok Online Origin Classic",
   description:
-    "Ítems, bestiario, mapas y tablas de drop para la comunidad de Ragnarok Online Origin Classic. Proyecto independiente, sin afiliación oficial con Gravity ni con otros sitios de la comunidad.",
+    "Ítems, bestiario, mapas y tablas de drop para la comunidad de Special Delivery en Ragnarok Online Origin Classic. Proyecto independiente, sin afiliación oficial con Gravity.",
   nav: [
-    { href: "/", label: "Inicio" },
-    { href: "/items", label: "Ítems" },
-    { href: "/monsters", label: "Monstruos" },
-    { href: "/maps", label: "Mapas" },
+    { href: "/panel", label: "Inicio" },
+    { href: "/panel/items", label: "Ítems" },
+    { href: "/panel/monsters", label: "Monstruos" },
+    { href: "/panel/maps", label: "Mapas" },
+    { href: "/panel/party", label: "Party Builder" },
   ],
 };

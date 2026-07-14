@@ -1,17 +1,18 @@
 /**
- * OAuth2 de Discord para el login del panel admin, como alternativa al
- * usuario/contraseña. No usa ninguna librería externa: el flujo de Discord
- * es un OAuth2 estándar simple (authorize -> code -> token -> /users/@me).
+ * OAuth2 de Discord para el login de usuarios (cualquier miembro del server
+ * de Special Delivery) y, con el mismo flujo, para el admin (verificado por
+ * ADMIN_DISCORD_IDS en el callback). No usa ninguna librería externa: el
+ * flujo de Discord es un OAuth2 estándar simple (authorize -> code -> token
+ * -> /users/@me).
  *
- * Autorización: no hay tabla de usuarios ni roles de servidor — se admite
- * a quien inicie sesión con una cuenta de Discord cuyo ID esté en
- * ADMIN_DISCORD_IDS (lista separada por comas). Cualquier otra cuenta de
- * Discord que inicie sesión es rechazada.
+ * La membresía al server y los roles del usuario se verifican por separado,
+ * con el bot (ver src/lib/discord-bot.ts) — este archivo solo resuelve la
+ * identidad básica de la cuenta de Discord que inició sesión.
  */
 
 const DISCORD_API = "https://discord.com/api/v10";
 
-export const DISCORD_STATE_COOKIE = "rooc_discord_oauth_state";
+export const DISCORD_STATE_COOKIE = "sd_discord_oauth_state";
 
 function getClientId(): string {
   const id = process.env.DISCORD_CLIENT_ID;
@@ -64,6 +65,7 @@ export type DiscordUser = {
   id: string;
   username: string;
   global_name: string | null;
+  avatar: string | null;
 };
 
 async function fetchDiscordUser(accessToken: string): Promise<DiscordUser> {
@@ -85,7 +87,7 @@ export async function resolveDiscordUser(code: string, redirectUri: string): Pro
 }
 
 /** Lista blanca de IDs de Discord con acceso al panel admin. */
-export function isAllowedDiscordId(discordId: string): boolean {
+export function isAllowedAdminId(discordId: string): boolean {
   const allowed = (process.env.ADMIN_DISCORD_IDS ?? "")
     .split(",")
     .map((id) => id.trim())

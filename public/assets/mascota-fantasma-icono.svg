@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 340" width="340" height="340" role="img" aria-label="Mascota fantasma de Special Delivery">
+  <!--
+    PLACEHOLDER TEMPORAL: emoji de fantasma mientras llega el arte final.
+    Reemplaza este archivo por tu ilustración definitiva, manteniendo el
+    mismo nombre (mascota-fantasma-icono.svg), tamaño (340x340) y fondo
+    transparente para que el header, el hero, el footer y el favicon
+    no se rompan.
+  -->
+  <text x="50%" y="53%" font-size="260" text-anchor="middle" dominant-baseline="middle">👻</text>
+</svg>

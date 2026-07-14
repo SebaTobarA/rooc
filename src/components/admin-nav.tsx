@@ -10,6 +10,8 @@ const links = [
   { href: "/admin/maps", label: "Mapas" },
   { href: "/admin/drops", label: "Drops" },
   { href: "/admin/import", label: "Importar CSV/JSON" },
+  { href: "/admin/members", label: "Miembros" },
+  { href: "/admin/roles", label: "Roles y permisos" },
 ];
 
 export function AdminNav() {

@@ -7,7 +7,7 @@ import { RarityBadge } from "@/components/rarity-badge";
 export function ItemCard({ item }: { item: Item }) {
   return (
     <Link
-      href={`/items/${item.slug}`}
+      href={`/panel/items/${item.slug}`}
       className="group flex flex-col gap-3 rounded-xl border border-border bg-surface p-4 transition-all hover:-translate-y-0.5 hover:border-accent/60 hover:bg-surface-hover hover:shadow-lg hover:shadow-accent/10"
     >
       <div className="flex items-center gap-3">

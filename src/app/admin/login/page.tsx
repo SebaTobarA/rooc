@@ -6,7 +6,7 @@ export const metadata = {
 
 const ERROR_MESSAGES: Record<string, string> = {
   "1": "Usuario o contraseña incorrectos.",
-  discord_not_allowed: "Esa cuenta de Discord no tiene acceso al panel admin.",
+  discord_not_member: "Esa cuenta de Discord no pertenece al server de Special Delivery.",
   discord_invalid: "No se pudo completar el inicio de sesión con Discord. Probá de nuevo.",
   discord_failed: "Hubo un error al conectar con Discord. Probá de nuevo.",
 };
@@ -33,7 +33,7 @@ export default async function AdminLoginPage({
         )}
 
         <a
-          href={`/api/admin/discord/login?from=${encodeURIComponent(from)}`}
+          href={`/api/auth/discord/login?from=${encodeURIComponent(from)}`}
           className="mt-6 flex w-full items-center justify-center gap-2 rounded-md bg-[#5865F2] px-3 py-2 font-medium text-white transition-colors hover:bg-[#4752c4]"
         >
           <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current" aria-hidden="true">

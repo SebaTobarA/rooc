@@ -34,7 +34,7 @@ export function DropsByMonster({
             <tr key={drop.id} className="hover:bg-surface/60">
               <td className="px-4 py-2">
                 <Link
-                  href={`/monsters/${drop.monster.slug}`}
+                  href={`/panel/monsters/${drop.monster.slug}`}
                   className="font-medium text-foreground hover:text-accent"
                 >
                   {drop.monster.name}
@@ -72,7 +72,7 @@ export function DropsByItem({ drops }: { drops: (Drop & { item: Item })[] }) {
             <tr key={drop.id} className="hover:bg-surface/60">
               <td className="px-4 py-2">
                 <Link
-                  href={`/items/${drop.item.slug}`}
+                  href={`/panel/items/${drop.item.slug}`}
                   className="flex items-center gap-2 font-medium text-foreground hover:text-accent"
                 >
                   <Image

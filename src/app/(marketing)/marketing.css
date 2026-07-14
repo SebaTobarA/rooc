@@ -1,0 +1,1643 @@
+/* =========================================================
+   Special Delivery — styles.css
+   Mobile-first. Sin frameworks. Paleta basada en la mascota:
+   celeste (primario) + rosa suave (secundario/hover) sobre negro.
+   ========================================================= */
+
+:root {
+  /* Paleta */
+  --color-bg: #0a0a0d;
+  --color-bg-alt: #111116;
+  --color-surface: #17171d;
+  --color-border: #26262f;
+
+  --color-text: #e9edf1;
+  --color-text-muted: #a3adb8;
+
+  --color-primary: #6fe0f5;      /* celeste — acentos, links, bordes activos */
+  --color-primary-dim: #4dc4da;
+  --color-secondary: #ffb3c6;    /* rosa suave — hover/secundario */
+
+  --color-focus: #ffe27a;        /* foco de teclado, alto contraste */
+
+  --gradient-title: linear-gradient(135deg, #ffffff 15%, var(--color-primary) 60%, var(--color-secondary) 100%);
+  --gradient-line: linear-gradient(90deg, var(--color-primary), var(--color-secondary));
+
+  --radius: 10px;
+  --max-width: 1100px;
+  --max-width-wide: 1280px;
+
+  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* ---------- Animaciones reutilizables ---------- */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes floatY {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes ghostGlowPulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes pulseGlow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(111, 224, 245, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(111, 224, 245, 0);
+  }
+}
+
+@keyframes playPulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
+}
+
+@keyframes wordmarkDrift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -14px, 0);
+  }
+}
+
+@keyframes lineGrow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* Scroll-reveal: oculto hasta que script.js le agrega .is-visible al entrar en viewport.
+   El <noscript> en el <head> asegura que sin JS el contenido siga siendo visible.
+   .reveal-scroll es la variante reversible: se oculta de nuevo si se sale
+   del viewport (usada en "Acerca de la Guild"), en vez de revelarse una
+   sola vez y quedar fija como .reveal. */
+.reveal,
+.reveal-scroll {
+  opacity: 0;
+  transform: translateY(34px) scale(0.97);
+  filter: blur(6px);
+  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+    filter 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform, filter;
+}
+
+.reveal.is-visible,
+.reveal-scroll.is-visible {
+  opacity: 1;
+  transform: none;
+  filter: blur(0);
+}
+
+/* Variantes direccionales: entran desde un costado en vez de desde abajo,
+   para dar variedad al recorrido de scroll (usadas en bloques de texto
+   destacados, ej. citas / frases de identidad de la guild). */
+.reveal-left {
+  opacity: 0;
+  transform: translateX(-40px);
+  filter: blur(6px);
+  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+    filter 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reveal-left.is-visible {
+  opacity: 1;
+  transform: none;
+  filter: blur(0);
+}
+
+/* Efecto cascada dentro de cada grupo (requisitos) */
+.requirements-list li.reveal:nth-child(2),
+.reveal-stagger > *:nth-child(2) { transition-delay: 0.08s; }
+.requirements-list li.reveal:nth-child(3),
+.reveal-stagger > *:nth-child(3) { transition-delay: 0.16s; }
+.requirements-list li.reveal:nth-child(4),
+.reveal-stagger > *:nth-child(4) { transition-delay: 0.24s; }
+.requirements-list li.reveal:nth-child(5),
+.reveal-stagger > *:nth-child(5) { transition-delay: 0.32s; }
+.reveal-stagger > *:nth-child(6) { transition-delay: 0.4s; }
+
+/* ---------- Eyebrow: etiqueta pequeña + línea, encabeza cada sección ---------- */
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin: 0 0 1rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+}
+
+.eyebrow::before {
+  content: '';
+  display: block;
+  width: 28px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--gradient-line);
+  transform-origin: left center;
+  animation: lineGrow 0.6s ease both;
+}
+
+.section-alt .eyebrow,
+.reclutamiento-hero .eyebrow {
+  color: var(--color-secondary);
+}
+
+.eyebrow-center {
+  justify-content: center;
+  width: 100%;
+}
+
+/* ---------- Reset básico ---------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background:
+    repeating-linear-gradient(115deg, rgba(111, 224, 245, 0.025) 0px, rgba(111, 224, 245, 0.025) 1px, transparent 1px, transparent 90px),
+    var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+a:hover,
+a:focus-visible {
+  color: var(--color-secondary);
+}
+
+ul {
+  padding-left: 1.2rem;
+}
+
+/* Foco visible y consistente para navegación por teclado */
+:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.icon {
+  width: 1.1em;
+  height: 1.1em;
+}
+
+/* ---------- Header / Nav ---------- */
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  /* Nota: a propósito NO se usa backdrop-filter acá: crea un "containing
+     block" para los hijos con position:fixed (como .primary-nav en mobile)
+     y el menú quedaría comprimido dentro de la altura del header. */
+  background: rgba(10, 10, 13, 0.97);
+  border-bottom: 1px solid var(--color-border);
+  transition: box-shadow 0.25s ease;
+}
+
+/* Se agrega al hacer scroll (ver script.js) para separar el header del contenido */
+.site-header.is-scrolled {
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+}
+
+.header-inner {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 0.7rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--color-text);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.brand:hover,
+.brand:focus-visible {
+  color: var(--color-primary);
+}
+
+.brand-logo {
+  width: 40px;
+  height: 40px;
+}
+
+.brand-name {
+  font-size: 1.05rem;
+  white-space: nowrap;
+}
+
+/* Botón hamburguesa (solo mobile) */
+.nav-toggle {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  width: 40px;
+  height: 40px;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.nav-toggle-bar {
+  display: block;
+  height: 2px;
+  width: 20px;
+  margin: 0 auto;
+  background: var(--color-text);
+  border-radius: 2px;
+}
+
+.primary-nav {
+  position: fixed;
+  inset: 0 0 0 30%;
+  top: 65px;
+  background: var(--color-bg-alt);
+  border-left: 1px solid var(--color-border);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  transform: translateX(100%);
+  transition: transform 0.25s ease;
+}
+
+.primary-nav.is-open {
+  transform: translateX(0);
+}
+
+.primary-nav ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.nav-link {
+  position: relative;
+  display: inline-block;
+  color: var(--color-text);
+  font-weight: 600;
+  font-size: 1.05rem;
+  padding-bottom: 2px;
+}
+
+.nav-link:hover,
+.nav-link:focus-visible {
+  color: var(--color-primary);
+}
+
+/* Subrayado animado: crece desde el centro al pasar el mouse o enfocar con teclado */
+.nav-link::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 2px;
+  background: var(--color-primary);
+  transform: scaleX(0);
+  transition: transform 0.25s ease;
+}
+
+.nav-link:hover::after,
+.nav-link:focus-visible::after {
+  transform: scaleX(1);
+}
+
+.header-auth {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.login-error-banner {
+  max-width: 52ch;
+  margin: 0 0 1.5rem;
+  padding: 0.7rem 1.1rem;
+  border: 1px solid rgba(255, 179, 198, 0.4);
+  border-radius: var(--radius);
+  background: rgba(255, 179, 198, 0.08);
+  color: var(--color-text);
+  font-size: 0.9rem;
+}
+
+/* ---------- Botones ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  border-radius: var(--radius);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease,
+    border-color 0.15s ease, box-shadow 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn:hover,
+.btn:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(111, 224, 245, 0.35);
+}
+
+.btn-discord {
+  background: var(--color-primary);
+  color: #0a0a0d;
+}
+
+.btn-discord:hover,
+.btn-discord:focus-visible {
+  background: var(--color-secondary);
+  color: #0a0a0d;
+  box-shadow: 0 8px 24px rgba(255, 179, 198, 0.4);
+}
+
+/* Pulso suave en los dos CTA principales (hero y reclutamiento) para invitar al click,
+   se detiene al pasar el mouse para no pelear con el glow del :hover */
+.hero .btn-discord,
+.recruit-cta .btn-discord,
+.join-teaser .btn-discord,
+.reclutamiento-hero .btn-discord {
+  animation: pulseGlow 2.6s ease-in-out infinite;
+}
+
+.hero .btn-discord:hover,
+.hero .btn-discord:focus-visible,
+.recruit-cta .btn-discord:hover,
+.recruit-cta .btn-discord:focus-visible,
+.join-teaser .btn-discord:hover,
+.join-teaser .btn-discord:focus-visible,
+.reclutamiento-hero .btn-discord:hover,
+.reclutamiento-hero .btn-discord:focus-visible {
+  animation-play-state: paused;
+}
+
+/* Conteo de conectados dentro del botón de Discord (ver data-discord-online en
+   script.js). A propósito sin caja/fondo propio: solo semáforo + número,
+   integrado tipográficamente con el resto del texto del botón. */
+.discord-online {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.discord-online-count {
+  font-variant-numeric: tabular-nums;
+}
+
+.discord-online-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #23a55a;
+  box-shadow: 0 0 0 0 rgba(35, 165, 90, 0.6);
+  animation: dotPulse 2s ease-in-out infinite;
+}
+
+@keyframes dotPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(35, 165, 90, 0.55);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(35, 165, 90, 0);
+  }
+}
+
+.btn-small {
+  padding: 0.5rem 0.9rem;
+  font-size: 0.9rem;
+}
+
+.btn-large {
+  padding: 0.9rem 1.6rem;
+  font-size: 1.05rem;
+}
+
+/* ---------- Hero ---------- */
+.hero {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 3rem 1rem 2.5rem;
+  text-align: center;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(111, 224, 245, 0.08), transparent 60%);
+}
+
+.hero-inner {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.hero-logo-wrap {
+  position: relative;
+  margin-bottom: 1rem;
+  animation: fadeInUp 0.7s ease both;
+}
+
+/* Resplandor difuso detrás del fantasma, pulsa lentamente */
+.hero-logo-wrap::before {
+  content: '';
+  position: absolute;
+  inset: 10%;
+  background: radial-gradient(circle, rgba(111, 224, 245, 0.45), transparent 70%);
+  filter: blur(18px);
+  z-index: 0;
+  animation: ghostGlowPulse 3.6s ease-in-out infinite;
+}
+
+.hero-logo {
+  position: relative;
+  z-index: 1;
+  width: 140px;
+  height: 140px;
+  animation: floatY 4.5s ease-in-out infinite;
+}
+
+.hero .eyebrow {
+  justify-content: center;
+  animation: fadeInUp 0.7s ease both;
+}
+
+.hero-title {
+  font-size: clamp(2.4rem, 8vw, 4rem);
+  font-weight: 800;
+  margin: 0 0 0.4rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  background: var(--gradient-title);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: fadeInUp 0.7s ease both;
+  animation-delay: 0.1s;
+}
+
+/* Insignia tipo "fundado en" en vez de texto plano */
+.hero-tagline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--color-secondary);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 0.4rem 1.1rem;
+  border: 1px solid rgba(255, 179, 198, 0.35);
+  border-radius: 999px;
+  background: rgba(255, 179, 198, 0.07);
+  margin: 0 0 1.5rem;
+  animation: fadeInUp 0.7s ease both;
+  animation-delay: 0.2s;
+}
+
+.hero .btn-discord {
+  margin-bottom: 2.2rem;
+  animation: fadeInUp 0.7s ease both, pulseGlow 2.6s ease-in-out infinite;
+  animation-delay: 0.3s, 0.9s;
+}
+
+/* ---------- Carrusel de videos ----------
+   Tipo "rail": varias tarjetas visibles a la vez, scroll horizontal por
+   píxeles (no por porcentaje de slide completo) — ver script.js. */
+.carousel {
+  position: relative;
+  width: 100%;
+}
+
+.carousel-track {
+  display: flex;
+  gap: 1rem;
+  overflow: hidden;
+  touch-action: pan-y;
+}
+
+.carousel-slide {
+  flex: 0 0 auto;
+  width: clamp(200px, 42vw, 280px);
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+
+/* Facade: miniatura + botón play. El iframe real solo se crea al hacer click (script.js) */
+.yt-facade {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  cursor: pointer;
+  background: #000;
+}
+
+/* Título / canal / fecha debajo de la miniatura */
+.yt-meta {
+  padding: 0.9rem 1rem 1.1rem;
+}
+
+.yt-title {
+  margin: 0 0 0.4rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--color-text);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.yt-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.yt-channel {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.yt-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex: 0 0 auto;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.yt-date svg {
+  width: 14px;
+  height: 14px;
+}
+
+.yt-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.yt-play {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.25);
+  transition: background 0.15s ease;
+}
+
+.yt-play svg {
+  animation: playPulse 2.4s ease-in-out infinite;
+  transition: transform 0.2s ease;
+}
+
+.yt-facade:hover .yt-play,
+.yt-facade:focus-visible .yt-play {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.yt-facade:hover .yt-play svg,
+.yt-facade:focus-visible .yt-play svg {
+  transform: scale(1.15);
+  animation-play-state: paused;
+}
+
+.carousel-slide iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+
+/* Fila de controles debajo del carrusel: barra de progreso + flechas */
+.carousel-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.carousel-progress {
+  flex: 1;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--color-border);
+  overflow: hidden;
+}
+
+.carousel-progress-bar {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: var(--color-primary);
+  transition: width 0.2s ease;
+}
+
+.carousel-arrows {
+  display: flex;
+  gap: 0.5rem;
+  flex: 0 0 auto;
+}
+
+.carousel-arrow {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, transform 0.15s ease, background 0.15s ease;
+}
+
+.carousel-arrow:hover,
+.carousel-arrow:focus-visible {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  background: rgba(111, 224, 245, 0.12);
+  transform: scale(1.1);
+}
+
+/* ---------- Secciones genéricas ---------- */
+.section {
+  padding: 3rem 1rem;
+}
+
+.section-alt {
+  background: var(--color-bg-alt);
+}
+
+/* "Etapas" de la web: cada una ocupa al menos una pantalla completa (o media,
+   para la de videos) y el scroll entre ellas es el scroll normal del
+   navegador — sin scroll-jacking, para evitar los problemas de renderizado
+   que esto causaba en iPad/iPhone (position:sticky + vh dinámico de iOS). Se
+   usa min-height (no height fijo) para que si el contenido no entra en
+   pantallas chicas, la sección simplemente crezca en vez de recortarse. */
+.section-fullscreen {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.section-halfscreen {
+  min-height: 50vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.section-inner {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  width: 100%;
+}
+
+.section-title {
+  font-size: clamp(2.1rem, 7vw, 3.4rem);
+  font-weight: 800;
+  margin: 0 0 1.8rem;
+  letter-spacing: 0.01em;
+  line-height: 1.08;
+  text-transform: uppercase;
+  background: var(--gradient-title);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.section-lead {
+  color: var(--color-text-muted);
+  max-width: 65ch;
+  font-size: 1.05rem;
+}
+
+/* ---------- Watermark: palabra gigante en transparencia detrás del
+   contenido de una sección, para dar sensación de peso/escala (referencia:
+   nostra.id). Va en un contenedor propio con overflow:hidden — nunca en un
+   ancestro de .deck, porque eso rompe position:sticky (ver historial). */
+.watermark-host {
+  position: relative;
+}
+
+.watermark {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  z-index: 0;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.watermark span {
+  font-size: clamp(5rem, 22vw, 16rem);
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: transparent;
+  -webkit-text-stroke: 1px rgba(233, 237, 241, 0.09);
+  opacity: 0.55;
+  user-select: none;
+  animation: wordmarkDrift 10s ease-in-out infinite;
+}
+
+.watermark-host > .section-inner,
+.watermark-host > .deck {
+  position: relative;
+  z-index: 1;
+}
+
+/* Fantasma gigante en transparencia de fondo (sección Reclutamiento del home).
+   El centrado (translate -50%/-50%) vive en el wrapper y la animación de
+   flotado en la imagen: si ambas cosas tocaran "transform" en el mismo
+   elemento, la animación pisaría por completo el translate de centrado
+   (los keyframes reemplazan el valor, no lo componen). */
+.ghost-watermark-wrap {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: clamp(320px, 46vw, 620px);
+  transform: translate(-50%, -50%);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.ghost-watermark {
+  display: block;
+  width: 100%;
+  height: auto;
+  opacity: 0.06;
+  user-select: none;
+  animation: wordmarkDrift 12s ease-in-out infinite;
+}
+
+/* ---------- Partículas de fondo ("Acerca de la Guild") ----------
+   Puramente decorativas (aria-hidden), generadas una sola vez por script.js
+   con posiciones/tamaños/tiempos aleatorios. Se omiten por completo con
+   prefers-reduced-motion (ver script.js) para no gastar DOM ni animación.
+   Importante: SIN overflow acá (solo position:relative). Cualquier
+   ancestro con overflow distinto de "visible" rompe position:sticky en
+   sus descendientes — .particles ya recorta sus propias partículas con
+   su propio overflow:hidden, así que no hace falta repetirlo acá, y
+   repetirlo fue justamente lo que impedía que .deck-sticky se fijara en
+   pantalla (el crossfade "funcionaba" en los números pero nunca se veía
+   fijo, porque el contenido pasaba de largo con el scroll normal). */
+.section-particles-host {
+  position: relative;
+}
+
+.particles {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.particles span {
+  position: absolute;
+  border-radius: 50%;
+  background: var(--color-primary);
+  animation: particleTwinkle ease-in-out infinite;
+}
+
+@keyframes particleTwinkle {
+  0%,
+  100% {
+    opacity: 0.12;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 0.6;
+    transform: translateY(-16px);
+  }
+}
+
+/* Todo el contenido real de la sección va por encima de las partículas */
+.section-particles-host > .section-inner {
+  position: relative;
+  z-index: 1;
+}
+
+/* ---------- Acerca de la Guild: "presentación" de 2 láminas ----------
+   Por defecto (sin JS, o con prefers-reduced-motion) las 2 láminas están
+   apiladas en flujo normal, siempre visibles — nada de esto es necesario
+   para leer el contenido. Solo cuando corresponde, script.js agrega
+   .deck-enabled y fija (.deck-sticky) el área mientras hace un crossfade
+   entre láminas según el progreso del scroll dentro de .deck. */
+.deck-slide {
+  padding: 2rem 0;
+}
+
+.deck-slide + .deck-slide {
+  margin-top: 2rem;
+}
+
+.deck-enabled.deck {
+  position: relative;
+  height: 220vh;
+  height: 220dvh;
+}
+
+.deck-enabled .deck-sticky {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  display: block;
+}
+
+.deck-enabled .deck-slide {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  margin-top: 0;
+  padding: 0;
+  opacity: 0;
+}
+
+.deck-enabled .deck-slide .section-inner {
+  width: 100%;
+}
+
+/* ---------- Bloque título + tarjeta (dentro de cada lámina) ---------- */
+.info-block {
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 0.5rem 0.25rem;
+}
+
+.info-block-title {
+  position: relative;
+}
+
+.info-block-accent {
+  display: none;
+}
+
+.info-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1.5rem 1.75rem;
+}
+
+.section-subtitle {
+  font-size: clamp(1.6rem, 4vw, 2.3rem);
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  text-align: left;
+  margin: 0;
+  line-height: 1.1;
+  background: var(--gradient-title);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.section-text {
+  font-size: 1.1rem;
+  line-height: 1.7;
+  color: var(--color-text);
+  text-align: left;
+}
+
+/* ---------- Liderazgo: timeline vertical numerada ----------
+   Referencia visual: nostra.id/about. La línea (.timeline-line-fill) y el
+   estado "encendido" de cada .timeline-step se controlan por JS en
+   updateDeck() (script.js), atados al mismo progreso de scroll que ya
+   mueve el crossfade — por eso se dibujan en vivo con la rueda del mouse
+   en vez de aparecer todos juntos. Sin JS (o con prefers-reduced-motion)
+   quedan todos encendidos de entrada: ver reglas por defecto abajo. */
+.leadership-text {
+  margin: 0.75rem 0 0;
+  font-size: 1rem;
+  color: var(--color-text-muted);
+}
+
+.timeline {
+  position: relative;
+  padding: 0.5rem 0.25rem 0.5rem 2.2rem;
+}
+
+.timeline-line {
+  position: absolute;
+  top: 1.4rem;
+  bottom: 1.4rem;
+  left: 1.85rem;
+  width: 2px;
+  background: var(--color-border);
+  z-index: 1;
+}
+
+.timeline-line-fill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-origin: top center;
+  transform: scaleY(1);
+  background: var(--gradient-line);
+  transition: transform 0.1s linear;
+}
+
+.timeline-list {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1.6rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.timeline-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.1rem;
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+
+.timeline-node {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  margin-left: -2.2rem;
+  border-radius: 50%;
+  background: var(--color-bg);
+  border: 2px solid var(--color-primary);
+  box-shadow: 0 0 0 4px rgba(111, 224, 245, 0.12);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, color 0.3s ease;
+}
+
+.timeline-node-num {
+  font-size: 0.85rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--color-primary);
+}
+
+/* El primer rango (Guild Leader) siempre lleva el acento dorado, como
+   distinción fija de jerarquía — no depende del progreso de scroll. */
+.timeline-step-lead .timeline-node {
+  border-color: var(--color-focus);
+  box-shadow: 0 0 0 4px rgba(255, 226, 122, 0.16), 0 0 22px rgba(255, 226, 122, 0.35);
+}
+
+.timeline-step-lead .timeline-node-num {
+  color: var(--color-focus);
+}
+
+/* Estado "apagado": el paso todavía no fue alcanzado por el scroll.
+   Solo existe cuando script.js agrega .deck-enabled (ver más abajo). */
+.deck-enabled .timeline-step {
+  opacity: 0.35;
+}
+
+.deck-enabled .timeline-step.is-lit {
+  opacity: 1;
+}
+
+.deck-enabled .timeline-step:not(.timeline-step-lead) .timeline-node {
+  box-shadow: 0 0 0 4px rgba(111, 224, 245, 0.08);
+}
+
+.deck-enabled .timeline-step.is-lit:not(.timeline-step-lead) .timeline-node {
+  box-shadow: 0 0 0 4px rgba(111, 224, 245, 0.18), 0 0 18px rgba(111, 224, 245, 0.4);
+}
+
+.timeline-content {
+  padding-top: 0.4rem;
+}
+
+.timeline-role {
+  margin: 0 0 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.org-people {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 0.9rem 1.4rem;
+}
+
+.org-person {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+/* Mismo tamaño/diseño de avatar para todos los cargos (antes solo lo tenía
+   el Guild Leader): círculo con borde rosa y glow sutil. */
+.org-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 52px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 2px solid var(--color-secondary);
+  background: linear-gradient(160deg, rgba(111, 224, 245, 0.18), rgba(255, 179, 198, 0.14));
+  color: var(--color-primary);
+  font-weight: 700;
+  font-size: 1.2rem;
+  box-shadow: 0 0 0 4px rgba(255, 179, 198, 0.15);
+}
+
+.org-name {
+  font-weight: 600;
+  font-size: 1.05rem;
+  color: var(--color-text);
+}
+
+/* ---------- Videos + redes sociales ---------- */
+.videos-title {
+  font-size: clamp(1.9rem, 5vw, 2.8rem);
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  text-align: center;
+  margin: 0 0 1.2rem;
+  line-height: 1.1;
+  background: var(--gradient-title);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.social-links {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin: 0 0 2rem;
+}
+
+.social-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  transition: color 0.15s ease, border-color 0.15s ease, transform 0.15s ease, background 0.15s ease;
+}
+
+.social-link:hover,
+.social-link:focus-visible {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  background: rgba(111, 224, 245, 0.12);
+  transform: translateY(-2px);
+}
+
+.social-link .icon {
+  width: 1.3em;
+  height: 1.3em;
+}
+
+/* ---------- Reclutamiento ---------- */
+.requirements-title {
+  margin-top: 2rem;
+  font-size: 1.15rem;
+  text-transform: uppercase;
+  color: var(--color-primary);
+  letter-spacing: 0.04em;
+}
+
+.requirements-list {
+  color: var(--color-text-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.recruit-cta {
+  margin-top: 2.2rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.8rem;
+}
+
+.recruit-cta-text {
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+/* Variante centrada, usada como CTA final de la página de reclutamiento */
+.recruit-cta-centered {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 0;
+  align-items: center;
+  text-align: center;
+}
+
+/* ---------- Teaser "Reclutamiento" del home (estilo tarjeta de invitación) ---------- */
+.reclutamiento-teaser {
+  position: relative;
+  overflow: hidden;
+}
+
+.reclutamiento-teaser > .section-inner {
+  position: relative;
+  z-index: 1;
+}
+
+.join-teaser {
+  position: relative;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2rem 1rem;
+}
+
+.join-teaser .eyebrow {
+  justify-content: center;
+}
+
+.join-teaser-title {
+  margin: 0 0 1.1rem;
+}
+
+.join-teaser-text {
+  max-width: 52ch;
+  margin: 0 0 2.2rem;
+  color: var(--color-text-muted);
+  font-size: 1.1rem;
+}
+
+/* ---------- Reclutamiento: requisitos como tarjetas (página dedicada) ---------- */
+.requirements-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  list-style: none;
+  padding: 0;
+  margin: 1.5rem 0 0;
+}
+
+/* Tarjeta suelta usada en "Qué buscamos en un nuevo miembro" (página de reclutamiento) */
+.culture-card {
+  margin-top: 1.5rem;
+}
+
+.requirement-card {
+  position: relative;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1.4rem 1.5rem;
+  overflow: hidden;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.requirement-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--gradient-line);
+}
+
+.requirement-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(111, 224, 245, 0.4);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.35);
+}
+
+.requirement-card-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+  margin-bottom: 0.4rem;
+}
+
+.requirement-card-value {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+/* ---------- Reclutamiento: proceso de postulación en pasos ---------- */
+.process-steps {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.4rem;
+  counter-reset: step;
+  list-style: none;
+  padding: 0;
+  margin: 2rem 0 0;
+}
+
+.process-step {
+  position: relative;
+  padding-left: 3.6rem;
+}
+
+.process-step::before {
+  counter-increment: step;
+  content: counter(step, decimal-leading-zero);
+  position: absolute;
+  left: 0;
+  top: -0.2rem;
+  font-size: 1.6rem;
+  font-weight: 800;
+  background: var(--gradient-title);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.process-step-title {
+  margin: 0 0 0.3rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.process-step-text {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.process-step + .process-step {
+  padding-top: 1.4rem;
+  border-top: 1px dashed var(--color-border);
+}
+
+/* ---------- Página dedicada de Reclutamiento: hero propio ---------- */
+.reclutamiento-hero {
+  min-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 5rem 1rem 3rem;
+  position: relative;
+  background: radial-gradient(circle at 50% 0%, rgba(111, 224, 245, 0.1), transparent 60%);
+}
+
+.reclutamiento-hero .eyebrow {
+  justify-content: center;
+}
+
+.reclutamiento-hero-title {
+  font-size: clamp(2.4rem, 8vw, 4.2rem);
+  font-weight: 800;
+  line-height: 1.05;
+  margin: 0 0 1.2rem;
+  text-transform: uppercase;
+  background: var(--gradient-title);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.reclutamiento-hero-text {
+  max-width: 58ch;
+  color: var(--color-text-muted);
+  font-size: 1.1rem;
+  margin: 0 0 2rem;
+}
+
+.reclutamiento-hero-ghost-wrap {
+  position: absolute;
+  top: 45%;
+  left: 50%;
+  width: clamp(360px, 55vw, 760px);
+  transform: translate(-50%, -50%);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.reclutamiento-hero-ghost {
+  display: block;
+  width: 100%;
+  height: auto;
+  opacity: 0.05;
+  user-select: none;
+  animation: wordmarkDrift 12s ease-in-out infinite;
+}
+
+.reclutamiento-hero > *:not(.reclutamiento-hero-ghost-wrap) {
+  position: relative;
+  z-index: 1;
+}
+
+/* Migas de pan simples para volver al inicio desde la página dedicada */
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+.back-link:hover,
+.back-link:focus-visible {
+  color: var(--color-primary);
+}
+
+/* ---------- Footer ---------- */
+.site-footer {
+  border-top: 1px solid var(--color-border);
+  padding: 2rem 1rem 1.5rem;
+  text-align: center;
+}
+
+.footer-inner {
+  max-width: var(--max-width);
+  margin: 0 auto 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.2rem;
+}
+
+.footer-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+}
+
+.footer-nav {
+  display: flex;
+  gap: 1.2rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.footer-nav a {
+  color: var(--color-text-muted);
+}
+
+.footer-nav a:hover,
+.footer-nav a:focus-visible {
+  color: var(--color-primary);
+}
+
+.footer-discord {
+  color: var(--color-text-muted);
+}
+
+.footer-discord:hover,
+.footer-discord:focus-visible {
+  color: var(--color-primary);
+}
+
+.footer-discord .icon {
+  width: 1.6em;
+  height: 1.6em;
+}
+
+.footer-copy {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+/* =========================================================
+   Breakpoints — mobile-first: de aquí en adelante, pantallas
+   más grandes (tablet / desktop)
+   ========================================================= */
+
+@media (min-width: 720px) {
+  .nav-toggle {
+    display: none;
+  }
+
+  .primary-nav {
+    position: static;
+    inset: auto;
+    transform: none;
+    background: transparent;
+    border: none;
+    padding: 0;
+    flex-direction: row;
+    align-items: center;
+    gap: 1.5rem;
+  }
+
+  .primary-nav ul {
+    flex-direction: row;
+    gap: 1.5rem;
+  }
+
+  .hero-title {
+    font-size: 2.8rem;
+  }
+
+  .hero-logo {
+    width: 180px;
+    height: 180px;
+  }
+
+  .recruit-cta {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .recruit-cta-centered {
+    flex-direction: column;
+  }
+
+  .info-block {
+    grid-template-columns: 0.8fr 1.2fr;
+    gap: 2.5rem;
+    padding: 1rem;
+  }
+
+  .info-block-accent {
+    display: block;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: -1.25rem;
+    width: 3px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, var(--color-primary), var(--color-secondary));
+  }
+
+  .requirements-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .process-steps {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2rem;
+  }
+
+  .process-step + .process-step {
+    padding-top: 0;
+    border-top: none;
+  }
+}
+
+@media (min-width: 960px) {
+  .requirements-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Respeta usuarios que prefieren menos animación */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
+  /* Las animaciones infinitas (float, glow, pulse) se apagan del todo en vez
+     de solo acortarse, para no generar movimiento constante e innecesario */
+  .hero-logo,
+  .hero-logo-wrap::before,
+  .hero .btn-discord,
+  .recruit-cta .btn-discord,
+  .join-teaser .btn-discord,
+  .reclutamiento-hero .btn-discord,
+  .yt-play svg,
+  .discord-online-dot,
+  .watermark span,
+  .ghost-watermark,
+  .reclutamiento-hero-ghost,
+  .eyebrow::before {
+    animation: none !important;
+  }
+
+  .reveal,
+  .reveal-scroll,
+  .reveal-left {
+    filter: none !important;
+  }
+}

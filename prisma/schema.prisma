@@ -245,3 +245,58 @@ model Drop {
   @@unique([monsterId, itemId])
   @@index([itemId])
 }
+
+// ---------------------------------------------------------------------------
+// Pilar 5: Usuarios de Discord, permisos por rol y plantillas de party
+// ---------------------------------------------------------------------------
+
+// Se crea/actualiza en cada login exitoso con Discord. `roles` cachea los IDs
+// de rol del servidor al momento del login (ver src/lib/discord-bot.ts), para
+// no depender de una consulta a la API de Discord en cada request.
+model User {
+  id          String   @id @default(cuid())
+  discordId   String   @unique
+  username    String
+  globalName  String?
+  avatarHash  String?
+  roles       String[]
+  // true si discordId está en ADMIN_DISCORD_IDS al momento del login. El
+  // acceso a /admin siempre revalida contra esa env var, nunca confía solo
+  // en este campo cacheado.
+  isAdmin     Boolean  @default(false)
+  lastLoginAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  partyTemplates PartyTemplate[]
+}
+
+// Mapea un rol de Discord (por su ID) a lo que puede ver/hacer dentro del
+// panel. Se administra desde /admin/roles; los permisos efectivos de un
+// usuario son el OR de todas las filas cuyo discordRoleId esté en User.roles.
+model RolePermission {
+  id               String   @id @default(cuid())
+  discordRoleId    String   @unique
+  // Cacheado desde la API del bot (GET /guilds/{id}/roles), se refresca cada
+  // vez que se abre /admin/roles.
+  roleName         String
+  canViewPanel     Boolean  @default(true)
+  canViewParty     Boolean  @default(true)
+  canManageParty   Boolean  @default(false)
+  canManageContent Boolean  @default(false)
+  updatedAt        DateTime @updatedAt
+}
+
+model PartyTemplate {
+  id          String   @id @default(cuid())
+  event       String
+  name        String
+  // Estado completo de parties/slots (mismo shape que useCampo en el party builder).
+  data        Json
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([event])
+}

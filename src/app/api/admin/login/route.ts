@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     return NextResponse.redirect(url, { status: 303 });
   }
 
-  const token = await createSessionToken(username);
+  const token = await createSessionToken({ username, roles: [], isAdmin: true });
   const redirectTo = from.startsWith("/admin") ? from : "/admin";
   const response = NextResponse.redirect(new URL(redirectTo, request.url), {
     status: 303,

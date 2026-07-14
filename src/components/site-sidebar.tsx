@@ -7,10 +7,14 @@ import { siteConfig } from "@/config/site";
 
 function Brand() {
   return (
-    <Link href="/" className="flex items-center gap-2 font-bold tracking-tight">
-      <span className="flex h-8 w-8 items-center justify-center rounded-md bg-accent text-accent-foreground">
-        R
-      </span>
+    <Link href="/panel" className="flex items-center gap-2 font-bold tracking-tight">
+      <img
+        src="/assets/mascota-fantasma-icono.svg"
+        alt=""
+        width={32}
+        height={32}
+        className="h-8 w-8"
+      />
       <span className="text-lg text-foreground">{siteConfig.shortName}</span>
     </Link>
   );
@@ -43,8 +47,37 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
+export type SidebarSession = {
+  label: string;
+  isAdmin: boolean;
+};
+
+function AccountBlock({ session }: { session: SidebarSession }) {
+  return (
+    <div className="mt-auto flex flex-col gap-2 border-t border-border pt-4 text-sm">
+      <span className="truncate text-muted">{session.label}</span>
+      {session.isAdmin && (
+        <Link
+          href="/admin"
+          className="rounded-[10px] px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-accent hover:bg-surface"
+        >
+          Panel de Admin
+        </Link>
+      )}
+      <form action="/api/auth/logout" method="POST">
+        <button
+          type="submit"
+          className="w-full rounded-[10px] border border-border px-3 py-2 text-xs text-muted hover:text-foreground"
+        >
+          Cerrar sesión
+        </button>
+      </form>
+    </div>
+  );
+}
+
 /** Menú lateral izquierdo (desktop) con menú deslizable equivalente en mobile. */
-export function SiteSidebar() {
+export function SiteSidebar({ session }: { session?: SidebarSession | null }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   return (
@@ -53,6 +86,7 @@ export function SiteSidebar() {
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col gap-6 border-r border-border bg-background p-5 sm:flex">
         <Brand />
         <NavLinks />
+        {session && <AccountBlock session={session} />}
       </aside>
 
       {/* --- Barra superior + botón hamburguesa, solo mobile --- */}
@@ -95,6 +129,7 @@ export function SiteSidebar() {
               </button>
             </div>
             <NavLinks onNavigate={() => setDrawerOpen(false)} />
+            {session && <AccountBlock session={session} />}
           </div>
         </div>
       )}

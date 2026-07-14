@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 import { SESSION_COOKIE_NAME, verifySessionToken } from "@/lib/session";
 
 export const config = {
-  matcher: ["/admin/:path*", "/api/admin/:path*"],
+  matcher: ["/admin/:path*", "/api/admin/:path*", "/panel/:path*"],
 };
 
 // Endpoints que deben quedar accesibles sin sesión (si no, nadie podría
@@ -11,8 +11,6 @@ export const config = {
 const PUBLIC_PATHS = [
   "/admin/login",
   "/api/admin/login",
-  "/api/admin/discord/login",
-  "/api/admin/discord/callback",
 ];
 
 export async function proxy(request: NextRequest) {
@@ -25,13 +23,24 @@ export async function proxy(request: NextRequest) {
   const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
   const session = await verifySessionToken(token);
 
-  if (!session) {
-    // Las llamadas de API (fetch/fetch con FormData) reciben un 401 en vez
-    // de un redirect HTML, para que el cliente pueda mostrar un error claro.
-    if (pathname.startsWith("/api/")) {
-      return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  if (pathname.startsWith("/admin") || pathname.startsWith("/api/admin")) {
+    if (!session?.isAdmin) {
+      if (pathname.startsWith("/api/")) {
+        return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+      }
+      const loginUrl = new URL("/admin/login", request.url);
+      loginUrl.searchParams.set("from", pathname);
+      return NextResponse.redirect(loginUrl);
     }
-    const loginUrl = new URL("/admin/login", request.url);
+    return NextResponse.next();
+  }
+
+  // /panel/*: cualquier sesión válida (miembro del server que inició sesión
+  // con Discord) alcanza. Sin sesión, va directo al login de Discord en vez
+  // de a una página intermedia — la web de marketing ya tiene el botón de
+  // login en el header para quien llegue por su cuenta.
+  if (!session) {
+    const loginUrl = new URL("/api/auth/discord/login", request.url);
     loginUrl.searchParams.set("from", pathname);
     return NextResponse.redirect(loginUrl);
   }

@@ -1,18 +1,29 @@
 /**
- * Sesión de admin muy simple: un único usuario (definido por variables de
- * entorno, sin tabla de usuarios) y una cookie firmada con HMAC-SHA256.
+ * Sesión firmada con HMAC-SHA256, compartida por el login de usuario
+ * (Discord, cualquier miembro del server) y el login de admin (Discord con
+ * ID en ADMIN_DISCORD_IDS, o usuario/contraseña como alternativa).
  *
  * Se usa Web Crypto (`crypto.subtle`) en vez de el módulo `node:crypto`
- * porque este archivo se importa tanto desde `middleware.ts` (Edge runtime)
+ * porque este archivo se importa tanto desde `proxy.ts` (Edge runtime)
  * como desde route handlers (Node runtime), y Web Crypto funciona en ambos.
  */
 
-export const SESSION_COOKIE_NAME = "rooc_admin_session";
+export const SESSION_COOKIE_NAME = "sd_session";
 const SESSION_DURATION_MS = 1000 * 60 * 60 * 24 * 7; // 7 días
 
-type SessionPayload = {
-  u: string; // username
-  exp: number; // timestamp de expiración (ms)
+export type SessionPayload = {
+  // Presente en sesiones creadas por login de Discord.
+  discordId?: string;
+  // Presente en sesiones creadas por el login admin de usuario/contraseña.
+  username?: string;
+  // IDs de rol de Discord cacheados al momento del login (vacío para el
+  // login de usuario/contraseña).
+  roles: string[];
+  // true si la cuenta tiene acceso al panel admin. Para sesiones de Discord
+  // se recalcula en cada login contra ADMIN_DISCORD_IDS; proxy.ts revalida
+  // esta misma env var antes de dejar pasar cualquier request a /admin.
+  isAdmin: boolean;
+  exp: number;
 };
 
 function getSecret(): string {
@@ -51,10 +62,12 @@ async function getKey(): Promise<CryptoKey> {
   );
 }
 
-/** Crea el valor de cookie firmado para un usuario recién autenticado. */
-export async function createSessionToken(username: string): Promise<string> {
+/** Crea el valor de cookie firmado para una sesión recién autenticada. */
+export async function createSessionToken(
+  data: Omit<SessionPayload, "exp">
+): Promise<string> {
   const payload: SessionPayload = {
-    u: username,
+    ...data,
     exp: Date.now() + SESSION_DURATION_MS,
   };
   const payloadJson = JSON.stringify(payload);

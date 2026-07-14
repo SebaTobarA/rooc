@@ -6,7 +6,7 @@ import { ELEMENT_LABEL, RACE_LABEL } from "@/lib/labels";
 export function MonsterCard({ monster }: { monster: Monster }) {
   return (
     <Link
-      href={`/monsters/${monster.slug}`}
+      href={`/panel/monsters/${monster.slug}`}
       className="group flex flex-col gap-3 rounded-xl border border-border bg-surface p-4 transition-all hover:-translate-y-0.5 hover:border-accent/60 hover:bg-surface-hover hover:shadow-lg hover:shadow-accent/10"
     >
       <div className="flex items-center gap-3">
