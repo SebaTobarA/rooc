@@ -23,7 +23,7 @@ sin tocar lo existente (ver [Arquitectura y extensibilidad](#arquitectura-y-exte
 ## Stack técnico
 
 - [Next.js 16](https://nextjs.org/) (App Router) + TypeScript
-- [Prisma ORM](https://www.prisma.io/) 6.x + SQLite en desarrollo / PostgreSQL en producción
+- [Prisma ORM](https://www.prisma.io/) 6.x + PostgreSQL (Neon, serverless)
 - [Tailwind CSS 4](https://tailwindcss.com/) para estilos
 - Autenticación de admin simple: usuario/contraseña por variable de entorno + cookie firmada (sin sistema de usuarios ni dependencias externas de auth)
 - [zod](https://zod.dev/) para validar formularios y datos importados
@@ -43,8 +43,9 @@ npm install
 # 2. Copiar variables de entorno
 cp .env.example .env
 # (en Windows sin bash: copy .env.example .env)
+# Completá DATABASE_URL con tu propia base de Neon (ver sección "Base de datos")
 
-# 3. Crear la base de datos SQLite local y aplicar el esquema
+# 3. Aplicar el esquema a la base de datos
 npx prisma migrate dev
 
 # 4. Cargar datos de ejemplo (placeholder)
@@ -61,47 +62,28 @@ defecto `admin` / `cambiame123` — **cambialos antes de desplegar**).
 
 ## Base de datos
 
-### Desarrollo: SQLite (por defecto)
+### PostgreSQL (Neon, gratis) — misma base para desarrollo y producción
 
-El proyecto viene configurado para usar SQLite en desarrollo — no requiere
-instalar ni configurar ningún servidor de base de datos. El archivo vive en
-`prisma/dev.db` y se genera solo al correr `prisma migrate dev`.
+El proyecto usa Postgres tanto en desarrollo como en producción (sin
+SQLite), para no tener dos configuraciones distintas. Se usa
+[Neon](https://neon.tech/) por su plan gratuito y su CLI (`neonctl`), pero
+[Supabase](https://supabase.com/) funciona igual de bien si lo preferís.
 
-```env
-DATABASE_URL="file:./dev.db"
-```
-
-### Producción: PostgreSQL (Neon o Supabase, gratis)
-
-Para producción se recomienda un Postgres serverless gratuito. Pasos:
-
-1. Creá una base en [Neon](https://neon.tech/) o [Supabase](https://supabase.com/) (ambos tienen plan gratuito).
-2. Copiá la connection string que te dan (incluye usuario, password, host y `?sslmode=require`).
-3. En `prisma/schema.prisma`, cambiá el provider del datasource:
-
-   ```prisma
-   datasource db {
-     provider = "postgresql" // antes: "sqlite"
-     url      = env("DATABASE_URL")
-   }
-   ```
-
-4. Actualizá `DATABASE_URL` en tu `.env` (local) y en las variables de entorno de tu hosting (producción) con la connection string de Postgres.
-5. Corré las migraciones contra la nueva base:
+1. Creá una cuenta en [neon.tech](https://neon.tech/) (o iniciá sesión con GitHub).
+2. Creá un proyecto nuevo (podés usar la web o `npx neonctl@latest init` desde la terminal).
+3. Copiá la connection string que te da Neon (incluye usuario, password, host y `?sslmode=require`) y pegala en `DATABASE_URL` dentro de tu `.env`.
+4. Corré las migraciones contra esa base:
 
    ```bash
-   npx prisma migrate deploy
+   npx prisma migrate dev
    ```
 
-6. (Opcional) Cargá los datos de ejemplo también en Postgres con `npm run db:seed`, o mejor: usá la [importación masiva](#importación-masiva-csvjson) con tus propios datos.
+5. Cargá los datos de ejemplo con `npm run db:seed`, o directamente tus propios datos con la [importación masiva](#importación-masiva-csvjson).
 
-> **Nota:** los filtros de búsqueda por texto (`contains`) no usan `mode:
-> "insensitive"` porque SQLite no lo soporta. En SQLite esto ya es
-> case-insensitive para ASCII por defecto; al migrar a Postgres las
-> búsquedas pasan a ser case-sensitive. Si te importa, agregá `mode:
-> "insensitive"` a los `where` de `src/app/items/page.tsx`,
-> `src/app/monsters/page.tsx` y `src/app/maps/page.tsx` (ya vas a estar en
-> Postgres, así que el argumento es válido ahí).
+En producción (Vercel u otro hosting) se usa la **misma** `DATABASE_URL`
+apuntando a este proyecto de Neon (o a otro separado, si preferís no
+mezclar datos de prueba con datos reales — para eso creás un segundo
+proyecto en Neon y usás esa connection string solo en producción).
 
 ### Prisma Studio
 
@@ -268,19 +250,17 @@ assets-source/
 
 ## Desplegar gratis (Vercel + Postgres serverless)
 
-1. Migrá el `datasource` de `schema.prisma` a `postgresql` y creá una base
-   en Neon o Supabase (ver [Producción: PostgreSQL](#producción-postgresql-neon-o-supabase-gratis)).
-2. Subí el repo a GitHub.
-3. En [Vercel](https://vercel.com/), importá el repo (el framework Next.js
+1. Tené lista tu base en Neon (ver [Base de datos](#base-de-datos) arriba) y el repo subido a GitHub.
+2. En [Vercel](https://vercel.com/), importá el repo (el framework Next.js
    se detecta solo).
-4. Cargá las variables de entorno en el proyecto de Vercel: `DATABASE_URL`,
+3. Cargá las variables de entorno en el proyecto de Vercel: `DATABASE_URL`,
    `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `ADMIN_SESSION_SECRET`.
-5. En **Build Command**, usá `prisma migrate deploy && next build` (o
+4. En **Build Command**, usá `prisma migrate deploy && next build` (o
    agregá `"vercel-build": "prisma migrate deploy && next build"` a los
    `scripts` de `package.json` y dejá que Vercel lo detecte solo).
-6. Desplegá. Una vez arriba, corré el seed manualmente si querés datos de
+5. Desplegá. Una vez arriba, corré el seed manualmente si querés datos de
    ejemplo en producción (`npx prisma db seed` con `DATABASE_URL` apuntando
-   a Postgres), o cargá tus datos reales por el panel admin / importación
+   a esa base), o cargá tus datos reales por el panel admin / importación
    masiva.
 
 ## Limitaciones conocidas de la v1

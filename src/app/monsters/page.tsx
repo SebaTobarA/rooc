@@ -29,7 +29,7 @@ export default async function MonstersPage({
   const levelMax = params.levelMax ? Number(params.levelMax) : undefined;
 
   const where: Prisma.MonsterWhereInput = {
-    ...(q ? { name: { contains: q } } : {}),
+    ...(q ? { name: { contains: q, mode: "insensitive" } } : {}),
     ...(race ? { race } : {}),
     ...(mapId ? { maps: { some: { mapId } } } : {}),
     ...(levelMin !== undefined || levelMax !== undefined

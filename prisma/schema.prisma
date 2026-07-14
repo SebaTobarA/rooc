@@ -12,11 +12,11 @@ generator client {
   provider = "prisma-client-js"
 }
 
-// En desarrollo usamos SQLite (cero configuración). Para producción se
-// cambia el provider a "postgresql" y DATABASE_URL apunta a Neon/Supabase.
-// Ver README.md > "Base de datos" para el paso a paso de la migración.
+// Postgres (Neon) tanto en desarrollo como en producción. Si en algún
+// momento se quiere volver a SQLite solo en local, cambiar el provider acá
+// y regenerar las migraciones (los archivos SQL son específicos por motor).
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 

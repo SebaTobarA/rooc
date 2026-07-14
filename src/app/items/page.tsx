@@ -22,7 +22,7 @@ export default async function ItemsPage({
   const rarity = params.rarity as ItemRarity | undefined;
 
   const where: Prisma.ItemWhereInput = {
-    ...(q ? { name: { contains: q } } : {}),
+    ...(q ? { name: { contains: q, mode: "insensitive" } } : {}),
     ...(slot ? { slot } : {}),
     ...(rarity ? { rarity } : {}),
   };

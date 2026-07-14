@@ -19,7 +19,7 @@ export default async function MapsPage({
   const region = params.region?.trim() ?? "";
 
   const where: Prisma.GameMapWhereInput = {
-    ...(q ? { name: { contains: q } } : {}),
+    ...(q ? { name: { contains: q, mode: "insensitive" } } : {}),
     ...(region ? { region } : {}),
   };
 
