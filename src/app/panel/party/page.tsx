@@ -19,8 +19,8 @@ export default async function PartyPage() {
       <div className="mx-auto max-w-2xl px-4 py-16 text-center">
         <h1 className="text-xl font-bold text-foreground">Sin acceso</h1>
         <p className="mt-2 text-sm text-muted">
-          Tu rol no tiene habilitada la sección de Party Builder. Si creés que es un error,
-          consultá con un administrador del server.
+          Tu rol no tiene habilitada la sección de Party Builder. Si crees que es un error,
+          consulta con un administrador del server.
         </p>
       </div>
     );

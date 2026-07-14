@@ -41,9 +41,9 @@ export default async function AdminDashboardPage() {
       </div>
 
       <div className="mt-8 rounded-xl border border-dashed border-border p-5">
-        <h2 className="font-semibold text-foreground">¿Tenés muchos datos para cargar?</h2>
+        <h2 className="font-semibold text-foreground">¿Tienes muchos datos para cargar?</h2>
         <p className="mt-1 text-sm text-muted">
-          Usá{" "}
+          Usa{" "}
           <Link href="/admin/import" className="text-accent hover:underline">
             importación masiva por CSV o JSON
           </Link>{" "}

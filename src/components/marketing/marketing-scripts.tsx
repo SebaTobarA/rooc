@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 
 type Video = {
   videoId: string;
@@ -41,6 +42,8 @@ const DISCORD_REFRESH_MS = 60000;
  * layout/página de marketing.
  */
 export function MarketingScripts() {
+  const pathname = usePathname();
+
   useEffect(() => {
     const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const cleanups: Array<() => void> = [];
@@ -394,7 +397,12 @@ export function MarketingScripts() {
     return () => {
       cleanups.forEach((fn) => fn());
     };
-  }, []);
+    // Se vuelve a ejecutar en cada cambio de ruta: MarketingLayout persiste
+    // entre `/` y `/reclutamiento` (comparten el mismo layout), así que sin
+    // esta dependencia el scroll-reveal y el resto de la inicialización solo
+    // corren una vez y el contenido de la página a la que se navega con el
+    // link queda invisible hasta que se hace un refresh completo.
+  }, [pathname]);
 
   return null;
 }
