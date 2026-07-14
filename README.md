@@ -180,6 +180,31 @@ Tanto la importación por CLI como por admin usan el mismo código
   como "no placeholder" (`isPlaceholder: false`), para poder distinguir tus
   datos reales de los datos de ejemplo del seed.
 
+### Login alternativo con Discord
+
+Además de usuario/contraseña, `/admin/login` tiene un botón para iniciar
+sesión con Discord. No hay tabla de usuarios ni roles: cualquier cuenta de
+Discord puede intentar loguearse, pero solo se deja pasar a los IDs
+listados en `ADMIN_DISCORD_IDS` (separados por coma) — el resto recibe un
+error de "cuenta no autorizada".
+
+Para activarlo:
+
+1. Creá una aplicación en el [Discord Developer Portal](https://discord.com/developers/applications).
+2. En la sección **OAuth2**, agregá como Redirect URI tanto
+   `http://localhost:3000/api/admin/discord/callback` (para desarrollo) como
+   `https://tu-dominio/api/admin/discord/callback` (para producción).
+3. Copiá el **Client ID** y el **Client Secret** a `DISCORD_CLIENT_ID` y
+   `DISCORD_CLIENT_SECRET` en tu `.env` (y en las variables de entorno de
+   Vercel).
+4. Activá el "Modo desarrollador" en Discord (Configuración de usuario >
+   Avanzado) para poder copiar tu ID haciendo clic derecho sobre tu perfil,
+   y agregalo a `ADMIN_DISCORD_IDS`.
+
+Si `DISCORD_CLIENT_ID`/`DISCORD_CLIENT_SECRET` no están configurados, el
+botón de Discord simplemente va a fallar al hacer clic — el login por
+usuario/contraseña sigue funcionando igual.
+
 ## Arquitectura y extensibilidad
 
 El esquema (`prisma/schema.prisma`) tiene 4 modelos principales — `Item`,

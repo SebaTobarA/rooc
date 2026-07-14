@@ -8,7 +8,12 @@ export const config = {
 
 // Endpoints que deben quedar accesibles sin sesión (si no, nadie podría
 // loguearse ni ver el formulario de login).
-const PUBLIC_PATHS = ["/admin/login", "/api/admin/login"];
+const PUBLIC_PATHS = [
+  "/admin/login",
+  "/api/admin/login",
+  "/api/admin/discord/login",
+  "/api/admin/discord/callback",
+];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
