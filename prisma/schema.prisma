@@ -1,0 +1,247 @@
+// Esquema de base de datos - [NOMBRE DEL SITIO]
+//
+// Pilares de la v1: Item, Monster, GameMap, Drop (+ Npc como apoyo de GameMap).
+// Pensado para crecer: cartas, medallas, monturas, pets, etc. se agregan como
+// modelos NUEVOS (ej. "Card", "Medal", "Mount") que referencian Item/Monster
+// donde corresponda, sin tocar los modelos existentes. El campo `category` en
+// Item ya deja lugar para futuras variantes dentro del propio modelo si en
+// algún momento conviene (ej. "equipo" vs algo liviano), pero lo normal para
+// contenido realmente distinto (cartas, medallas...) es un modelo propio.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// En desarrollo usamos SQLite (cero configuración). Para producción se
+// cambia el provider a "postgresql" y DATABASE_URL apunta a Neon/Supabase.
+// Ver README.md > "Base de datos" para el paso a paso de la migración.
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum EquipSlot {
+  WEAPON
+  SHIELD
+  HEAD_TOP
+  HEAD_MID
+  HEAD_LOW
+  ARMOR
+  GARMENT
+  SHOES
+  ACCESSORY
+}
+
+// Tipo de arma, solo aplica cuando slot = WEAPON. Se usa además para elegir
+// el ícono placeholder por defecto (ver src/lib/weapon-icons.ts).
+enum WeaponType {
+  NONE
+  SWORD
+  DAGGER
+  TWO_HAND_SWORD
+  SPEAR
+  AXE
+  HATCHET
+  MACE
+  ROD
+  STAFF
+  BOW
+  CROSSBOW
+  KNUCKLE
+  INSTRUMENT
+  WHIP
+  BOOK
+  KATAR
+  CASE
+  GRASS
+  SCYTHE
+}
+
+enum ItemRarity {
+  COMUN
+  POCO_COMUN
+  RARO
+  EPICO
+  LEGENDARIO
+}
+
+enum Element {
+  NEUTRO
+  AGUA
+  TIERRA
+  FUEGO
+  VIENTO
+  VENENO
+  SAGRADO
+  SOMBRA
+  FANTASMA
+  NO_MUERTO
+}
+
+enum MonsterRace {
+  HUMANOIDE
+  BESTIA
+  PLANTA
+  NO_MUERTO
+  DEMONIO
+  INSECTO
+  PEZ
+  ANGEL
+  DRAGON
+  AMORFO
+}
+
+enum MonsterSize {
+  PEQUENO
+  MEDIANO
+  GRANDE
+}
+
+// ---------------------------------------------------------------------------
+// Pilar 1: Items / equipamiento
+// ---------------------------------------------------------------------------
+
+model Item {
+  id          String @id @default(cuid())
+  slug        String @unique
+
+  name        String
+  // Campo abierto a futuro: hoy siempre "equipo". Si más adelante se decide
+  // modelar cartas/medallas/monturas como filas de Item en vez de modelos
+  // propios, este campo ya permite distinguirlas sin migrar la tabla.
+  category    String @default("equipo")
+
+  slot        EquipSlot
+  weaponType  WeaponType @default(NONE)
+  levelReq    Int        @default(1)
+  rarity      ItemRarity @default(COMUN)
+
+  description String @default("")
+  // Texto libre con stats/bonos, ej: "+10 ATK, +5 DES, +3% resistencia a Fuego"
+  // En v1 no se modelan bonos como filas estructuradas para no sobre-diseñar
+  // antes de tener datos reales; si hace falta filtrar/ordenar por stat en el
+  // futuro, se puede migrar a una tabla ItemStat sin romper lo existente.
+  stats       String @default("")
+
+  iconUrl       String?
+  // Marca que el registro es un dato de ejemplo cargado por el seed, no un
+  // dato real de la comunidad. El admin panel puede filtrar/avisar por esto.
+  isPlaceholder Boolean @default(true)
+
+  drops     Drop[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category])
+  @@index([slot])
+  @@index([rarity])
+}
+
+// ---------------------------------------------------------------------------
+// Pilar 2: Bestiario (monstruos)
+// ---------------------------------------------------------------------------
+
+model Monster {
+  id   String @id @default(cuid())
+  slug String @unique
+
+  name         String
+  level        Int
+  hp           Int
+  atk          Int
+  atkMax       Int?
+  def          Int         @default(0)
+  element      Element     @default(NEUTRO)
+  elementLevel Int         @default(1)
+  race         MonsterRace
+  size         MonsterSize @default(MEDIANO)
+
+  description String @default("")
+  iconUrl       String?
+  isPlaceholder Boolean @default(true)
+
+  maps      MapMonster[]
+  drops     Drop[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([level])
+  @@index([race])
+}
+
+// ---------------------------------------------------------------------------
+// Pilar 3: Mapas
+// ---------------------------------------------------------------------------
+
+model GameMap {
+  id   String @id @default(cuid())
+  slug String @unique
+
+  name        String
+  region      String
+  description String @default("")
+
+  isPlaceholder Boolean @default(true)
+
+  monsters  MapMonster[]
+  npcs      Npc[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([region])
+}
+
+// Tabla de relación N:N entre GameMap y Monster (un monstruo puede aparecer
+// en varios mapas y un mapa tiene varios monstruos).
+model MapMonster {
+  id String @id @default(cuid())
+
+  mapId     String
+  monsterId String
+
+  map     GameMap @relation(fields: [mapId], references: [id], onDelete: Cascade)
+  monster Monster @relation(fields: [monsterId], references: [id], onDelete: Cascade)
+
+  @@unique([mapId, monsterId])
+  @@index([monsterId])
+}
+
+// NPC simple asociado a un mapa (placeholder de texto, sin posición ni ícono
+// en v1, según lo pedido).
+model Npc {
+  id   String @id @default(cuid())
+  name String
+  role String @default("") // ej: "Kafra", "Comerciante", "NPC de misión"
+
+  mapId String
+  map   GameMap @relation(fields: [mapId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([mapId])
+}
+
+// ---------------------------------------------------------------------------
+// Pilar 4: Tablas de drop (conecta Monster <-> Item)
+// ---------------------------------------------------------------------------
+
+model Drop {
+  id String @id @default(cuid())
+
+  monsterId String
+  itemId    String
+  // Porcentaje de probabilidad, ej. 12.5 = 12.5%
+  rate      Float
+
+  monster Monster @relation(fields: [monsterId], references: [id], onDelete: Cascade)
+  item    Item    @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([monsterId, itemId])
+  @@index([itemId])
+}

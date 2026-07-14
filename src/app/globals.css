@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+/*
+ * Identidad visual v1: tema oscuro "gamer" con acento carmesí (combina con
+ * el set de íconos de armas). Es un punto de partida propio, no una copia de
+ * ningún sitio existente — se puede retocar todo desde estas variables.
+ */
+:root {
+  --background: #0a0c11;
+  --background-elevated: #0f121a;
+  --surface: #151923;
+  --surface-hover: #1b2029;
+  --border: #262b36;
+  --foreground: #e8e9ed;
+  --muted: #8f97a3;
+  --accent: #c9333f;
+  --accent-hover: #e0424e;
+  --accent-foreground: #ffffff;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-background-elevated: var(--background-elevated);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-border: var(--border);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-foreground: var(--accent-foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}

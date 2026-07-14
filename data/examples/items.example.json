@@ -1,0 +1,24 @@
+[
+  {
+    "name": "Espada Larga de Hierro",
+    "category": "equipo",
+    "slot": "WEAPON",
+    "weaponType": "SWORD",
+    "levelReq": 20,
+    "rarity": "POCO_COMUN",
+    "description": "Forjada en las herrerías del norte.",
+    "stats": "+18 ATK, +2% Crit",
+    "iconUrl": ""
+  },
+  {
+    "name": "Yelmo de Bronce",
+    "category": "equipo",
+    "slot": "ARMOR",
+    "weaponType": "NONE",
+    "levelReq": 15,
+    "rarity": "COMUN",
+    "description": "Protección estándar para la cabeza.",
+    "stats": "+12 DEF",
+    "iconUrl": ""
+  }
+]

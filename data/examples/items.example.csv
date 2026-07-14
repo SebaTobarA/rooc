@@ -1,0 +1,4 @@
+name,category,slot,weaponType,levelReq,rarity,description,stats,iconUrl
+Espada Larga de Hierro,equipo,WEAPON,SWORD,20,POCO_COMUN,Forjada en las herrerías del norte.,"+18 ATK, +2% Crit",
+Yelmo de Bronce,equipo,ARMOR,NONE,15,COMUN,Protección estándar para la cabeza.,+12 DEF,
+Guanteletes del Alba,equipo,ACCESSORY,NONE,30,RARO,"Brillan tenuemente al amanecer.","+5 FUE, +5 DES",

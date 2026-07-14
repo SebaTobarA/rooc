@@ -1,0 +1,16 @@
+[
+  {
+    "name": "Trol de las Marismas",
+    "level": 22,
+    "hp": 650,
+    "atk": 30,
+    "atkMax": 42,
+    "def": 10,
+    "element": "VENENO",
+    "elementLevel": 1,
+    "race": "BESTIA",
+    "size": "GRANDE",
+    "description": "Habita en pantanos y ataca en emboscada.",
+    "iconUrl": ""
+  }
+]

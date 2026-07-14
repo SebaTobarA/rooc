@@ -1,0 +1,3 @@
+name,level,hp,atk,atkMax,def,element,elementLevel,race,size,description,iconUrl
+Trol de las Marismas,22,650,30,42,10,VENENO,1,BESTIA,GRANDE,Habita en pantanos y ataca en emboscada.,
+Espíritu Errante,17,300,22,30,4,FANTASMA,2,AMORFO,MEDIANO,Aparece solo durante la noche.,
