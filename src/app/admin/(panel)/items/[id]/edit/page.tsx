@@ -12,13 +12,16 @@ export default async function EditItemPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const item = await prisma.item.findUnique({ where: { id } });
+  const [item, sets] = await Promise.all([
+    prisma.item.findUnique({ where: { id } }),
+    prisma.itemSet.findMany({ orderBy: { name: "asc" } }),
+  ]);
   if (!item) notFound();
 
   return (
     <div>
       <h2 className="mb-4 text-lg font-semibold text-foreground">Editar {item.name}</h2>
-      <ItemForm item={item} action={updateItem.bind(null, id)} />
+      <ItemForm item={item} sets={sets} action={updateItem.bind(null, id)} />
     </div>
   );
 }

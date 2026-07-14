@@ -25,8 +25,8 @@ async function revalidateDropPaths(monsterId: string, itemId: string) {
     prisma.item.findUnique({ where: { id: itemId } }),
   ]);
   revalidatePath("/admin/drops");
-  if (monster) revalidatePath(`/monsters/${monster.slug}`);
-  if (item) revalidatePath(`/items/${item.slug}`);
+  if (monster) revalidatePath(`/panel/monsters/${monster.slug}`);
+  if (item) revalidatePath(`/panel/items/${item.slug}`);
 }
 
 export async function createDrop(formData: FormData) {

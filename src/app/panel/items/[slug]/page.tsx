@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { resolveItemIcon, EQUIP_SLOT_LABEL, WEAPON_TYPE_LABEL } from "@/lib/weapon-icons";
 import { RarityBadge } from "@/components/rarity-badge";
 import { DropsByMonster } from "@/components/drop-tables";
+import { ItemDetailTabs } from "@/components/item-detail-tabs";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +28,10 @@ export default async function ItemDetailPage({
 
   const item = await prisma.item.findUnique({
     where: { slug },
-    include: { drops: { include: { monster: true } } },
+    include: {
+      drops: { include: { monster: true } },
+      set: { include: { tiers: { orderBy: { refineLevel: "asc" } }, pieceBonuses: { orderBy: { pieceCount: "asc" } } } },
+    },
   });
 
   if (!item) notFound();
@@ -77,18 +81,10 @@ export default async function ItemDetailPage({
             </div>
           </dl>
 
-          {item.stats && (
-            <div className="mt-4">
-              <p className="text-xs uppercase tracking-wide text-muted">Stats / bonos</p>
-              <p className="mt-1 text-accent">{item.stats}</p>
-            </div>
-          )}
-
-          {item.description && (
-            <p className="mt-4 text-sm text-muted">{item.description}</p>
-          )}
         </div>
       </div>
+
+      <ItemDetailTabs stats={item.stats} description={item.description} set={item.set} />
 
       <section className="mt-8">
         <h2 className="mb-3 text-lg font-semibold text-foreground">

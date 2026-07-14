@@ -132,6 +132,9 @@ model Item {
   // dato real de la comunidad. El admin panel puede filtrar/avisar por esto.
   isPlaceholder Boolean @default(true)
 
+  setId String?
+  set   ItemSet? @relation(fields: [setId], references: [id])
+
   drops     Drop[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -139,6 +142,7 @@ model Item {
   @@index([category])
   @@index([slot])
   @@index([rarity])
+  @@index([setId])
 }
 
 // ---------------------------------------------------------------------------
@@ -299,4 +303,85 @@ model PartyTemplate {
   updatedAt   DateTime @updatedAt
 
   @@index([event])
+}
+
+// ---------------------------------------------------------------------------
+// Liderazgo: cargos y miembros mostrados en la home, gestionados desde
+// /admin/leadership. Los miembros se eligen de la lista real de Discord
+// (ver src/lib/discord-bot.ts) al agregarlos.
+// ---------------------------------------------------------------------------
+
+model LeadershipPosition {
+  id        String             @id @default(cuid())
+  title     String
+  // Determina el número de rango (01, 02...) y el orden en pantalla.
+  order     Int
+  members   LeadershipMember[]
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  @@index([order])
+}
+
+model LeadershipMember {
+  id         String             @id @default(cuid())
+  positionId String
+  position   LeadershipPosition @relation(fields: [positionId], references: [id], onDelete: Cascade)
+
+  discordId         String
+  discordUsername   String
+  discordAvatarHash String?
+  // Editable desde el admin; se precarga con el nick/username de Discord al
+  // agregar al miembro pero puede diferir del apodo real en el juego.
+  nickname          String
+  order             Int      @default(0)
+  createdAt         DateTime @default(now())
+
+  @@index([positionId])
+}
+
+// ---------------------------------------------------------------------------
+// Sets de equipamiento ("build effect"): stat base por tener una pieza, más
+// bonos que se destraban por nivel de refine y por cantidad de piezas
+// equipadas del mismo set.
+// ---------------------------------------------------------------------------
+
+model ItemSet {
+  id   String @id @default(cuid())
+  name String @unique
+  slug String @unique
+
+  // Bono que se obtiene solo por equipar una pieza del set, ej. "Max HP +100".
+  baseStatText String @default("")
+
+  items        Item[]
+  tiers        ItemSetTier[]
+  pieceBonuses ItemSetPieceBonus[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ItemSetTier {
+  id    String  @id @default(cuid())
+  setId String
+  set   ItemSet @relation(fields: [setId], references: [id], onDelete: Cascade)
+
+  // Nivel de refine que destraba este bono (3, 6, 10, 12, 15...).
+  refineLevel Int
+  statText    String
+
+  @@unique([setId, refineLevel])
+}
+
+model ItemSetPieceBonus {
+  id    String  @id @default(cuid())
+  setId String
+  set   ItemSet @relation(fields: [setId], references: [id], onDelete: Cascade)
+
+  // Cantidad de piezas del set equipadas simultáneamente (2, 3, 4...).
+  pieceCount Int
+  statText   String
+
+  @@unique([setId, pieceCount])
 }

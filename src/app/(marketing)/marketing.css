@@ -973,6 +973,22 @@ ul {
   position: relative;
 }
 
+/* Entrada escalonada del título de "Liderazgo": arranca oculto y desplazado
+   a la izquierda, y se revela antes que el primer rango del timeline (ver
+   updateDeck() en marketing-scripts.tsx) para que la secuencia se sienta
+   título -> rango 1 -> rango 2 -> ... en vez de todo junto. */
+.deck-enabled #leadershipTitle {
+  opacity: 0;
+  transform: translateX(-28px);
+  transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.deck-enabled #leadershipTitle.title-visible {
+  opacity: 1;
+  transform: none;
+}
+
 .info-block-accent {
   display: none;
 }
@@ -1059,7 +1075,9 @@ ul {
   align-items: flex-start;
   gap: 1.1rem;
   opacity: 1;
-  transition: opacity 0.3s ease;
+  transform: none;
+  transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .timeline-node {
@@ -1095,15 +1113,29 @@ ul {
   color: var(--color-focus);
 }
 
-/* Estado "apagado": el paso todavía no fue alcanzado por el scroll.
+/* Estado "apagado": el paso todavía no fue alcanzado por el scroll. Además
+   de la opacidad baja, arranca corrido hacia abajo para que al "encenderse"
+   se sienta una entrada propia (no solo un fundido) — ver .is-lit abajo.
    Solo existe cuando script.js agrega .deck-enabled (ver más abajo). */
 .deck-enabled .timeline-step {
   opacity: 0.35;
+  transform: translateY(18px);
 }
 
 .deck-enabled .timeline-step.is-lit {
   opacity: 1;
+  transform: none;
 }
+
+/* Retraso creciente por posición: aunque el umbral de "encendido" de cada
+   paso ya está repartido a lo largo del scroll, este pequeño delay extra
+   hace que la transición de cada uno se perciba como un paso propio de la
+   secuencia en vez de una animación continua. */
+.timeline-step:nth-child(2) { transition-delay: 0.05s; }
+.timeline-step:nth-child(3) { transition-delay: 0.1s; }
+.timeline-step:nth-child(4) { transition-delay: 0.15s; }
+.timeline-step:nth-child(5) { transition-delay: 0.2s; }
+.timeline-step:nth-child(n + 6) { transition-delay: 0.25s; }
 
 .deck-enabled .timeline-step:not(.timeline-step-lead) .timeline-node {
   box-shadow: 0 0 0 4px rgba(111, 224, 245, 0.08);
@@ -1155,6 +1187,9 @@ ul {
   font-weight: 700;
   font-size: 1.2rem;
   box-shadow: 0 0 0 4px rgba(255, 179, 198, 0.15);
+  /* Cuando .org-avatar es un <img> con foto real de Discord (en vez del
+     span con inicial), esto evita que se deforme dentro del círculo. */
+  object-fit: cover;
 }
 
 .org-name {

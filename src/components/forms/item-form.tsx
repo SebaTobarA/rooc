@@ -1,14 +1,17 @@
-import type { Item } from "@prisma/client";
+import type { Item, ItemSet } from "@prisma/client";
 import { EquipSlot, ItemRarity, WeaponType } from "@prisma/client";
 import { EQUIP_SLOT_LABEL, WEAPON_TYPE_LABEL } from "@/lib/weapon-icons";
 import { RARITY_LABEL } from "@/lib/labels";
 import { Field, SubmitButton, inputClass } from "@/components/forms/form-fields";
+import { ImageUploadField } from "@/components/forms/image-upload-field";
 
 export function ItemForm({
   item,
+  sets,
   action,
 }: {
   item?: Item;
+  sets: ItemSet[];
   action: (formData: FormData) => void | Promise<void>;
 }) {
   return (
@@ -75,6 +78,20 @@ export function ItemForm({
         <input name="stats" defaultValue={item?.stats} className={inputClass} />
       </Field>
 
+      <Field
+        label="Set de equipamiento"
+        hint="Opcional. Habilita la pestaña &quot;Build effect&quot; en la ficha pública con los bonos del set."
+      >
+        <select name="setId" defaultValue={item?.setId ?? ""} className={inputClass}>
+          <option value="">Ninguno</option>
+          {sets.map((set) => (
+            <option key={set.id} value={set.id}>
+              {set.name}
+            </option>
+          ))}
+        </select>
+      </Field>
+
       <Field label="Descripción">
         <textarea
           name="description"
@@ -85,10 +102,10 @@ export function ItemForm({
       </Field>
 
       <Field
-        label="URL de ícono"
+        label="Imagen de equipamiento"
         hint="Opcional. Si se deja vacío se usa un ícono placeholder según el tipo de arma/slot."
       >
-        <input name="iconUrl" defaultValue={item?.iconUrl ?? ""} className={inputClass} />
+        <ImageUploadField name="iconUrl" defaultValue={item?.iconUrl ?? ""} />
       </Field>
 
       <SubmitButton>{item ? "Guardar cambios" : "Crear ítem"}</SubmitButton>

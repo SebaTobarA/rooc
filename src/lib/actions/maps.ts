@@ -21,10 +21,9 @@ function parseMapForm(formData: FormData) {
 }
 
 function revalidateMapPaths(slug?: string) {
-  revalidatePath("/maps");
+  revalidatePath("/panel/maps");
   revalidatePath("/admin/maps");
-  revalidatePath("/");
-  if (slug) revalidatePath(`/maps/${slug}`);
+  if (slug) revalidatePath(`/panel/maps/${slug}`);
 }
 
 export async function createMap(formData: FormData) {

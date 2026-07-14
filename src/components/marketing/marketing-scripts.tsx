@@ -351,6 +351,7 @@ export function MarketingScripts() {
     if (deck && !prefersReducedMotion) {
       const deckSlides = Array.from(deck.querySelectorAll(".deck-slide")) as HTMLElement[];
       const timelineFill = document.getElementById("timelineFill");
+      const leadershipTitle = document.getElementById("leadershipTitle");
       const timelineSteps = Array.from(
         document.querySelectorAll("#leadershipTimeline .timeline-step")
       ) as HTMLElement[];
@@ -376,9 +377,16 @@ export function MarketingScripts() {
             timelineFill.style.transform = `scaleY(${fade})`;
           }
 
+          // El título entra primero (antes que el rango 01), con un umbral
+          // más bajo que el del primer paso, para que la secuencia se sienta
+          // título -> rango 1 -> rango 2 -> ... en vez de todo junto.
+          if (leadershipTitle) {
+            leadershipTitle.classList.toggle("title-visible", fade >= 0.08);
+          }
+
           if (timelineSteps.length) {
             timelineSteps.forEach((step, index) => {
-              const threshold = (index + 1) / timelineSteps.length;
+              const threshold = 0.18 + (index / timelineSteps.length) * 0.82;
               step.classList.toggle("is-lit", fade >= threshold - 0.001);
             });
           }

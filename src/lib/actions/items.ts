@@ -16,6 +16,7 @@ const itemSchema = z.object({
   description: z.string().default(""),
   stats: z.string().default(""),
   iconUrl: z.string().optional(),
+  setId: z.string().default(""),
 });
 
 function parseItemForm(formData: FormData) {
@@ -28,22 +29,22 @@ function parseItemForm(formData: FormData) {
     description: formData.get("description") ?? "",
     stats: formData.get("stats") ?? "",
     iconUrl: formData.get("iconUrl") || undefined,
+    setId: formData.get("setId") ?? "",
   });
 }
 
 function revalidateItemPaths(slug?: string) {
-  revalidatePath("/items");
+  revalidatePath("/panel/items");
   revalidatePath("/admin/items");
-  revalidatePath("/");
-  if (slug) revalidatePath(`/items/${slug}`);
+  if (slug) revalidatePath(`/panel/items/${slug}`);
 }
 
 export async function createItem(formData: FormData) {
-  const data = parseItemForm(formData);
+  const { setId, ...data } = parseItemForm(formData);
   const slug = slugify(data.name);
 
   await prisma.item.create({
-    data: { ...data, slug, isPlaceholder: false },
+    data: { ...data, slug, isPlaceholder: false, setId: setId || null },
   });
 
   revalidateItemPaths(slug);
@@ -51,7 +52,7 @@ export async function createItem(formData: FormData) {
 }
 
 export async function updateItem(id: string, formData: FormData) {
-  const data = parseItemForm(formData);
+  const { setId, ...data } = parseItemForm(formData);
   const existing = await prisma.item.findUniqueOrThrow({ where: { id } });
 
   // Si cambia el nombre, regeneramos el slug (y por lo tanto la URL pública).
@@ -59,7 +60,7 @@ export async function updateItem(id: string, formData: FormData) {
 
   await prisma.item.update({
     where: { id },
-    data: { ...data, slug },
+    data: { ...data, slug, setId: setId || null },
   });
 
   revalidateItemPaths(existing.slug);

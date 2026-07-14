@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { DiscordIcon } from "@/components/marketing/discord-icon";
+import { prisma } from "@/lib/prisma";
+import { discordAvatarUrl } from "@/lib/discord-avatar";
 
 const DISCORD_INVITE_URL = "https://discord.gg/XnTrEKEGw";
 
 const LOGIN_ERROR_MESSAGES: Record<string, string> = {
   discord_not_member: "Esa cuenta de Discord no pertenece al server de Special Delivery. Únete primero desde el botón de Discord.",
-  discord_invalid: "No se pudo completar el inicio de sesión con Discord. Probá de nuevo.",
-  discord_failed: "Hubo un error al conectar con Discord. Probá de nuevo.",
+  discord_invalid: "No se pudo completar el inicio de sesión con Discord. Intenta de nuevo.",
+  discord_failed: "Hubo un error al conectar con Discord. Intenta de nuevo.",
 };
 
 export default async function HomePage({
@@ -16,6 +18,11 @@ export default async function HomePage({
 }) {
   const params = await searchParams;
   const errorMessage = params.error ? LOGIN_ERROR_MESSAGES[params.error] : undefined;
+
+  const leadershipPositions = await prisma.leadershipPosition.findMany({
+    orderBy: { order: "asc" },
+    include: { members: { orderBy: { order: "asc" } } },
+  });
 
   return (
     <>
@@ -81,7 +88,7 @@ export default async function HomePage({
             <div className="deck-slide">
               <div className="section-inner">
                 <div className="info-block">
-                  <div className="info-block-title">
+                  <div className="info-block-title" id="leadershipTitle">
                     <span className="eyebrow">Liderazgo</span>
                     <h3 className="section-subtitle">El mando no<br />se improvisa</h3>
                     <p className="section-text leadership-text">La cadena de mando, de arriba hacia abajo: quienes marcan el rumbo, sostienen el estándar y mantienen unido al gremio.</p>
@@ -96,90 +103,48 @@ export default async function HomePage({
                       </div>
 
                       <ol className="timeline-list">
-                        <li className="timeline-step timeline-step-lead">
-                          <span className="timeline-node"><span className="timeline-node-num">01</span></span>
-                          <div className="timeline-content">
-                            <p className="timeline-role">Guild Leader</p>
-                            <div className="org-people">
-                              <div className="org-person">
-                                <span className="org-avatar" aria-hidden="true">H</span>
-                                <span className="org-name">Hunteriwi</span>
+                        {leadershipPositions.map((position, index) => (
+                          <li
+                            key={position.id}
+                            className={`timeline-step${index === 0 ? " timeline-step-lead" : ""}`}
+                          >
+                            <span className="timeline-node">
+                              <span className="timeline-node-num">
+                                {String(index + 1).padStart(2, "0")}
+                              </span>
+                            </span>
+                            <div className="timeline-content">
+                              <p className="timeline-role">{position.title}</p>
+                              <div className="org-people">
+                                {position.members.map((member) => {
+                                  const avatar = discordAvatarUrl(
+                                    member.discordId,
+                                    member.discordAvatarHash,
+                                    52
+                                  );
+                                  return (
+                                    <div key={member.id} className="org-person">
+                                      {avatar ? (
+                                        <img src={avatar} alt="" className="org-avatar" />
+                                      ) : (
+                                        <span className="org-avatar" aria-hidden="true">
+                                          {member.nickname.slice(0, 1).toUpperCase()}
+                                        </span>
+                                      )}
+                                      <span className="org-name">{member.nickname}</span>
+                                    </div>
+                                  );
+                                })}
+                                {position.members.length === 0 && (
+                                  <div className="org-person">
+                                    <span className="org-avatar" aria-hidden="true">?</span>
+                                    <span className="org-name">Por definir</span>
+                                  </div>
+                                )}
                               </div>
                             </div>
-                          </div>
-                        </li>
-
-                        <li className="timeline-step">
-                          <span className="timeline-node"><span className="timeline-node-num">02</span></span>
-                          <div className="timeline-content">
-                            <p className="timeline-role">Vice Guild Leader</p>
-                            <div className="org-people">
-                              <div className="org-person">
-                                <span className="org-avatar" aria-hidden="true">A</span>
-                                <span className="org-name">Ahead</span>
-                              </div>
-                              <div className="org-person">
-                                <span className="org-avatar" aria-hidden="true">G</span>
-                                <span className="org-name">Gotic</span>
-                              </div>
-                              <div className="org-person">
-                                <span className="org-avatar" aria-hidden="true">S</span>
-                                <span className="org-name">Styan</span>
-                              </div>
-                            </div>
-                          </div>
-                        </li>
-
-                        <li className="timeline-step">
-                          <span className="timeline-node"><span className="timeline-node-num">03</span></span>
-                          <div className="timeline-content">
-                            <p className="timeline-role">Comandante</p>
-                            <div className="org-people">
-                              <div className="org-person">
-                                <span className="org-avatar" aria-hidden="true">P</span>
-                                <span className="org-name">Por definir</span>
-                              </div>
-                            </div>
-                          </div>
-                        </li>
-
-                        <li className="timeline-step">
-                          <span className="timeline-node"><span className="timeline-node-num">04</span></span>
-                          <div className="timeline-content">
-                            <p className="timeline-role">Oficiales</p>
-                            <div className="org-people">
-                              <div className="org-person">
-                                <span className="org-avatar" aria-hidden="true">P</span>
-                                <span className="org-name">Pendiente</span>
-                              </div>
-                              <div className="org-person">
-                                <span className="org-avatar" aria-hidden="true">P</span>
-                                <span className="org-name">Pendiente</span>
-                              </div>
-                              <div className="org-person">
-                                <span className="org-avatar" aria-hidden="true">P</span>
-                                <span className="org-name">Pendiente</span>
-                              </div>
-                              <div className="org-person">
-                                <span className="org-avatar" aria-hidden="true">P</span>
-                                <span className="org-name">Pendiente</span>
-                              </div>
-                            </div>
-                          </div>
-                        </li>
-
-                        <li className="timeline-step">
-                          <span className="timeline-node"><span className="timeline-node-num">05</span></span>
-                          <div className="timeline-content">
-                            <p className="timeline-role">Estrella del Carisma</p>
-                            <div className="org-people">
-                              <div className="org-person">
-                                <span className="org-avatar" aria-hidden="true">L</span>
-                                <span className="org-name">Lulupe</span>
-                              </div>
-                            </div>
-                          </div>
-                        </li>
+                          </li>
+                        ))}
                       </ol>
                     </div>
                   </div>

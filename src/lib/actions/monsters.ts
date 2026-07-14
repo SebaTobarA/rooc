@@ -41,10 +41,9 @@ function parseMonsterForm(formData: FormData) {
 }
 
 function revalidateMonsterPaths(slug?: string) {
-  revalidatePath("/monsters");
+  revalidatePath("/panel/monsters");
   revalidatePath("/admin/monsters");
-  revalidatePath("/");
-  if (slug) revalidatePath(`/monsters/${slug}`);
+  if (slug) revalidatePath(`/panel/monsters/${slug}`);
 }
 
 export async function createMonster(formData: FormData) {
@@ -89,13 +88,13 @@ export async function addMonsterToMap(monsterId: string, mapId: string) {
     create: { mapId, monsterId },
   });
   revalidateMonsterPaths();
-  revalidatePath("/maps");
+  revalidatePath("/panel/maps");
   revalidatePath("/admin/maps");
 }
 
 export async function removeMonsterFromMap(mapMonsterId: string) {
   await prisma.mapMonster.delete({ where: { id: mapMonsterId } });
   revalidateMonsterPaths();
-  revalidatePath("/maps");
+  revalidatePath("/panel/maps");
   revalidatePath("/admin/maps");
 }
