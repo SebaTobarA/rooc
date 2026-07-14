@@ -365,7 +365,12 @@ export function MarketingScripts() {
           let progress = scrollable > 0 ? -rect.top / scrollable : 0;
           progress = Math.max(0, Math.min(1, progress));
 
-          let fade = (progress - 0.35) / 0.35;
+          // Antes el crossfade ocurría en un tramo angosto (35%-70% del
+          // scroll), lo que hacía que el título y los 5 rangos aparecieran
+          // casi todos juntos. Se ensancha a 20%-80% (+ el deck ahora mide
+          // 320vh en vez de 220vh, ver marketing.css) para darle bastante
+          // más recorrido de scroll a toda la secuencia.
+          let fade = (progress - 0.2) / 0.6;
           fade = Math.max(0, Math.min(1, fade));
 
           deckSlides[0].style.opacity = String(1 - fade);

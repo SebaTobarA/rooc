@@ -28,7 +28,7 @@ export default async function AdminSetsPage() {
               <th className="px-4 py-2 font-medium">Stat base</th>
               <th className="px-4 py-2 font-medium">Tiers de refine</th>
               <th className="px-4 py-2 font-medium">Bonos por piezas</th>
-              <th className="px-4 py-2 font-medium">Ítems</th>
+              <th className="px-4 py-2 font-medium">Equipamiento</th>
               <th className="px-4 py-2 font-medium">Acciones</th>
             </tr>
           </thead>

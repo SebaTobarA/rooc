@@ -13,7 +13,7 @@ export default async function AdminDashboardPage() {
   ]);
 
   const cards = [
-    { href: "/admin/items", label: "Ítems", count: items },
+    { href: "/admin/items", label: "Equipamiento", count: items },
     { href: "/admin/monsters", label: "Monstruos", count: monsters },
     { href: "/admin/maps", label: "Mapas", count: maps },
     { href: "/admin/drops", label: "Drops", count: drops },

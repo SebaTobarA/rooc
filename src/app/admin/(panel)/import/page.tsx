@@ -17,7 +17,7 @@ export default function AdminImportPage() {
         <p className="font-medium text-foreground">Formato esperado (columnas):</p>
         <ul className="mt-2 space-y-1">
           <li>
-            <strong className="text-foreground">Ítems:</strong> name, category,
+            <strong className="text-foreground">Equipamiento:</strong> name, category,
             slot, weaponType, levelReq, rarity, description, stats, iconUrl
           </li>
           <li>

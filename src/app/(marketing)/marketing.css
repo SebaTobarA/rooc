@@ -381,6 +381,115 @@ ul {
   gap: 0.6rem;
 }
 
+/* ---------- Menú de usuario (header, sesión iniciada) ---------- */
+.user-menu {
+  position: relative;
+}
+
+.user-menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.7rem 0.4rem 0.4rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.user-menu-trigger:hover,
+.user-menu-trigger:focus-visible {
+  border-color: var(--color-primary);
+  background: var(--color-bg-alt);
+}
+
+.user-menu-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.user-menu-avatar-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(160deg, rgba(111, 224, 245, 0.25), rgba(255, 179, 198, 0.2));
+  color: var(--color-primary);
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+.user-menu-label {
+  max-width: 12ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.user-menu-chevron {
+  color: var(--color-text-muted);
+  transition: transform 0.2s ease;
+}
+
+.user-menu-chevron.is-open {
+  transform: rotate(180deg);
+}
+
+.user-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: transparent;
+  border: none;
+  cursor: default;
+}
+
+.user-menu-dropdown {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+  padding: 0.4rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-alt);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+.user-menu-item {
+  display: block;
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.user-menu-item:hover,
+.user-menu-item:focus-visible {
+  background: var(--color-surface);
+  color: var(--color-primary);
+}
+
+.user-menu-item-danger:hover,
+.user-menu-item-danger:focus-visible {
+  color: var(--color-secondary);
+}
+
 .login-error-banner {
   max-width: 52ch;
   margin: 0 0 1.5rem;
@@ -931,10 +1040,12 @@ ul {
   margin-top: 2rem;
 }
 
+/* Más alto que antes (220vh) para darle más "metros" de scroll a la
+   transición título -> rangos del timeline y que no se sienta apurada. */
 .deck-enabled.deck {
   position: relative;
-  height: 220vh;
-  height: 220dvh;
+  height: 320vh;
+  height: 320dvh;
 }
 
 .deck-enabled .deck-sticky {
@@ -973,19 +1084,19 @@ ul {
   position: relative;
 }
 
-/* Entrada escalonada del título de "Liderazgo": arranca oculto y desplazado
-   a la izquierda, y se revela antes que el primer rango del timeline (ver
-   updateDeck() en marketing-scripts.tsx) para que la secuencia se sienta
-   título -> rango 1 -> rango 2 -> ... en vez de todo junto. */
+/* Entrada del título de "Liderazgo": se desliza desde la izquierda antes de
+   que aparezca el primer rango del timeline (ver updateDeck() en
+   marketing-scripts.tsx). Importante: NO se le pone opacity propia acá —
+   el título ya hereda la opacidad del crossfade de la lámina 2 (deckSlides[1]
+   en updateDeck()); agregarle opacity 0->1 aparte multiplicaba ambas
+   opacidades y el título quedaba "fantasma", superpuesto con la lámina 1
+   sin terminar de desvanecerse. Solo se anima la posición. */
 .deck-enabled #leadershipTitle {
-  opacity: 0;
   transform: translateX(-28px);
-  transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
-    transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .deck-enabled #leadershipTitle.title-visible {
-  opacity: 1;
   transform: none;
 }
 

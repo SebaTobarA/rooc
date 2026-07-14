@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { siteConfig } from "@/config/site";
 
 export const metadata = {
@@ -7,8 +8,8 @@ export const metadata = {
 const ERROR_MESSAGES: Record<string, string> = {
   "1": "Usuario o contraseña incorrectos.",
   discord_not_member: "Esa cuenta de Discord no pertenece al server de Special Delivery.",
-  discord_invalid: "No se pudo completar el inicio de sesión con Discord. Probá de nuevo.",
-  discord_failed: "Hubo un error al conectar con Discord. Probá de nuevo.",
+  discord_invalid: "No se pudo completar el inicio de sesión con Discord. Intenta de nuevo.",
+  discord_failed: "Hubo un error al conectar con Discord. Intenta de nuevo.",
 };
 
 export default async function AdminLoginPage({
@@ -23,7 +24,10 @@ export default async function AdminLoginPage({
   return (
     <div className="flex min-h-[calc(100vh-4rem-5rem)] items-center justify-center px-4 py-16">
       <div className="w-full max-w-sm rounded-xl border border-border bg-surface p-6 shadow-lg shadow-black/20">
-        <h1 className="text-xl font-bold text-foreground">Panel admin</h1>
+        <Link href="/" className="text-xs text-muted hover:text-foreground">
+          ← Volver a la web principal
+        </Link>
+        <h1 className="mt-3 text-xl font-bold text-foreground">Panel admin</h1>
         <p className="mt-1 text-sm text-muted">{siteConfig.shortName}</p>
 
         {errorMessage && (

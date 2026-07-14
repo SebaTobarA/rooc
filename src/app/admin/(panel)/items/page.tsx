@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { EQUIP_SLOT_LABEL } from "@/lib/weapon-icons";
 import { deleteItem } from "@/lib/actions/items";
 
-export const metadata = { title: "Ítems" };
+export const metadata = { title: "Equipamiento" };
 export const dynamic = "force-dynamic";
 
 export default async function AdminItemsPage() {
@@ -12,7 +12,7 @@ export default async function AdminItemsPage() {
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-foreground">Ítems ({items.length})</h2>
+        <h2 className="text-lg font-semibold text-foreground">Equipamiento ({items.length})</h2>
         <Link
           href="/admin/items/new"
           className="btn-brand px-3 py-1.5 text-sm"
