@@ -4,17 +4,17 @@ Base de datos y herramientas para la comunidad de **Ragnarok Online Origin
 Classic (ROOC)**. Proyecto independiente, sin afiliación con Gravity ni con
 ningún otro sitio de la comunidad — diseño, marca y datos son propios.
 
-La v1 cubre los cuatro pilares que suelen faltar en otros sitios no
-oficiales:
+La v1 cubre los pilares que suelen faltar en otros sitios no oficiales:
 
 - **Ítems y equipamiento** (armas, armaduras, accesorios)
+- **Cartas** (por slot, con bonos de colección, despertar y refine)
 - **Bestiario** (monstruos con stats de combate)
 - **Mapas** (regiones, monstruos que aparecen, NPCs)
 - **Tablas de drop** (relación monstruo → ítem → % de probabilidad)
 
-Cartas, medallas, monturas, pets y simuladores de clase quedan para después
-— el esquema de datos ya está pensado para agregarlos como modelos nuevos
-sin tocar lo existente (ver [Arquitectura y extensibilidad](#arquitectura-y-extensibilidad)).
+Medallas, monturas, pets y simuladores de clase quedan para después — el
+esquema de datos ya está pensado para agregarlos como modelos nuevos sin
+tocar lo existente (ver [Arquitectura y extensibilidad](#arquitectura-y-extensibilidad)).
 
 > **Los datos cargados por el seed son 100% de ejemplo/placeholder.**
 > Nombres, stats y mapas están inventados para poder navegar el sitio de
@@ -115,8 +115,8 @@ sin tocar código:
 ### Opción A: desde el panel admin
 
 1. Entrá a `/admin/import`.
-2. Elegí la tabla (Ítems, Monstruos, Mapas o Drops) y subí un archivo `.csv`
-   o `.json` con el formato esperado (ver abajo).
+2. Elegí la tabla (Ítems, Cartas, Monstruos, Mapas o Drops) y subí un archivo
+   `.csv` o `.json` con el formato esperado (ver abajo).
 3. El resultado muestra cuántas filas se crearon, cuántas se actualizaron y
    el detalle de las filas con error (no bloquean el resto de la
    importación).
@@ -125,13 +125,14 @@ sin tocar código:
 
 ```bash
 npm run import -- --type items --file data/mis-items.csv
+npm run import -- --type cards --file data/mis-cartas.json
 npm run import -- --type monsters --file data/mis-monstruos.json
 npm run import -- --type maps --file data/mis-mapas.csv
 npm run import -- --type drops --file data/mis-drops.csv
 ```
 
-`--type` acepta `items`, `monsters`, `maps` o `drops`. El formato (CSV o
-JSON) se detecta por la extensión del archivo.
+`--type` acepta `items`, `cards`, `monsters`, `maps` o `drops`. El formato
+(CSV o JSON) se detecta por la extensión del archivo.
 
 ### Formato esperado de cada tabla
 
@@ -141,6 +142,7 @@ en [`data/examples/`](data/examples/). Resumen de columnas:
 | Tabla | Columnas |
 |---|---|
 | **items** | `name`*, `category`, `slot`*, `weaponType`, `levelReq`*, `rarity`, `description`, `stats`, `iconUrl` |
+| **cards** | `name`*, `slot`*, `rarity`, `classRestriction`, `description`, `ability`, `stats`, `collectionBonus`, `awaken`, `refine`, `iconUrl` |
 | **monsters** | `name`*, `level`*, `hp`*, `atk`*, `atkMax`, `def`, `element`, `elementLevel`, `race`*, `size`, `description`, `iconUrl` |
 | **maps** | `name`*, `region`*, `description` |
 | **drops** | `monster`* (nombre o slug), `item`* (nombre o slug), `rate`* |
@@ -207,12 +209,13 @@ usuario/contraseña sigue funcionando igual.
 
 ## Arquitectura y extensibilidad
 
-El esquema (`prisma/schema.prisma`) tiene 4 modelos principales — `Item`,
-`Monster`, `GameMap`, `Drop` — más `MapMonster` (relación N:N) y `Npc` como
-apoyo de `GameMap`.
+El esquema (`prisma/schema.prisma`) tiene los modelos principales — `Item`,
+`Card`, `Monster`, `GameMap`, `Drop` — más `MapMonster` (relación N:N) y
+`Npc` como apoyo de `GameMap`. `Card` se agregó siguiendo esta misma receta,
+como ejemplo real de cómo crecer el esquema sin tocar lo existente.
 
-Para agregar una categoría nueva en el futuro (cartas, medallas, monturas,
-pets, etc.):
+Para agregar una categoría nueva en el futuro (medallas, monturas, pets,
+etc.):
 
 1. Agregá un modelo nuevo en `prisma/schema.prisma` (ej. `model Card { ... }`), con sus propios campos y, si corresponde, una relación hacia `Item` o `Monster`.
 2. Corré `npx prisma migrate dev --name add_cards`.

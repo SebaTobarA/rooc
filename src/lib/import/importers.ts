@@ -1,4 +1,6 @@
 import {
+  CardRarity,
+  CardSlot,
   Element,
   EquipSlot,
   ItemRarity,
@@ -99,6 +101,54 @@ export async function importItems(rows: RawRow[]): Promise<ImportSummary> {
         summary.updated++;
       } else {
         await prisma.item.create({ data });
+        summary.created++;
+      }
+    } catch (err) {
+      summary.errors.push(`Fila ${index + 2}: ${(err as Error).message}`);
+    }
+  }
+
+  return summary;
+}
+
+// ---------------------------------------------------------------------------
+// Cartas
+// ---------------------------------------------------------------------------
+
+export async function importCards(rows: RawRow[]): Promise<ImportSummary> {
+  const summary = newSummary();
+
+  for (const [index, row] of rows.entries()) {
+    try {
+      const name = requireField(row, "name");
+      const slug = row.slug?.trim() || slugify(name);
+      const slot = parseEnumField(requireField(row, "slot"), CardSlot, "slot");
+      const rarity = row.rarity
+        ? parseEnumField(row.rarity, CardRarity, "rarity")
+        : CardRarity.VERDE;
+
+      const data = {
+        name,
+        slug,
+        slot,
+        rarity,
+        classRestriction: row.classRestriction?.trim() ?? "",
+        description: row.description?.trim() ?? "",
+        ability: row.ability?.trim() ?? "",
+        stats: row.stats?.trim() ?? "",
+        collectionBonus: row.collectionBonus?.trim() ?? "",
+        awaken: row.awaken?.trim() ?? "",
+        refine: row.refine?.trim() ?? "",
+        iconUrl: row.iconUrl?.trim() || null,
+        isPlaceholder: false,
+      };
+
+      const existing = await prisma.card.findUnique({ where: { slug } });
+      if (existing) {
+        await prisma.card.update({ where: { slug }, data });
+        summary.updated++;
+      } else {
+        await prisma.card.create({ data });
         summary.created++;
       }
     } catch (err) {
@@ -251,10 +301,11 @@ export async function importDrops(rows: RawRow[]): Promise<ImportSummary> {
   return summary;
 }
 
-export type ImportEntity = "items" | "monsters" | "maps" | "drops";
+export type ImportEntity = "items" | "cards" | "monsters" | "maps" | "drops";
 
 export const importersByEntity: Record<ImportEntity, (rows: RawRow[]) => Promise<ImportSummary>> = {
   items: importItems,
+  cards: importCards,
   monsters: importMonsters,
   maps: importMaps,
   drops: importDrops,

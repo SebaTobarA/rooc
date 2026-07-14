@@ -11,6 +11,7 @@ type ApiResponse =
 
 const ENTITIES = [
   { value: "items", label: "Ítems" },
+  { value: "cards", label: "Cartas" },
   { value: "monsters", label: "Monstruos" },
   { value: "maps", label: "Mapas" },
   { value: "drops", label: "Drops" },

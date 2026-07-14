@@ -21,6 +21,11 @@ export default function AdminImportPage() {
             slot, weaponType, levelReq, rarity, description, stats, iconUrl
           </li>
           <li>
+            <strong className="text-foreground">Cartas:</strong> name, slot,
+            rarity, classRestriction, description, ability, stats,
+            collectionBonus, awaken, refine, iconUrl
+          </li>
+          <li>
             <strong className="text-foreground">Monstruos:</strong> name, level,
             hp, atk, atkMax, def, element, elementLevel, race, size,
             description, iconUrl

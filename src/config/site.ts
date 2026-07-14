@@ -8,10 +8,11 @@ export const siteConfig = {
   shortName: "Special Delivery",
   tagline: "Base de datos y herramientas para la guild de Ragnarok Online Origin Classic",
   description:
-    "Ítems, bestiario, mapas y tablas de drop para la comunidad de Special Delivery en Ragnarok Online Origin Classic. Proyecto independiente, sin afiliación oficial con Gravity.",
+    "Ítems, cartas, bestiario, mapas y tablas de drop para la comunidad de Special Delivery en Ragnarok Online Origin Classic. Proyecto independiente, sin afiliación oficial con Gravity.",
   nav: [
     { href: "/panel", label: "Inicio" },
     { href: "/panel/items", label: "Ítems" },
+    { href: "/panel/cards", label: "Cartas" },
     { href: "/panel/monsters", label: "Monstruos" },
     { href: "/panel/maps", label: "Mapas" },
     { href: "/panel/party", label: "Party Builder" },

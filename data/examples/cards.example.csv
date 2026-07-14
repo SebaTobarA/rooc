@@ -1,0 +1,3 @@
+name,slot,rarity,classRestriction,description,ability,stats,collectionBonus,awaken,refine,iconUrl
+Condor,CLOAK,VERDE,,Carta de evasión básica.,,FLEE: 5,MATK: 2,"Lv5: PDMG/MDMG Reduction +1%; Lv10: PDMG/MDMG Reduction +0.50%; Lv15: FLEE +2",,
+Vocal,CLOAK,MORADA,,Defensa mágica con efecto por refine.,,MDMG Reduction: 5.00%,PATK: 12,"Lv5: Refine +10: MDMG is increased by an additional 1.5%; Lv10: MDMG Reduction +1.50%; Lv15: MDMG Reduction +1%",Refine +10: MDMG +3%,

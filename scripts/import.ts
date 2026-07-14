@@ -5,7 +5,7 @@
  *   npm run import -- --type items --file data/mis-items.csv
  *   npm run import -- --type monsters --file data/mis-monstruos.json
  *
- * --type acepta: items | monsters | maps | drops
+ * --type acepta: items | cards | monsters | maps | drops
  * El formato (CSV o JSON) se detecta por la extensión del archivo.
  * Ver data/examples/ para el formato de columnas esperado de cada tabla.
  */
@@ -26,7 +26,7 @@ function parseArgs(argv: string[]) {
   return args;
 }
 
-const VALID_TYPES: ImportEntity[] = ["items", "monsters", "maps", "drops"];
+const VALID_TYPES: ImportEntity[] = ["items", "cards", "monsters", "maps", "drops"];
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));

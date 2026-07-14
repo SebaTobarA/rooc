@@ -4,8 +4,9 @@ import { prisma } from "@/lib/prisma";
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboardPage() {
-  const [items, monsters, maps, drops, placeholderItems] = await Promise.all([
+  const [items, cardCount, monsters, maps, drops, placeholderItems] = await Promise.all([
     prisma.item.count(),
+    prisma.card.count(),
     prisma.monster.count(),
     prisma.gameMap.count(),
     prisma.drop.count(),
@@ -14,6 +15,7 @@ export default async function AdminDashboardPage() {
 
   const cards = [
     { href: "/admin/items", label: "Equipamiento", count: items },
+    { href: "/admin/cards", label: "Cartas", count: cardCount },
     { href: "/admin/monsters", label: "Monstruos", count: monsters },
     { href: "/admin/maps", label: "Mapas", count: maps },
     { href: "/admin/drops", label: "Drops", count: drops },

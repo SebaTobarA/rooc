@@ -1,4 +1,4 @@
-import type { Element, ItemRarity, MonsterRace, MonsterSize } from "@prisma/client";
+import type { CardRarity, CardSlot, Element, ItemRarity, MonsterRace, MonsterSize } from "@prisma/client";
 
 export const RARITY_LABEL: Record<ItemRarity, string> = {
   COMUN: "Común",
@@ -47,4 +47,32 @@ export const SIZE_LABEL: Record<MonsterSize, string> = {
   PEQUENO: "Pequeño",
   MEDIANO: "Mediano",
   GRANDE: "Grande",
+};
+
+export const CARD_SLOT_LABEL: Record<CardSlot, string> = {
+  MAIN_HAND: "Mano principal",
+  OFF_HAND: "Mano secundaria",
+  ARMOR: "Armadura",
+  CLOAK: "Capa",
+  SHOES: "Calzado",
+  ACCESSORY: "Accesorio",
+  PENDIENTE: "Pendiente",
+  HEADWEAR: "Cabeza",
+  FACEWEAR: "Rostro",
+  MOUTHWEAR: "Boca",
+  BACKWEAR: "Espalda",
+  COSTUME: "Costume",
+};
+
+export const CARD_RARITY_LABEL: Record<CardRarity, string> = {
+  VERDE: "Verde",
+  AZUL: "Azul",
+  MORADA: "Morada",
+};
+
+// Clases de color Tailwind aplicadas al texto/borde según rareza de carta.
+export const CARD_RARITY_COLOR: Record<CardRarity, string> = {
+  VERDE: "text-emerald-400 border-emerald-500/40",
+  AZUL: "text-sky-400 border-sky-500/40",
+  MORADA: "text-fuchsia-400 border-fuchsia-500/40",
 };

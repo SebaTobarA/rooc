@@ -146,6 +146,68 @@ model Item {
 }
 
 // ---------------------------------------------------------------------------
+// Pilar 5 (agregado post-v1): Cartas
+// ---------------------------------------------------------------------------
+
+// Slot donde se inserta la carta. Distinto de EquipSlot porque las cartas
+// tienen su propia grilla de slots (Main-Hand/Off-Hand en vez de Weapon,
+// más Pendiente/Facewear/Mouthwear/Backwear/Costume que no existen en Item).
+enum CardSlot {
+  MAIN_HAND
+  OFF_HAND
+  ARMOR
+  CLOAK
+  SHOES
+  ACCESSORY
+  PENDIENTE
+  HEADWEAR
+  FACEWEAR
+  MOUTHWEAR
+  BACKWEAR
+  COSTUME
+}
+
+enum CardRarity {
+  VERDE
+  AZUL
+  MORADA
+}
+
+model Card {
+  id   String @id @default(cuid())
+  slug String @unique
+
+  name             String
+  slot             CardSlot
+  rarity           CardRarity @default(VERDE)
+  // clase/rol: restricción de clase, texto libre (hoy siempre vacío en los
+  // datos de origen, se deja el campo para cuando se documente).
+  classRestriction String     @default("")
+
+  description String @default("")
+  // efecto/habilidad
+  ability     String @default("")
+  // estadisticas: texto libre tipo "FLEE: 5" o "DEX: 2, PATK: 5", igual
+  // filosofía que Item.stats (no se modela como filas estructuradas en v1).
+  stats       String @default("")
+  // collection_bonus: bono que se obtiene por tener la carta en la colección.
+  collectionBonus String @default("")
+  // awaken: bonos por nivel de despertar (Lv5/Lv10/Lv15), texto libre.
+  awaken          String @default("")
+  // refine: bono adicional por nivel de refine, cuando aplica.
+  refine          String @default("")
+
+  iconUrl       String?
+  isPlaceholder Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([slot])
+  @@index([rarity])
+}
+
+// ---------------------------------------------------------------------------
 // Pilar 2: Bestiario (monstruos)
 // ---------------------------------------------------------------------------
 

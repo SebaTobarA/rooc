@@ -1,0 +1,28 @@
+[
+  {
+    "name": "Condor",
+    "slot": "CLOAK",
+    "rarity": "VERDE",
+    "classRestriction": "",
+    "description": "Carta de evasión básica.",
+    "ability": "",
+    "stats": "FLEE: 5",
+    "collectionBonus": "MATK: 2",
+    "awaken": "Lv5: PDMG/MDMG Reduction +1%; Lv10: PDMG/MDMG Reduction +0.50%; Lv15: FLEE +2",
+    "refine": "",
+    "iconUrl": ""
+  },
+  {
+    "name": "Vocal",
+    "slot": "CLOAK",
+    "rarity": "MORADA",
+    "classRestriction": "",
+    "description": "Defensa mágica con efecto por refine.",
+    "ability": "",
+    "stats": "MDMG Reduction: 5.00%",
+    "collectionBonus": "PATK: 12",
+    "awaken": "Lv5: Refine +10: MDMG is increased by an additional 1.5%; Lv10: MDMG Reduction +1.50%; Lv15: MDMG Reduction +1%",
+    "refine": "Refine +10: MDMG +3%",
+    "iconUrl": ""
+  }
+]

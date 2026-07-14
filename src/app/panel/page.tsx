@@ -7,8 +7,9 @@ import { siteConfig } from "@/config/site";
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const [itemCount, monsterCount, mapCount, dropCount] = await Promise.all([
+  const [itemCount, cardCount, monsterCount, mapCount, dropCount] = await Promise.all([
     prisma.item.count(),
+    prisma.card.count(),
     prisma.monster.count(),
     prisma.gameMap.count(),
     prisma.drop.count(),
@@ -21,6 +22,13 @@ export default async function HomePage() {
       description: "Armas, armaduras y accesorios con stats, nivel requerido y rareza.",
       count: itemCount,
       unit: "ítems",
+    },
+    {
+      href: "/panel/cards",
+      title: "Cartas",
+      description: "Cartas equipables por slot, con bonos de colección, despertar y refine.",
+      count: cardCount,
+      unit: "cartas",
     },
     {
       href: "/panel/monsters",
@@ -48,6 +56,12 @@ export default async function HomePage() {
         <div className="mt-6 flex flex-wrap gap-3">
           <Link href="/panel/items" className="btn-brand px-4 py-2 text-sm">
             Explorar ítems
+          </Link>
+          <Link
+            href="/panel/cards"
+            className="rounded-[10px] border border-border px-4 py-2 text-sm font-semibold uppercase tracking-wide text-foreground transition-colors hover:bg-surface-hover"
+          >
+            Explorar cartas
           </Link>
           <Link
             href="/panel/monsters"
@@ -82,9 +96,9 @@ export default async function HomePage() {
       <section className="mt-10 rounded-xl border border-dashed border-border p-5">
         <h2 className="font-semibold text-foreground">Próximamente</h2>
         <p className="mt-1 text-sm text-muted">
-          Cartas, medallas, monturas, pets y simuladores de clase — la
-          arquitectura ya está pensada para sumarlos como secciones nuevas sin
-          rehacer lo existente.
+          Medallas, monturas, pets y simuladores de clase — la arquitectura ya
+          está pensada para sumarlos como secciones nuevas sin rehacer lo
+          existente.
         </p>
       </section>
     </div>
