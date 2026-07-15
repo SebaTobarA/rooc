@@ -24,9 +24,10 @@ function getGuildId(): string {
   return id;
 }
 
-async function discordBotFetch(path: string): Promise<Response> {
+async function discordBotFetch(path: string, init?: RequestInit): Promise<Response> {
   const response = await fetch(`${DISCORD_API}${path}`, {
-    headers: { Authorization: `Bot ${getBotToken()}` },
+    ...init,
+    headers: { ...init?.headers, Authorization: `Bot ${getBotToken()}` },
     cache: "no-store",
   });
   if (response.status === 429) {
@@ -81,6 +82,32 @@ export async function getGuildRoles(): Promise<DiscordGuildRole[]> {
 export const getGuildRolesCached = unstable_cache(getGuildRoles, ["guild-roles"], {
   revalidate: 300,
 });
+
+/**
+ * Asigna/quita un rol a un miembro puntual — usado para mantener sincronizada
+ * la clase elegida en /panel/perfil con el rol real en Discord. Requiere que
+ * el rol del bot esté por encima del rol de clase en la jerarquía del server
+ * (si no, Discord devuelve 403).
+ */
+export async function addGuildMemberRole(discordId: string, roleId: string): Promise<void> {
+  const response = await discordBotFetch(
+    `/guilds/${getGuildId()}/members/${discordId}/roles/${roleId}`,
+    { method: "PUT" }
+  );
+  if (!response.ok) {
+    throw new Error(`No se pudo asignar el rol en Discord (${response.status}).`);
+  }
+}
+
+export async function removeGuildMemberRole(discordId: string, roleId: string): Promise<void> {
+  const response = await discordBotFetch(
+    `/guilds/${getGuildId()}/members/${discordId}/roles/${roleId}`,
+    { method: "DELETE" }
+  );
+  if (!response.ok) {
+    throw new Error(`No se pudo quitar el rol en Discord (${response.status}).`);
+  }
+}
 
 /** Todos los miembros del server, paginado (Discord devuelve como máximo 1000 por página). */
 export async function getGuildMembers(): Promise<DiscordGuildMember[]> {
