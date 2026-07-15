@@ -1,4 +1,13 @@
-import type { CardRarity, CardSlot, Element, ItemRarity, MonsterRace, MonsterSize } from "@prisma/client";
+import type {
+  CardRarity,
+  CardSlot,
+  Element,
+  EventCategory,
+  EventStatus,
+  ItemRarity,
+  MonsterRace,
+  MonsterSize,
+} from "@prisma/client";
 
 export const RARITY_LABEL: Record<ItemRarity, string> = {
   COMUN: "Común",
@@ -75,4 +84,14 @@ export const CARD_RARITY_COLOR: Record<CardRarity, string> = {
   VERDE: "text-emerald-400 border-emerald-500/40",
   AZUL: "text-sky-400 border-sky-500/40",
   MORADA: "text-fuchsia-400 border-fuchsia-500/40",
+};
+
+export const EVENT_CATEGORY_LABEL: Record<EventCategory, string> = {
+  GUILD_LEAGUE: "Guild League",
+  EMPERIUM_OVERRUN: "Emperium Overrun",
+};
+
+export const EVENT_STATUS_LABEL: Record<EventStatus, string> = {
+  DRAFT: "Borrador",
+  PUBLISHED: "Enviado a Discord",
 };

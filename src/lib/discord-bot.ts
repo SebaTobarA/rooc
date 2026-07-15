@@ -51,6 +51,30 @@ export type DiscordGuildRole = {
   managed: boolean;
 };
 
+export type DiscordEmbed = {
+  title?: string;
+  description?: string;
+  color?: number;
+  fields?: { name: string; value: string; inline?: boolean }[];
+  footer?: { text: string };
+  timestamp?: string;
+};
+
+/** Estilos de botón de la API de Discord (1=azul, 2=gris, 3=verde, 4=rojo). */
+export type DiscordButtonStyle = 1 | 2 | 3 | 4;
+
+export type DiscordButton = {
+  type: 2;
+  style: DiscordButtonStyle;
+  label: string;
+  custom_id: string;
+};
+
+export type DiscordActionRow = {
+  type: 1;
+  components: DiscordButton[];
+};
+
 /** Un solo miembro por ID. Devuelve null si no pertenece al server (404). */
 export async function getGuildMember(discordId: string): Promise<DiscordGuildMember | null> {
   const response = await discordBotFetch(`/guilds/${getGuildId()}/members/${discordId}`);
@@ -106,6 +130,38 @@ export async function removeGuildMemberRole(discordId: string, roleId: string): 
   );
   if (!response.ok) {
     throw new Error(`No se pudo quitar el rol en Discord (${response.status}).`);
+  }
+}
+
+/** Postea un mensaje nuevo (con embed y/o botones) en un canal. Devuelve el ID del mensaje creado. */
+export async function postChannelMessage(
+  channelId: string,
+  body: { embeds?: DiscordEmbed[]; components?: DiscordActionRow[] }
+): Promise<{ id: string }> {
+  const response = await discordBotFetch(`/channels/${channelId}/messages`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    throw new Error(`No se pudo publicar el mensaje en Discord (${response.status}).`);
+  }
+  return response.json();
+}
+
+/** Edita un mensaje ya publicado por el bot (ej. para refrescar el roster de un evento). */
+export async function editChannelMessage(
+  channelId: string,
+  messageId: string,
+  body: { embeds?: DiscordEmbed[]; components?: DiscordActionRow[] }
+): Promise<void> {
+  const response = await discordBotFetch(`/channels/${channelId}/messages/${messageId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    throw new Error(`No se pudo editar el mensaje en Discord (${response.status}).`);
   }
 }
 

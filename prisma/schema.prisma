@@ -106,19 +106,19 @@ enum MonsterSize {
 // ---------------------------------------------------------------------------
 
 model Item {
-  id          String @id @default(cuid())
-  slug        String @unique
+  id   String @id @default(cuid())
+  slug String @unique
 
-  name        String
+  name     String
   // Campo abierto a futuro: hoy siempre "equipo". Si más adelante se decide
   // modelar cartas/medallas/monturas como filas de Item en vez de modelos
   // propios, este campo ya permite distinguirlas sin migrar la tabla.
-  category    String @default("equipo")
+  category String @default("equipo")
 
-  slot        EquipSlot
-  weaponType  WeaponType @default(NONE)
-  levelReq    Int        @default(1)
-  rarity      ItemRarity @default(COMUN)
+  slot       EquipSlot
+  weaponType WeaponType @default(NONE)
+  levelReq   Int        @default(1)
+  rarity     ItemRarity @default(COMUN)
 
   description String @default("")
   // Texto libre con stats/bonos, ej: "+10 ATK, +5 DES, +3% resistencia a Fuego"
@@ -184,12 +184,12 @@ model Card {
   // datos de origen, se deja el campo para cuando se documente).
   classRestriction String     @default("")
 
-  description String @default("")
+  description     String @default("")
   // efecto/habilidad
-  ability     String @default("")
+  ability         String @default("")
   // estadisticas: texto libre tipo "FLEE: 5" o "DEX: 2, PATK: 5", igual
   // filosofía que Item.stats (no se modela como filas estructuradas en v1).
-  stats       String @default("")
+  stats           String @default("")
   // collection_bonus: bono que se obtiene por tener la carta en la colección.
   collectionBonus String @default("")
   // awaken: bonos por nivel de despertar (Lv5/Lv10/Lv15), texto libre.
@@ -226,14 +226,14 @@ model Monster {
   race         MonsterRace
   size         MonsterSize @default(MEDIANO)
 
-  description String @default("")
+  description   String  @default("")
   iconUrl       String?
   isPlaceholder Boolean @default(true)
 
   maps      MapMonster[]
   drops     Drop[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
 
   @@index([level])
   @@index([race])
@@ -255,8 +255,8 @@ model GameMap {
 
   monsters  MapMonster[]
   npcs      Npc[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
 
   @@index([region])
 }
@@ -335,6 +335,7 @@ model User {
   updatedAt   DateTime @updatedAt
 
   partyTemplates PartyTemplate[]
+  events         Event[]
 }
 
 // Mapea un rol de Discord (por su ID) a lo que puede ver/hacer dentro del
@@ -365,6 +366,73 @@ model PartyTemplate {
   updatedAt   DateTime @updatedAt
 
   @@index([event])
+}
+
+// ---------------------------------------------------------------------------
+// Asistencia a eventos (Guild League / Emperium Overrun): se crean en
+// /admin/events y, al enviarse, el bot postea un roster con botones en
+// Discord (ver src/lib/events.ts y src/app/api/discord/interactions).
+// `channelId`/`messageId` quedan grabados al enviar para que el endpoint de
+// interacciones pueda editar el mensaje sin depender del request original.
+// ---------------------------------------------------------------------------
+
+enum EventCategory {
+  GUILD_LEAGUE
+  EMPERIUM_OVERRUN
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum EventSignupStatus {
+  CONFIRMED
+  LATE
+  NOT_ATTENDING
+}
+
+model Event {
+  id          String        @id @default(cuid())
+  title       String
+  description String        @default("")
+  category    EventCategory
+  startsAt    DateTime
+
+  status      EventStatus @default(DRAFT)
+  channelId   String?
+  messageId   String?
+  publishedAt DateTime?
+
+  createdById String
+  createdBy   User          @relation(fields: [createdById], references: [id])
+  signups     EventSignup[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+// Snapshot (`displayName`/`className`/`classRoleId`) re-derivado desde
+// Discord en cada interacción del bot — el embed y las tablas de admin se
+// renderizan solo desde acá, sin pegarle a la API de Discord en cada lectura.
+model EventSignup {
+  id      String @id @default(cuid())
+  eventId String
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  discordId   String
+  displayName String
+  className   String
+  classRoleId String
+
+  status    EventSignupStatus @default(CONFIRMED)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  @@unique([eventId, discordId])
+  @@index([eventId, status])
 }
 
 // ---------------------------------------------------------------------------
