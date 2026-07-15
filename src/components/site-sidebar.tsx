@@ -57,27 +57,43 @@ export type SidebarSession = {
 
 function ProfileCard({ session }: { session: SidebarSession }) {
   return (
-    <div className="flex items-center gap-3 rounded-[10px] border border-border bg-surface p-3">
-      {session.avatarUrl ? (
-        <img
-          src={session.avatarUrl}
-          alt=""
-          width={40}
-          height={40}
-          className="h-10 w-10 shrink-0 rounded-full"
-        />
-      ) : (
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-background-elevated text-sm font-semibold text-muted">
-          {session.label.slice(0, 1).toUpperCase()}
+    <div className="profile-card flex items-center gap-3 rounded-[10px] border border-border bg-surface p-3">
+      <span className="profile-card__sparkle" style={{ top: "2px", right: "10px", color: "var(--secondary)" }}>
+        ✦
+      </span>
+      <span
+        className="profile-card__sparkle"
+        style={{ bottom: "4px", left: "38px", color: "var(--focus)", animationDelay: "0.9s" }}
+      >
+        ✦
+      </span>
+
+      <div className="profile-card__avatar">
+        <span className="profile-card__avatar-glow" />
+        <span className="profile-card__ring">
+          {session.avatarUrl ? (
+            <img
+              src={session.avatarUrl}
+              alt=""
+              width={40}
+              height={40}
+              className="block h-10 w-10 rounded-full bg-surface"
+            />
+          ) : (
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-background-elevated text-sm font-semibold text-muted">
+              {session.label.slice(0, 1).toUpperCase()}
+            </span>
+          )}
         </span>
-      )}
-      <div className="flex min-w-0 flex-col gap-0.5">
+      </div>
+
+      <div className="relative z-[1] flex min-w-0 flex-col gap-0.5">
         <span className="truncate text-sm font-semibold text-foreground">{session.label}</span>
         {session.username && (
           <span className="truncate text-xs text-muted">@{session.username}</span>
         )}
         {session.job && (
-          <span className="mt-0.5 w-fit truncate rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-medium text-accent">
+          <span className="profile-card__badge mt-0.5 w-fit truncate rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-medium text-accent">
             {session.job}
           </span>
         )}
