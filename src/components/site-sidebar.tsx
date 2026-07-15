@@ -49,13 +49,46 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
 
 export type SidebarSession = {
   label: string;
+  username: string | null;
+  avatarUrl: string | null;
+  job: string | null;
   isAdmin: boolean;
 };
+
+function ProfileCard({ session }: { session: SidebarSession }) {
+  return (
+    <div className="flex items-center gap-3 rounded-[10px] border border-border bg-surface p-3">
+      {session.avatarUrl ? (
+        <img
+          src={session.avatarUrl}
+          alt=""
+          width={40}
+          height={40}
+          className="h-10 w-10 shrink-0 rounded-full"
+        />
+      ) : (
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-background-elevated text-sm font-semibold text-muted">
+          {session.label.slice(0, 1).toUpperCase()}
+        </span>
+      )}
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <span className="truncate text-sm font-semibold text-foreground">{session.label}</span>
+        {session.username && (
+          <span className="truncate text-xs text-muted">@{session.username}</span>
+        )}
+        {session.job && (
+          <span className="mt-0.5 w-fit truncate rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-medium text-accent">
+            {session.job}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function AccountBlock({ session }: { session: SidebarSession }) {
   return (
     <div className="mt-auto flex flex-col gap-2 border-t border-border pt-4 text-sm">
-      <span className="truncate text-muted">{session.label}</span>
       {session.isAdmin && (
         <Link
           href="/admin"
@@ -85,6 +118,7 @@ export function SiteSidebar({ session }: { session?: SidebarSession | null }) {
       {/* --- Sidebar fijo, solo desktop --- */}
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col gap-6 border-r border-border bg-background p-5 sm:flex">
         <Brand />
+        {session && <ProfileCard session={session} />}
         <NavLinks />
         {session && <AccountBlock session={session} />}
       </aside>
@@ -128,6 +162,7 @@ export function SiteSidebar({ session }: { session?: SidebarSession | null }) {
                 </svg>
               </button>
             </div>
+            {session && <ProfileCard session={session} />}
             <NavLinks onNavigate={() => setDrawerOpen(false)} />
             {session && <AccountBlock session={session} />}
           </div>

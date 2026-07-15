@@ -8,6 +8,8 @@
  * configuración entregado aparte.
  */
 
+import { unstable_cache } from "next/cache";
+
 const DISCORD_API = "https://discord.com/api/v10";
 
 function getBotToken(): string {
@@ -69,6 +71,16 @@ export async function getGuildRoles(): Promise<DiscordGuildRole[]> {
     .filter((role) => role.name !== "@everyone")
     .sort((a, b) => b.position - a.position);
 }
+
+/**
+ * Como getGuildRoles pero cacheada 5 minutos — pensada para el layout del
+ * panel, que se ejecuta en cada navegación y no necesita ver cambios de rol
+ * al instante. /admin/roles sigue usando la versión sin cache de arriba
+ * para reflejar cambios apenas se guardan.
+ */
+export const getGuildRolesCached = unstable_cache(getGuildRoles, ["guild-roles"], {
+  revalidate: 300,
+});
 
 /** Todos los miembros del server, paginado (Discord devuelve como máximo 1000 por página). */
 export async function getGuildMembers(): Promise<DiscordGuildMember[]> {
