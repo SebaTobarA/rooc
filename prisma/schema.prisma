@@ -336,6 +336,7 @@ model User {
 
   partyTemplates PartyTemplate[]
   events         Event[]
+  eventTemplates EventTemplate[]
 }
 
 // Mapea un rol de Discord (por su ID) a lo que puede ver/hacer dentro del
@@ -370,10 +371,11 @@ model PartyTemplate {
 
 // ---------------------------------------------------------------------------
 // Asistencia a eventos (Guild League / Emperium Overrun): se crean en
-// /admin/events y, al enviarse, el bot postea un roster con botones en
-// Discord (ver src/lib/events.ts y src/app/api/discord/interactions).
-// `channelId`/`messageId` quedan grabados al enviar para que el endpoint de
-// interacciones pueda editar el mensaje sin depender del request original.
+// /panel/eventos (gestión de guild, permiso canManageParty) y, al enviarse,
+// el bot postea un roster con botones en Discord (ver src/lib/events.ts y
+// src/app/api/discord/interactions). `channelId`/`messageId` quedan
+// grabados al enviar para que el endpoint de interacciones pueda editar el
+// mensaje sin depender del request original.
 // ---------------------------------------------------------------------------
 
 enum EventCategory {
@@ -392,12 +394,47 @@ enum EventSignupStatus {
   NOT_ATTENDING
 }
 
+// Configuración reutilizable de estilo del embed (color, ícono) — se crea
+// una vez por tipo de evento y se reusa cada vez que se carga una fecha
+// nueva, para no reconfigurar el estilo en cada evento.
+model EventTemplate {
+  id         String        @id @default(cuid())
+  title      String
+  // Emoji corto opcional, antepuesto al título del embed en Discord.
+  icon       String?
+  embedColor String        @default("#6fe0f5")
+  category   EventCategory
+
+  createdById String
+  createdBy   User    @relation(fields: [createdById], references: [id])
+  events      Event[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Fila única — a qué canal de Discord se publican los eventos, editable
+// desde /panel/eventos. La app siempre lee/actualiza el primer registro.
+model GuildEventSettings {
+  id               String   @id @default(cuid())
+  defaultChannelId String?
+  updatedAt        DateTime @updatedAt
+}
+
 model Event {
   id          String        @id @default(cuid())
   title       String
   description String        @default("")
+  // Copiada del template elegido al crear el evento.
   category    EventCategory
-  startsAt    DateTime
+  templateId  String
+  template    EventTemplate @relation(fields: [templateId], references: [id])
+
+  startsAt       DateTime
+  endsAt         DateTime
+  // Hasta cuándo se aceptan altas/cambios de inscripción — lo carga quien
+  // crea el evento, independiente de startsAt/endsAt.
+  signupsCloseAt DateTime
 
   status      EventStatus @default(DRAFT)
   channelId   String?

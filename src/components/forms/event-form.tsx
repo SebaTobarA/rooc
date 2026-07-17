@@ -1,5 +1,4 @@
-import type { Event } from "@prisma/client";
-import { EventCategory } from "@prisma/client";
+import type { Event, EventTemplate } from "@prisma/client";
 import { EVENT_CATEGORY_LABEL } from "@/lib/labels";
 import { Field, SubmitButton, inputClass } from "@/components/forms/form-fields";
 
@@ -13,9 +12,11 @@ function toLocalInputValue(date: Date): string {
 
 export function EventForm({
   event,
+  templates,
   action,
 }: {
   event?: Event;
+  templates: EventTemplate[];
   action: (formData: FormData) => void | Promise<void>;
 }) {
   return (
@@ -24,22 +25,21 @@ export function EventForm({
         <input name="title" defaultValue={event?.title} required className={inputClass} />
       </Field>
 
-      <div className="grid grid-cols-2 gap-4">
-        <Field label="Categoría">
-          <select
-            name="category"
-            defaultValue={event?.category ?? EventCategory.GUILD_LEAGUE}
-            className={inputClass}
-          >
-            {Object.entries(EVENT_CATEGORY_LABEL).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </Field>
+      <Field label="Template" hint="Define el color, ícono y categoría del embed en Discord.">
+        <select name="templateId" defaultValue={event?.templateId} required className={inputClass}>
+          <option value="" disabled>
+            Elegí un template
+          </option>
+          {templates.map((template) => (
+            <option key={template.id} value={template.id}>
+              {template.title} — {EVENT_CATEGORY_LABEL[template.category]}
+            </option>
+          ))}
+        </select>
+      </Field>
 
-        <Field label="Fecha y hora">
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="Inicio">
           <input
             type="datetime-local"
             name="startsAt"
@@ -48,7 +48,30 @@ export function EventForm({
             className={inputClass}
           />
         </Field>
+
+        <Field label="Fin">
+          <input
+            type="datetime-local"
+            name="endsAt"
+            defaultValue={event ? toLocalInputValue(event.endsAt) : undefined}
+            required
+            className={inputClass}
+          />
+        </Field>
       </div>
+
+      <Field
+        label="Cierre de inscripciones"
+        hint="Hasta cuándo se aceptan altas/cambios de clase. No puede ser después del inicio."
+      >
+        <input
+          type="datetime-local"
+          name="signupsCloseAt"
+          defaultValue={event ? toLocalInputValue(event.signupsCloseAt) : undefined}
+          required
+          className={inputClass}
+        />
+      </Field>
 
       <Field label="Descripción" hint="Se muestra tal cual en el mensaje de Discord.">
         <textarea name="description" defaultValue={event?.description} rows={4} className={inputClass} />

@@ -5,25 +5,45 @@
  * tocar nada de red.
  */
 
-import type { Event, EventSignup } from "@prisma/client";
+import type { Event, EventSignup, EventTemplate } from "@prisma/client";
 import type { DiscordActionRow, DiscordButton, DiscordButtonStyle, DiscordEmbed } from "@/lib/discord-bot";
 import { JOB_ROLE_NAMES } from "@/lib/discord-job-roles";
 
-const BRAND_COLOR = 0x6fe0f5;
+const FALLBACK_COLOR = 0x6fe0f5;
 const MAX_FIELD_VALUE = 1024;
 
-const DATE_FORMATTER = new Intl.DateTimeFormat("es-AR", {
+export const DATE_FORMATTER = new Intl.DateTimeFormat("es-AR", {
   day: "2-digit",
   month: "2-digit",
   year: "numeric",
   timeZone: "America/Argentina/Buenos_Aires",
 });
-const TIME_FORMATTER = new Intl.DateTimeFormat("es-AR", {
+export const TIME_FORMATTER = new Intl.DateTimeFormat("es-AR", {
   hour: "2-digit",
   minute: "2-digit",
   hour12: false,
   timeZone: "America/Argentina/Buenos_Aires",
 });
+
+/** "#6fe0f5" -> 0x6fe0f5. Si el hex es inválido, cae al celeste de marca. */
+export function hexToDiscordColor(hex: string): number {
+  const parsed = parseInt(hex.replace("#", ""), 16);
+  return Number.isNaN(parsed) ? FALLBACK_COLOR : parsed;
+}
+
+function formatEventRange(startsAt: Date, endsAt: Date): string {
+  const sameDay = DATE_FORMATTER.format(startsAt) === DATE_FORMATTER.format(endsAt);
+  if (sameDay) {
+    return [
+      `📅 ${DATE_FORMATTER.format(startsAt)}`,
+      `🕐 ${TIME_FORMATTER.format(startsAt)} - ${TIME_FORMATTER.format(endsAt)}`,
+    ].join("\n");
+  }
+  return [
+    `📅 ${DATE_FORMATTER.format(startsAt)} ${TIME_FORMATTER.format(startsAt)}`,
+    `→ ${DATE_FORMATTER.format(endsAt)} ${TIME_FORMATTER.format(endsAt)}`,
+  ].join("\n");
+}
 
 function truncateFieldValue(lines: string[]): string {
   if (lines.length === 0) return "-";
@@ -40,7 +60,11 @@ function truncateFieldValue(lines: string[]): string {
   return value;
 }
 
-export function buildEventEmbed(event: Event, signups: EventSignup[]): DiscordEmbed {
+export function buildEventEmbed(
+  event: Event,
+  signups: EventSignup[],
+  template: Pick<EventTemplate, "icon" | "embedColor">
+): DiscordEmbed {
   const byClass = new Map<string, EventSignup[]>();
   for (const signup of signups) {
     if (signup.status === "NOT_ATTENDING") continue;
@@ -60,16 +84,16 @@ export function buildEventEmbed(event: Event, signups: EventSignup[]): DiscordEm
   const cant = signups.filter((s) => s.status === "NOT_ATTENDING").length;
 
   return {
-    title: event.title,
+    title: template.icon ? `${template.icon} ${event.title}` : event.title,
     description: [
       "**Event Info:**",
-      `📅 ${DATE_FORMATTER.format(event.startsAt)}`,
-      `🕐 ${TIME_FORMATTER.format(event.startsAt)}`,
+      formatEventRange(event.startsAt, event.endsAt),
+      `🔒 Inscripciones hasta ${DATE_FORMATTER.format(event.signupsCloseAt)} ${TIME_FORMATTER.format(event.signupsCloseAt)}`,
       "",
       "**Description:**",
       event.description || "-",
     ].join("\n"),
-    color: BRAND_COLOR,
+    color: hexToDiscordColor(template.embedColor),
     fields,
     footer: { text: `${confirmed} confirmados · ${late} tarde · ${cant} no asisten` },
     timestamp: event.startsAt.toISOString(),

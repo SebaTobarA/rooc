@@ -11,7 +11,6 @@ const links = [
   { href: "/admin/monsters", label: "Monstruos" },
   { href: "/admin/maps", label: "Mapas" },
   { href: "/admin/drops", label: "Drops" },
-  { href: "/admin/events", label: "Eventos" },
   { href: "/admin/import", label: "Importar CSV/JSON" },
   { href: "/admin/leadership", label: "Liderazgo" },
   { href: "/admin/members", label: "Miembros" },

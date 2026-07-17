@@ -40,9 +40,8 @@ function actorDisplayName(member: NonNullable<DiscordInteraction["member"]>): st
   return member.nick ?? member.user.global_name ?? member.user.username;
 }
 
-async function eventExists(eventId: string): Promise<boolean> {
-  const event = await prisma.event.findUnique({ where: { id: eventId }, select: { id: true } });
-  return Boolean(event);
+async function findEventGuard(eventId: string): Promise<{ signupsCloseAt: Date } | null> {
+  return prisma.event.findUnique({ where: { id: eventId }, select: { signupsCloseAt: true } });
 }
 
 async function safeEdit(token: string, content: string) {
@@ -82,10 +81,17 @@ async function handleComponent(interaction: Required<DiscordInteraction>) {
   const displayName = actorDisplayName(interaction.member);
   const token = interaction.token;
 
-  if (!(await eventExists(eventId))) {
+  const guard = await findEventGuard(eventId);
+  if (!guard) {
     return Response.json({
       type: 4,
       data: { flags: 64, content: "Este evento ya no está disponible." },
+    });
+  }
+  if (guard.signupsCloseAt.getTime() < Date.now()) {
+    return Response.json({
+      type: 4,
+      data: { flags: 64, content: "Las inscripciones para este evento ya cerraron." },
     });
   }
 

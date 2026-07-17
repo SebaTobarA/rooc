@@ -1,4 +1,6 @@
 import { notFound } from "next/navigation";
+import { getSession } from "@/lib/auth";
+import { getEffectivePermissions } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { EVENT_CATEGORY_LABEL, EVENT_STATUS_LABEL } from "@/lib/labels";
 import { JOB_ROLE_NAMES } from "@/lib/discord-job-roles";
@@ -19,10 +21,24 @@ const DATE_FORMATTER = new Intl.DateTimeFormat("es-AR", {
 const STATUS_LABEL = { CONFIRMED: "Confirmado", LATE: "Llega tarde", NOT_ATTENDING: "No alcanza" } as const;
 
 export default async function EventDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const session = await getSession();
+  const permissions = await getEffectivePermissions(session);
+
+  if (!permissions.canManageParty) {
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-16 text-center">
+        <h1 className="text-xl font-bold text-foreground">Sin acceso</h1>
+        <p className="mt-2 text-sm text-muted">
+          Tu rol no tiene habilitada la administración de eventos.
+        </p>
+      </div>
+    );
+  }
+
   const { id } = await params;
   const event = await prisma.event.findUnique({
     where: { id },
-    include: { signups: { orderBy: { displayName: "asc" } } },
+    include: { signups: { orderBy: { displayName: "asc" } }, template: true },
   });
   if (!event) notFound();
 
@@ -40,9 +56,12 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
   }
 
   return (
-    <div className="max-w-3xl">
+    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-foreground">{event.title}</h2>
+        <h1 className="text-lg font-semibold text-foreground">
+          {event.template.icon ? `${event.template.icon} ` : ""}
+          {event.title}
+        </h1>
         <span className="rounded-full border border-border px-3 py-1 text-xs text-muted">
           {EVENT_STATUS_LABEL[event.status]}
         </span>
@@ -55,8 +74,20 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
             <dd className="text-foreground">{EVENT_CATEGORY_LABEL[event.category]}</dd>
           </div>
           <div>
-            <dt className="text-xs uppercase tracking-wide text-muted">Fecha y hora</dt>
+            <dt className="text-xs uppercase tracking-wide text-muted">Template</dt>
+            <dd className="text-foreground">{event.template.title}</dd>
+          </div>
+          <div>
+            <dt className="text-xs uppercase tracking-wide text-muted">Inicio</dt>
             <dd className="text-foreground">{DATE_FORMATTER.format(event.startsAt)}</dd>
+          </div>
+          <div>
+            <dt className="text-xs uppercase tracking-wide text-muted">Fin</dt>
+            <dd className="text-foreground">{DATE_FORMATTER.format(event.endsAt)}</dd>
+          </div>
+          <div>
+            <dt className="text-xs uppercase tracking-wide text-muted">Cierre de inscripciones</dt>
+            <dd className="text-foreground">{DATE_FORMATTER.format(event.signupsCloseAt)}</dd>
           </div>
         </dl>
         {event.description && (
@@ -93,9 +124,9 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
       </div>
 
       <div className="mt-6">
-        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
           Anotados ({event.signups.length})
-        </h3>
+        </h2>
         <div className="grid gap-3 sm:grid-cols-2">
           {JOB_ROLE_NAMES.map((className) => {
             const list = byClass.get(className) ?? [];

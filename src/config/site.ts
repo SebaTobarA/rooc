@@ -15,6 +15,14 @@ export const siteConfig = {
     { href: "/panel/cards", label: "Cartas" },
     { href: "/panel/monsters", label: "Monstruos" },
     { href: "/panel/maps", label: "Mapas" },
-    { href: "/panel/party", label: "Party Builder" },
+  ],
+  navGroups: [
+    {
+      label: "Administración de la guild",
+      items: [
+        { href: "/panel/party", label: "Party Builder" },
+        { href: "/panel/eventos", label: "Eventos" },
+      ],
+    },
   ],
 };

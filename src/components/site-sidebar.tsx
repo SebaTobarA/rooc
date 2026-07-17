@@ -20,29 +20,52 @@ function Brand() {
   );
 }
 
+function NavItemLink({
+  href,
+  label,
+  pathname,
+  onNavigate,
+}: {
+  href: string;
+  label: string;
+  pathname: string;
+  onNavigate?: () => void;
+}) {
+  const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
+  return (
+    <Link
+      href={href}
+      onClick={onNavigate}
+      className={`rounded-[10px] px-3 py-2 text-sm font-medium uppercase tracking-wide transition-colors ${
+        active ? "bg-surface text-accent" : "text-muted hover:bg-surface hover:text-foreground"
+      }`}
+    >
+      {label}
+    </Link>
+  );
+}
+
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
 
   return (
-    <nav className="flex flex-col gap-1">
-      {siteConfig.nav.map((item) => {
-        const active =
-          item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            onClick={onNavigate}
-            className={`rounded-[10px] px-3 py-2 text-sm font-medium uppercase tracking-wide transition-colors ${
-              active
-                ? "bg-surface text-accent"
-                : "text-muted hover:bg-surface hover:text-foreground"
-            }`}
-          >
-            {item.label}
-          </Link>
-        );
-      })}
+    <nav className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1">
+        {siteConfig.nav.map((item) => (
+          <NavItemLink key={item.href} {...item} pathname={pathname} onNavigate={onNavigate} />
+        ))}
+      </div>
+
+      {siteConfig.navGroups.map((group) => (
+        <div key={group.label} className="flex flex-col gap-1">
+          <span className="px-3 text-xs font-semibold uppercase tracking-wide text-muted">
+            {group.label}
+          </span>
+          {group.items.map((item) => (
+            <NavItemLink key={item.href} {...item} pathname={pathname} onNavigate={onNavigate} />
+          ))}
+        </div>
+      ))}
     </nav>
   );
 }
