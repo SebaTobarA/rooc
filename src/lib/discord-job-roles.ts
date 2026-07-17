@@ -23,6 +23,7 @@ export const JOB_ROLE_NAMES = [
   "Champion",
   "High Priest",
   "Creator",
+  "Whitesmith",
   "Assassin Cross",
   "Sniper",
   "Professor",
@@ -53,10 +54,10 @@ export function resolveJobFromRoles(
 }
 
 /**
- * Los 13 roles de clase tal como existen hoy en el server (id real +
- * nombre), en el orden canónico de JOB_ROLE_NAMES — para poblar el
- * selector de clase en /panel/perfil. Si algún rol todavía no fue creado
- * en Discord, se omite de la lista en vez de romper la página.
+ * Los roles de clase tal como existen hoy en el server (id real + nombre),
+ * en el orden canónico de JOB_ROLE_NAMES — para poblar el selector de
+ * clase en /panel/perfil. Si algún rol todavía no fue creado en Discord,
+ * se omite de la lista en vez de romper la página.
  */
 export function listJobGuildRoles(
   guildRoles: Pick<DiscordGuildRole, "id" | "name">[]
