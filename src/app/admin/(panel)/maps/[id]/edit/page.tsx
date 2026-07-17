@@ -5,6 +5,7 @@ import { MapForm } from "@/components/forms/map-form";
 import { addNpc, deleteNpc, updateMap } from "@/lib/actions/maps";
 import { addMonsterToMap, removeMonsterFromMap } from "@/lib/actions/monsters";
 import { inputClass } from "@/components/forms/form-fields";
+import { BackLink } from "@/components/admin/back-link";
 
 export const metadata = { title: "Editar mapa" };
 export const dynamic = "force-dynamic";
@@ -41,6 +42,7 @@ export default async function EditMapPage({
 
   return (
     <div>
+      <BackLink href="/admin/maps" label="Mapas" />
       <h2 className="mb-4 text-lg font-semibold text-foreground">Editar {map.name}</h2>
       <MapForm map={map} action={updateMap.bind(null, id)} />
 

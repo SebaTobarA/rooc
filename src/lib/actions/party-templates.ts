@@ -10,7 +10,8 @@ export type PartyTemplateSnapshot = unknown;
 export async function createPartyTemplate(
   event: "GUILD_LEAGUE" | "EMPERIUM_OVERRUN",
   name: string,
-  data: PartyTemplateSnapshot
+  data: PartyTemplateSnapshot,
+  eventId?: string
 ) {
   const session = await getSession();
   if (!session?.discordId) throw new Error("No autenticado.");
@@ -24,7 +25,13 @@ export async function createPartyTemplate(
   if (!user) throw new Error("Usuario no encontrado.");
 
   await prisma.partyTemplate.create({
-    data: { event, name: name.trim() || "Sin nombre", data: data as object, createdById: user.id },
+    data: {
+      event,
+      name: name.trim() || "Sin nombre",
+      data: data as object,
+      createdById: user.id,
+      eventId: eventId ?? null,
+    },
   });
 
   revalidatePath("/panel/party");

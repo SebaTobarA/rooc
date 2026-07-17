@@ -1,19 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type DragEvent } from "react";
 import { AlertTriangle, Info } from "lucide-react";
 import type { Player, Party } from "@/types/party";
 import { PlayerChip } from "@/components/party/player-chip";
+import type { DragOrigin } from "@/lib/party/drag-payload";
 
 interface PartyCardProps {
   party: Party;
   members: Player[];
-  onDrop: (partyId: string) => void;
+  origin: DragOrigin;
+  onDrop: (e: DragEvent, partyId: string) => void;
   onRemovePlayer: (id: string) => void;
-  onDragStart: (id: string) => void;
 }
 
-export function PartyCard({ party, members, onDrop, onRemovePlayer, onDragStart }: PartyCardProps) {
+export function PartyCard({ party, members, origin, onDrop, onRemovePlayer }: PartyCardProps) {
   const [isDragOver, setIsDragOver] = useState(false);
 
   const hasNoTank = !members.some((m) => m.rol === "Tank");
@@ -57,13 +58,13 @@ export function PartyCard({ party, members, onDrop, onRemovePlayer, onDragStart 
         onDrop={(e) => {
           e.preventDefault();
           setIsDragOver(false);
-          onDrop(party.id);
+          onDrop(e, party.id);
         }}
         role="list"
         aria-label={`Party ${party.name}`}
       >
         {members.map((p) => (
-          <PlayerChip key={p.id} player={p} onRemove={onRemovePlayer} onDragStart={onDragStart} />
+          <PlayerChip key={p.id} player={p} origin={origin} onRemove={onRemovePlayer} />
         ))}
         {members.length === 0 && <p className="party-empty">Arrastra jugadores aquí</p>}
       </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
+import { useState, type DragEvent, type ReactNode } from "react";
 import { Wand2, FolderPlus, Sparkles, Save } from "lucide-react";
 import type { UseCampoReturn } from "@/lib/party/use-campo";
 import { StatsBar } from "@/components/party/stats-bar";
@@ -9,22 +9,29 @@ import { SlotPicker } from "@/components/party/slot-picker";
 import { PlayerChip } from "@/components/party/player-chip";
 import { PartyCard } from "@/components/party/party-card";
 import { createPartyTemplate } from "@/lib/actions/party-templates";
+import { readDragPayload, type DragOrigin, type DragPayload } from "@/lib/party/drag-payload";
 
 interface CampoProps {
   label: string;
   campo: UseCampoReturn;
+  /** Con qué se taggean los chips propios de este campo al arrastrarlos afuera. */
+  origin: DragOrigin;
+  /** A quién avisar cuando algo se suelta acá adentro — el padre decide de dónde sacarlo. */
+  onDropPlayer: (payload: DragPayload, partyId: string | null) => void;
   showSlotsImmediately?: boolean;
   slotPickerFooter?: ReactNode;
   onAfterImport?: () => void;
   hideImport?: boolean;
   hideSlotPicker?: boolean;
   /** Si se pasa, habilita el botón "Guardar como plantilla" para este campo. */
-  saveTemplate?: { event: "GUILD_LEAGUE" | "EMPERIUM_OVERRUN"; canManageParty: boolean };
+  saveTemplate?: { event: "GUILD_LEAGUE" | "EMPERIUM_OVERRUN"; canManageParty: boolean; eventId?: string };
 }
 
 export function Campo({
   label,
   campo,
+  origin,
+  onDropPlayer,
   showSlotsImmediately = false,
   slotPickerFooter,
   onAfterImport,
@@ -48,7 +55,6 @@ export function Campo({
     hasPlayers,
   } = campo;
 
-  const dragIdRef = useRef<string | null>(null);
   const [organizeError, setOrganizeError] = useState("");
   const [suggestMsg, setSuggestMsg] = useState("");
   const [saveMsg, setSaveMsg] = useState("");
@@ -56,15 +62,16 @@ export function Campo({
 
   const showSlots = showSlotsImmediately || hasPlayers;
 
-  function handleDragStart(id: string) {
-    dragIdRef.current = id;
-  }
-
-  function handleDrop(partyId: string | null) {
-    if (dragIdRef.current) {
-      assignPlayer(dragIdRef.current, partyId);
-      dragIdRef.current = null;
+  function handleZoneDrop(e: DragEvent, partyId: string | null) {
+    e.preventDefault();
+    const payload = readDragPayload(e);
+    if (!payload) return;
+    // Reasignación dentro del propio campo: no hace falta pasar por el padre.
+    if (payload.origin === origin) {
+      assignPlayer(payload.id, partyId);
+      return;
     }
+    onDropPlayer(payload, partyId);
   }
 
   function handleOrganize() {
@@ -97,7 +104,7 @@ export function Campo({
     setSaving(true);
     setSaveMsg("");
     try {
-      await createPartyTemplate(saveTemplate.event, name, { players, parties, compositions });
+      await createPartyTemplate(saveTemplate.event, name, { players, parties, compositions }, saveTemplate.eventId);
       setSaveMsg("Plantilla guardada.");
     } catch (err) {
       setSaveMsg(err instanceof Error ? err.message : "No se pudo guardar la plantilla.");
@@ -118,7 +125,12 @@ export function Campo({
         completeCount={completeCount}
       />
 
-      {!hideImport && <ImportBox onImport={handleImport} />}
+      {!hideImport && (
+        <details className="import-collapse">
+          <summary className="import-collapse-summary">Importar manualmente (nick, clase)</summary>
+          <ImportBox onImport={handleImport} />
+        </details>
+      )}
 
       {!hideSlotPicker && showSlots && (
         <SlotPicker compositions={compositions} onChange={setCompositions} extraFooter={slotPickerFooter} />
@@ -159,12 +171,12 @@ export function Campo({
         <div
           className="player-pool"
           onDragOver={(e) => e.preventDefault()}
-          onDrop={() => handleDrop(null)}
+          onDrop={(e) => handleZoneDrop(e, null)}
           role="list"
           aria-label="Jugadores sin asignar"
         >
           {unassigned.map((p) => (
-            <PlayerChip key={p.id} player={p} onRemove={removePlayer} onDragStart={handleDragStart} />
+            <PlayerChip key={p.id} player={p} origin={origin} onRemove={removePlayer} />
           ))}
           {unassigned.length === 0 && <p className="pool-empty">Sin jugadores pendientes</p>}
         </div>
@@ -177,9 +189,9 @@ export function Campo({
               key={party.id}
               party={party}
               members={players.filter((p) => p.partyId === party.id)}
-              onDrop={handleDrop}
+              origin={origin}
+              onDrop={handleZoneDrop}
               onRemovePlayer={removePlayer}
-              onDragStart={handleDragStart}
             />
           ))}
         </div>

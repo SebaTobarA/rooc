@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ArrowLeft } from "lucide-react";
+import type { Event, EventSignup } from "@prisma/client";
 import type { EventType } from "@/types/party";
 import { EventSelector } from "@/components/party/event-selector";
 import { GuildLeague } from "@/components/party/guild-league";
@@ -12,7 +13,17 @@ const EVENT_LABEL: Record<NonNullable<EventType>, string> = {
   emperium: "Emperium Overrun",
 };
 
-export function PartyBuilderApp({ canManageParty }: { canManageParty: boolean }) {
+type EventWithSignups = Event & { signups: EventSignup[] };
+
+export function PartyBuilderApp({
+  canManageParty,
+  guildLeagueEvents,
+  emperiumEvents,
+}: {
+  canManageParty: boolean;
+  guildLeagueEvents: EventWithSignups[];
+  emperiumEvents: EventWithSignups[];
+}) {
   const [event, setEvent] = useState<EventType>(null);
 
   if (!event) {
@@ -30,8 +41,10 @@ export function PartyBuilderApp({ canManageParty }: { canManageParty: boolean })
       </header>
 
       <main className="app-main">
-        {event === "guild" && <GuildLeague canManageParty={canManageParty} />}
-        {event === "emperium" && <EmperiumOverrun canManageParty={canManageParty} />}
+        {event === "guild" && <GuildLeague canManageParty={canManageParty} events={guildLeagueEvents} />}
+        {event === "emperium" && (
+          <EmperiumOverrun canManageParty={canManageParty} events={emperiumEvents} />
+        )}
       </main>
     </div>
   );

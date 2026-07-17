@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { DropForm } from "@/components/forms/drop-form";
 import { updateDrop } from "@/lib/actions/drops";
+import { BackLink } from "@/components/admin/back-link";
 
 export const metadata = { title: "Editar drop" };
 export const dynamic = "force-dynamic";
@@ -21,6 +22,7 @@ export default async function EditDropPage({
 
   return (
     <div>
+      <BackLink href="/admin/drops" label="Drops" />
       <h2 className="mb-4 text-lg font-semibold text-foreground">Editar drop</h2>
       <DropForm drop={drop} monsters={monsters} items={items} action={updateDrop.bind(null, id)} />
     </div>

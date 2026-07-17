@@ -356,15 +356,24 @@ model RolePermission {
 }
 
 model PartyTemplate {
-  id          String   @id @default(cuid())
+  id          String @id @default(cuid())
   event       String
   name        String
   // Estado completo de parties/slots (mismo shape que useCampo en el party builder).
   data        Json
   createdById String
-  createdBy   User     @relation(fields: [createdById], references: [id])
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdBy   User   @relation(fields: [createdById], references: [id])
+
+  // Evento de Discord del que salieron los jugadores, si se armó desde ahí
+  // (ver src/lib/party/from-signups.ts). Opcional — sigue existiendo el
+  // import manual sin evento. SetNull para que borrar el Event no borre la
+  // plantilla ya guardada. Se llama `sourceEvent` (no `event`) porque ese
+  // nombre ya lo usa el campo de texto libre de arriba.
+  eventId     String?
+  sourceEvent Event?  @relation(fields: [eventId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([event])
 }
@@ -441,9 +450,10 @@ model Event {
   messageId   String?
   publishedAt DateTime?
 
-  createdById String
-  createdBy   User          @relation(fields: [createdById], references: [id])
-  signups     EventSignup[]
+  createdById    String
+  createdBy      User            @relation(fields: [createdById], references: [id])
+  signups        EventSignup[]
+  partyTemplates PartyTemplate[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

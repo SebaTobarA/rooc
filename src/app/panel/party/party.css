@@ -348,6 +348,25 @@
   line-height: 1;
 }
 
+/* ---------- Import manual (colapsado) ---------- */
+.import-collapse {
+  margin-bottom: 18px;
+}
+.import-collapse-summary {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--pb-text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+.import-collapse-summary:hover {
+  color: var(--pb-accent-hover);
+}
+.import-collapse[open] .import-collapse-summary {
+  margin-bottom: 10px;
+}
+
 /* ---------- Import box ---------- */
 .import-box {
   margin-bottom: 18px;
@@ -726,6 +745,42 @@
   color: var(--pb-text-muted);
   width: 100%;
   text-align: center;
+}
+
+/* ---------- Selector de evento de Discord ---------- */
+.gl-event-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 14px;
+  background: var(--pb-surface-1);
+  border: 1px solid var(--pb-border);
+  border-radius: var(--pb-radius);
+  padding: 14px 16px;
+}
+.gl-event-picker-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--pb-text-secondary);
+  flex: 1;
+  min-width: 220px;
+}
+.gl-event-picker-select {
+  font-size: 13px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--pb-text-primary, var(--foreground, #e9edf1));
+  background: var(--pb-surface-2);
+  border: 1px solid var(--pb-border);
+  border-radius: var(--pb-radius-sm);
+  padding: 7px 10px;
 }
 
 /* ---------- Guild League — import dual ---------- */

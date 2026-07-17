@@ -1,6 +1,7 @@
 import "./party.css";
 import { getSession } from "@/lib/auth";
 import { getEffectivePermissions } from "@/lib/permissions";
+import { prisma } from "@/lib/prisma";
 import { PartyBuilderApp } from "@/components/party/party-builder-app";
 import { SavedTemplates } from "@/components/party/saved-templates";
 
@@ -26,9 +27,26 @@ export default async function PartyPage() {
     );
   }
 
+  const [guildLeagueEvents, emperiumEvents] = await Promise.all([
+    prisma.event.findMany({
+      where: { category: "GUILD_LEAGUE", status: "PUBLISHED" },
+      include: { signups: true },
+      orderBy: { startsAt: "desc" },
+    }),
+    prisma.event.findMany({
+      where: { category: "EMPERIUM_OVERRUN", status: "PUBLISHED" },
+      include: { signups: true },
+      orderBy: { startsAt: "desc" },
+    }),
+  ]);
+
   return (
     <div className="party-page">
-      <PartyBuilderApp canManageParty={permissions.canManageParty} />
+      <PartyBuilderApp
+        canManageParty={permissions.canManageParty}
+        guildLeagueEvents={guildLeagueEvents}
+        emperiumEvents={emperiumEvents}
+      />
       <SavedTemplates canManageParty={permissions.canManageParty} />
     </div>
   );

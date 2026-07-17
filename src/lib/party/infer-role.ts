@@ -1,5 +1,16 @@
 import type { Role } from "@/types/party";
 
+// Transliteradas primero (NFD + sacar diacríticos) y recién después filtradas
+// a [a-z] — así "Paladín" da la clave "paladin" en vez de "paladn" (que no
+// matchea nada). Mismo truco que ya usa src/lib/discord-job-roles.ts.
+function toKey(clase: string): string {
+  return clase
+    .normalize("NFD")
+    .replace(new RegExp("[\\u0300-\\u036f]", "g"), "")
+    .toLowerCase()
+    .replace(/[^a-z]/g, "");
+}
+
 // Aliases normalizados de todas las cadenas de evolución
 const CLASS_ROLE: Record<string, Role> = {
   // ── Tanque ────────────────────────────────────────────────────────────────
@@ -109,21 +120,21 @@ const DORAM_KEYS = new Set(["apprentice", "tobesummoner", "summoner", "grandsumm
  * Toda la cadena Doram queda como "Doram".
  */
 export function normalizeClass(clase: string): string {
-  const key = clase.toLowerCase().replace(/[^a-z]/g, "");
+  const key = toKey(clase);
   if (DORAM_KEYS.has(key)) return "Doram";
   return clase;
 }
 
 /** Infiere el rol a partir del nombre de clase (ya normalizado). */
 export function inferRole(clase: string): Role {
-  const key = clase.toLowerCase().replace(/[^a-z]/g, "");
+  const key = toKey(clase);
   if (DORAM_KEYS.has(key)) return "DPS";
   return CLASS_ROLE[key] ?? "Flexible";
 }
 
 /** Lord Knight puede cubrir Tank de emergencia cuando no hay Paladines. */
 export function isLordKnight(clase: string): boolean {
-  const key = clase.toLowerCase().replace(/[^a-z]/g, "");
+  const key = toKey(clase);
   return key === "lordknight" || key === "lk";
 }
 
@@ -131,7 +142,7 @@ export function isLordKnight(clase: string): boolean {
  * Músicos (Bard/Gypsy y evoluciones) — máximo 1 por party.
  */
 export function isMusicianClass(clase: string): boolean {
-  const key = clase.toLowerCase().replace(/[^a-z]/g, "");
+  const key = toKey(clase);
   return ["bard", "minstrel", "maestro", "clown", "dancer", "gypsy", "wanderer"].includes(key);
 }
 
@@ -139,7 +150,7 @@ export function isMusicianClass(clase: string): boolean {
  * Healers puros (Priest / High Priest / Archbishop) — máximo 1 por party.
  */
 export function isHealerClass(clase: string): boolean {
-  const key = clase.toLowerCase().replace(/[^a-z]/g, "");
+  const key = toKey(clase);
   return ["acolyte", "priest", "highpriest", "hp", "archbishop"].includes(key);
 }
 
@@ -148,6 +159,6 @@ export function isHealerClass(clase: string): boolean {
  * de músico ni de healer, puede convivir con cualquiera de los dos.
  */
 export function isCreatorClass(clase: string): boolean {
-  const key = clase.toLowerCase().replace(/[^a-z]/g, "");
+  const key = toKey(clase);
   return ["alchemist", "biochemist", "geneticist", "creator"].includes(key);
 }

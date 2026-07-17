@@ -65,6 +65,7 @@ export interface UseCampoReturn {
   compositions: SlotLabel[][];
   setCompositions: (c: SlotLabel[][]) => void;
   importPlayers: (raw: string) => ImportResult;
+  addPlayers: (players: Player[]) => void;
   organizeParties: () => string | null; // null = ok, string = error
   suggestDistribution: () => void;
   assignPlayer: (playerId: string, partyId: string | null) => void;
@@ -168,6 +169,18 @@ export function useCampo(initialSlots?: SlotLabel[], options: UseCampoOptions = 
     },
     [maxPlayers]
   );
+
+  // Alta directa (sin pasar por parseEntries) — usada para cargar jugadores
+  // ya resueltos desde otra fuente, ej. inscripciones a un evento de
+  // Discord (ver src/lib/party/from-signups.ts). Mismo dedupe por nickname
+  // que importPlayers, sin el límite de maxPlayers ni el parseo de texto.
+  const addPlayers = useCallback((newPlayers: Player[]) => {
+    setPlayers((prev) => {
+      const existingNicks = new Set(prev.map((p) => p.nickname.toLowerCase()));
+      const toAdd = newPlayers.filter((p) => !existingNicks.has(p.nickname.toLowerCase()));
+      return [...prev, ...toAdd];
+    });
+  }, []);
 
   // Cicla entre composiciones. Lord Knights son DPS primario; si faltan Tanks
   // (Paladines), se usan LKs como tanques de emergencia.
@@ -353,6 +366,7 @@ export function useCampo(initialSlots?: SlotLabel[], options: UseCampoOptions = 
     compositions,
     setCompositions,
     importPlayers,
+    addPlayers,
     organizeParties,
     suggestDistribution,
     assignPlayer,

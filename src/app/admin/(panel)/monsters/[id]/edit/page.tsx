@@ -7,6 +7,7 @@ import {
   updateMonster,
 } from "@/lib/actions/monsters";
 import { inputClass } from "@/components/forms/form-fields";
+import { BackLink } from "@/components/admin/back-link";
 
 export const metadata = { title: "Editar monstruo" };
 export const dynamic = "force-dynamic";
@@ -35,6 +36,7 @@ export default async function EditMonsterPage({
 
   return (
     <div>
+      <BackLink href="/admin/monsters" label="Monstruos" />
       <h2 className="mb-4 text-lg font-semibold text-foreground">Editar {monster.name}</h2>
       <MonsterForm monster={monster} action={updateMonster.bind(null, id)} />
 

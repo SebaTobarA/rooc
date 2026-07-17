@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { getEffectivePermissions } from "@/lib/permissions";
 import { renderAndPublishEmbed } from "@/lib/events";
 
 // Fecha y hora llegan como dos inputs nativos separados (type="date" +
@@ -78,6 +79,20 @@ export async function createEvent(formData: FormData) {
 export async function sendEvent(id: string) {
   await renderAndPublishEmbed(id);
   revalidateEventPaths(id);
+}
+
+/**
+ * Lectura fresca de los signups de un evento — usada por el Party Builder
+ * para "Actualizar inscriptos" sin recargar la página. Requiere el mismo
+ * permiso que gestionar parties, aunque sea de solo lectura.
+ */
+export async function getEventSignups(eventId: string) {
+  const session = await getSession();
+  const permissions = await getEffectivePermissions(session);
+  if (!permissions.canManageParty) {
+    throw new Error("Tu rol no tiene permiso para ver inscripciones de eventos.");
+  }
+  return prisma.eventSignup.findMany({ where: { eventId } });
 }
 
 export async function deleteEvent(id: string) {
