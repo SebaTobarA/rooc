@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { RotateCw } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { getEffectivePermissions } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
@@ -9,6 +10,7 @@ import { ChannelSettingsForm } from "@/components/panel/channel-settings-form";
 import { EventTemplateForm } from "@/components/panel/event-template-form";
 import { DeleteEventTemplateButton } from "@/components/panel/delete-event-template-button";
 import { createEventTemplate, updateEventTemplate } from "@/lib/actions/event-templates";
+import { resendEvent } from "@/lib/actions/events";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Eventos" };
@@ -151,6 +153,7 @@ export default async function EventosPage({
                 <th className="px-4 py-2 font-medium">Categoría</th>
                 <th className="px-4 py-2 font-medium">Fecha</th>
                 <th className="px-4 py-2 font-medium">Estado</th>
+                <th className="px-4 py-2 font-medium">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -164,6 +167,20 @@ export default async function EventosPage({
                   <td className="px-4 py-2 text-muted">{EVENT_CATEGORY_LABEL[event.category]}</td>
                   <td className="px-4 py-2 text-muted">{DATE_FORMATTER.format(event.startsAt)}</td>
                   <td className="px-4 py-2 text-muted">{EVENT_STATUS_LABEL[event.status]}</td>
+                  <td className="px-4 py-2">
+                    {event.status === "PUBLISHED" && (
+                      <form action={resendEvent.bind(null, event.id)}>
+                        <button
+                          type="submit"
+                          title="Reenviar a Discord — usar si alguien borró la publicación original"
+                          aria-label="Reenviar a Discord"
+                          className="flex h-7 w-7 items-center justify-center rounded-full bg-accent/10 text-accent hover:bg-accent/20"
+                        >
+                          <RotateCw size={13} />
+                        </button>
+                      </form>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

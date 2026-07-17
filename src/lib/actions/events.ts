@@ -82,6 +82,19 @@ export async function sendEvent(id: string) {
 }
 
 /**
+ * Vuelve a publicar el roster como mensaje nuevo — para cuando alguien borró
+ * la publicación original en Discord a mano. Se olvida el channelId/messageId
+ * guardados (apuntan a un mensaje que ya no existe) para que
+ * renderAndPublishEmbed tome la rama de "publicar de cero" en vez de
+ * intentar editar un mensaje borrado.
+ */
+export async function resendEvent(id: string) {
+  await prisma.event.update({ where: { id }, data: { channelId: null, messageId: null } });
+  await renderAndPublishEmbed(id);
+  revalidateEventPaths(id);
+}
+
+/**
  * Lectura fresca de los signups de un evento — usada por el Party Builder
  * para "Actualizar inscriptos" sin recargar la página. Requiere el mismo
  * permiso que gestionar parties, aunque sea de solo lectura.

@@ -1,10 +1,11 @@
 import { notFound } from "next/navigation";
+import { RotateCw } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { getEffectivePermissions } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { EVENT_CATEGORY_LABEL, EVENT_STATUS_LABEL } from "@/lib/labels";
 import { JOB_ROLE_NAMES } from "@/lib/discord-job-roles";
-import { sendEvent, deleteEvent } from "@/lib/actions/events";
+import { sendEvent, deleteEvent, resendEvent } from "@/lib/actions/events";
 import { BackLink } from "@/components/back-link";
 
 export const metadata = { title: "Detalle de evento" };
@@ -107,16 +108,28 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
               </form>
             </>
           ) : (
-            discordUrl && (
-              <a
-                href={discordUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="rounded-[10px] border border-border px-4 py-2 text-sm font-semibold uppercase tracking-wide text-foreground transition-colors hover:bg-surface-hover"
-              >
-                Ver en Discord
-              </a>
-            )
+            <>
+              {discordUrl && (
+                <a
+                  href={discordUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-[10px] border border-border px-4 py-2 text-sm font-semibold uppercase tracking-wide text-foreground transition-colors hover:bg-surface-hover"
+                >
+                  Ver en Discord
+                </a>
+              )}
+              <form action={resendEvent.bind(null, event.id)}>
+                <button
+                  type="submit"
+                  title="Reenviar a Discord — usar si alguien borró la publicación original"
+                  aria-label="Reenviar a Discord"
+                  className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-accent text-accent-foreground transition-transform hover:-translate-y-0.5"
+                >
+                  <RotateCw size={16} />
+                </button>
+              </form>
+            </>
           )}
         </div>
       </div>
