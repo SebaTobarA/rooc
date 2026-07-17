@@ -2,12 +2,16 @@ import type { Event, EventTemplate } from "@prisma/client";
 import { EVENT_CATEGORY_LABEL } from "@/lib/labels";
 import { Field, SubmitButton, inputClass } from "@/components/forms/form-fields";
 
-// El input datetime-local necesita "YYYY-MM-DDTHH:mm" en hora local, sin
-// timezone — a diferencia de toISOString() (que da UTC), así que se arma a
-// mano con los getters locales del Date.
-function toLocalInputValue(date: Date): string {
+// Los inputs date/time nativos necesitan "YYYY-MM-DD" y "HH:mm" en hora
+// local por separado (a diferencia de toISOString(), que da UTC), así que
+// se arman a mano con los getters locales del Date.
+function toLocalDateValue(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+function toLocalTimeValue(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 export function EventForm({
@@ -39,39 +43,51 @@ export function EventForm({
       </Field>
 
       <div className="grid grid-cols-2 gap-4">
-        <Field label="Inicio">
+        <Field label="Fecha de inicio">
           <input
-            type="datetime-local"
-            name="startsAt"
-            defaultValue={event ? toLocalInputValue(event.startsAt) : undefined}
+            type="date"
+            name="startsAtDate"
+            defaultValue={event ? toLocalDateValue(event.startsAt) : undefined}
             required
             className={inputClass}
           />
         </Field>
-
-        <Field label="Fin">
+        <Field label="Hora de inicio">
           <input
-            type="datetime-local"
-            name="endsAt"
-            defaultValue={event ? toLocalInputValue(event.endsAt) : undefined}
+            type="time"
+            name="startsAtTime"
+            defaultValue={event ? toLocalTimeValue(event.startsAt) : undefined}
             required
             className={inputClass}
           />
         </Field>
       </div>
 
-      <Field
-        label="Cierre de inscripciones"
-        hint="Hasta cuándo se aceptan altas/cambios de clase. No puede ser después del inicio."
-      >
-        <input
-          type="datetime-local"
-          name="signupsCloseAt"
-          defaultValue={event ? toLocalInputValue(event.signupsCloseAt) : undefined}
-          required
-          className={inputClass}
-        />
-      </Field>
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="Fecha de fin">
+          <input
+            type="date"
+            name="endsAtDate"
+            defaultValue={event ? toLocalDateValue(event.endsAt) : undefined}
+            required
+            className={inputClass}
+          />
+        </Field>
+        <Field label="Hora de fin">
+          <input
+            type="time"
+            name="endsAtTime"
+            defaultValue={event ? toLocalTimeValue(event.endsAt) : undefined}
+            required
+            className={inputClass}
+          />
+        </Field>
+      </div>
+
+      <p className="text-xs text-muted">
+        Las inscripciones quedan abiertas hasta la fecha y hora de fin — el mensaje sigue en
+        Discord hasta que se borre, así que no hace falta un cierre aparte.
+      </p>
 
       <Field label="Descripción" hint="Se muestra tal cual en el mensaje de Discord.">
         <textarea name="description" defaultValue={event?.description} rows={4} className={inputClass} />

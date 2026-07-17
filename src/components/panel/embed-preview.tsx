@@ -25,8 +25,6 @@ export function EmbedPreview({
           📅 &lt; fecha del evento &gt;
           <br />
           🕐 &lt; inicio &gt; - &lt; fin &gt;
-          <br />
-          🔒 Inscripciones hasta &lt; fecha y hora &gt;
         </p>
 
         <p className="mt-3 text-sm text-muted">

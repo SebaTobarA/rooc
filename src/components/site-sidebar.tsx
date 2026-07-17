@@ -45,6 +45,48 @@ function NavItemLink({
   );
 }
 
+function NavAccordionGroup({
+  group,
+  pathname,
+  onNavigate,
+}: {
+  group: { label: string; items: { href: string; label: string }[] };
+  pathname: string;
+  onNavigate?: () => void;
+}) {
+  const hasActiveItem = group.items.some((item) => pathname.startsWith(item.href));
+  const [open, setOpen] = useState(hasActiveItem);
+
+  return (
+    <div className="flex flex-col gap-1">
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        aria-expanded={open}
+        className="flex items-center justify-between rounded-[10px] px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted transition-colors hover:bg-surface hover:text-foreground"
+      >
+        {group.label}
+        <svg
+          viewBox="0 0 24 24"
+          className={`h-3 w-3 shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+        >
+          <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+      {open && (
+        <div className="flex flex-col gap-1">
+          {group.items.map((item) => (
+            <NavItemLink key={item.href} {...item} pathname={pathname} onNavigate={onNavigate} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
 
@@ -57,14 +99,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
       </div>
 
       {siteConfig.navGroups.map((group) => (
-        <div key={group.label} className="flex flex-col gap-1">
-          <span className="px-3 text-xs font-semibold uppercase tracking-wide text-muted">
-            {group.label}
-          </span>
-          {group.items.map((item) => (
-            <NavItemLink key={item.href} {...item} pathname={pathname} onNavigate={onNavigate} />
-          ))}
-        </div>
+        <NavAccordionGroup key={group.label} group={group} pathname={pathname} onNavigate={onNavigate} />
       ))}
     </nav>
   );

@@ -85,10 +85,6 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
             <dt className="text-xs uppercase tracking-wide text-muted">Fin</dt>
             <dd className="text-foreground">{DATE_FORMATTER.format(event.endsAt)}</dd>
           </div>
-          <div>
-            <dt className="text-xs uppercase tracking-wide text-muted">Cierre de inscripciones</dt>
-            <dd className="text-foreground">{DATE_FORMATTER.format(event.signupsCloseAt)}</dd>
-          </div>
         </dl>
         {event.description && (
           <p className="mt-4 whitespace-pre-wrap text-sm text-muted">{event.description}</p>

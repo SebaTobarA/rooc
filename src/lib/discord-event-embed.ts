@@ -88,7 +88,6 @@ export function buildEventEmbed(
     description: [
       "**Event Info:**",
       formatEventRange(event.startsAt, event.endsAt),
-      `🔒 Inscripciones hasta ${DATE_FORMATTER.format(event.signupsCloseAt)} ${TIME_FORMATTER.format(event.signupsCloseAt)}`,
       "",
       "**Description:**",
       event.description || "-",
