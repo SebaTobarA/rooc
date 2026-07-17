@@ -15,7 +15,7 @@ import { swapMemberJobClass } from "@/lib/discord-role-swap";
 export async function updateMyJobClass(roleId: string): Promise<{ error?: string }> {
   const session = await getSession();
   if (!session?.discordId) {
-    return { error: "Necesitás haber iniciado sesión con Discord." };
+    return { error: "Necesitas haber iniciado sesión con Discord." };
   }
 
   const result = await swapMemberJobClass(session.discordId, roleId);

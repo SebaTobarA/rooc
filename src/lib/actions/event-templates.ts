@@ -33,7 +33,7 @@ export async function createEventTemplate(formData: FormData) {
   const user = session?.discordId
     ? await prisma.user.findUnique({ where: { discordId: session.discordId } })
     : null;
-  if (!user) throw new Error("Necesitás haber iniciado sesión con Discord.");
+  if (!user) throw new Error("Necesitas haber iniciado sesión con Discord.");
 
   await prisma.eventTemplate.create({ data: { ...data, createdById: user.id } });
   revalidatePath("/panel/eventos");

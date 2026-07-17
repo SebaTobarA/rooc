@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getGuildRolesCached } from "@/lib/discord-bot";
 import { resolveJobFromRoles } from "@/lib/discord-job-roles";
 import { discordAvatarUrl } from "@/lib/discord-avatar";
+import { getEffectivePermissions } from "@/lib/permissions";
 import type { SidebarSession } from "@/components/site-sidebar";
 
 /**
@@ -31,11 +32,17 @@ export async function getSidebarSession(): Promise<SidebarSession | null> {
 
   if (!session) return null;
 
+  const permissions = await getEffectivePermissions(session);
+
   return {
     label: user?.globalName ?? user?.username ?? session.username ?? "Cuenta",
     username: user?.username ?? null,
     avatarUrl: user ? discordAvatarUrl(user.discordId, user.avatarHash) : null,
     job,
     isAdmin: session.isAdmin,
+    canViewParty: permissions.canViewParty,
+    canManageParty: permissions.canManageParty,
+    canManageRecruitment: permissions.canManageRecruitment,
+    isApplicantOnly: permissions.isApplicantOnly,
   };
 }

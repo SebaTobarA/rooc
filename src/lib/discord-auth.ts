@@ -86,11 +86,24 @@ export async function resolveDiscordUser(code: string, redirectUri: string): Pro
   return fetchDiscordUser(accessToken);
 }
 
-/** Lista blanca de IDs de Discord con acceso al panel admin. */
-export function isAllowedAdminId(discordId: string): boolean {
-  const allowed = (process.env.ADMIN_DISCORD_IDS ?? "")
+/**
+ * Lista blanca de IDs de Discord con acceso total al panel admin, definida
+ * por variable de entorno — son los "dueños" del sitio. No hay forma de
+ * modificar esta lista desde la UI (hace falta redeployar), a propósito:
+ * es la única categoría de admin que nadie puede tocar desde /admin/roles.
+ */
+function listOwnerIds(): string[] {
+  return (process.env.ADMIN_DISCORD_IDS ?? "")
     .split(",")
     .map((id) => id.trim())
     .filter(Boolean);
-  return allowed.includes(discordId);
+}
+
+export function isOwnerId(discordId: string): boolean {
+  return listOwnerIds().includes(discordId);
+}
+
+/** IDs de todos los dueños del sitio (ADMIN_DISCORD_IDS) — para mostrarlos en /admin/roles. */
+export function getOwnerIds(): string[] {
+  return listOwnerIds();
 }

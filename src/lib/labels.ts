@@ -1,4 +1,5 @@
 import type {
+  ApplicationStatus,
   CardRarity,
   CardSlot,
   Element,
@@ -94,4 +95,16 @@ export const EVENT_CATEGORY_LABEL: Record<EventCategory, string> = {
 export const EVENT_STATUS_LABEL: Record<EventStatus, string> = {
   DRAFT: "Borrador",
   PUBLISHED: "Enviado a Discord",
+};
+
+export const APPLICATION_STATUS_LABEL: Record<ApplicationStatus, string> = {
+  PENDING: "Pendiente de revisión",
+  APPROVED: "Aprobada",
+  WAITLISTED: "Lista de espera",
+};
+
+export const APPLICATION_STATUS_COLOR: Record<ApplicationStatus, string> = {
+  PENDING: "text-amber-400 border-amber-500/40",
+  APPROVED: "text-emerald-400 border-emerald-500/40",
+  WAITLISTED: "text-sky-400 border-sky-500/40",
 };

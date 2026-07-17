@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   DISCORD_STATE_COOKIE,
-  isAllowedAdminId,
+  isOwnerId,
   resolveDiscordUser,
 } from "@/lib/discord-auth";
 import { getGuildMember } from "@/lib/discord-bot";
@@ -11,6 +11,7 @@ import {
   createSessionToken,
 } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
+import { isDbGrantedAdmin } from "@/lib/permissions";
 
 function errorRedirect(request: Request, from: string, reason: string) {
   const target = from.startsWith("/admin") ? "/admin/login" : "/";
@@ -52,7 +53,7 @@ export async function GET(request: Request) {
       return errorRedirect(request, from, "discord_not_member");
     }
 
-    const isAdmin = isAllowedAdminId(discordUser.id);
+    const isAdmin = isOwnerId(discordUser.id) || (await isDbGrantedAdmin(discordUser.id));
 
     await prisma.user.upsert({
       where: { discordId: discordUser.id },

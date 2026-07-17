@@ -352,7 +352,69 @@ model RolePermission {
   canViewParty     Boolean  @default(true)
   canManageParty   Boolean  @default(false)
   canManageContent Boolean  @default(false)
+  // Ve el módulo "Reclutamiento" en /admin/recruitment (revisar/aprobar
+  // postulaciones), sin necesitar ser admin del sitio.
+  canManageRecruitment Boolean @default(false)
+  // Un usuario cuyo único rol con fila guardada tiene esto en true queda
+  // "solo postulante": en vez del panel normal, cualquier ruta de /panel
+  // lo redirige a /panel/postulacion (ver proxy.ts). Si además tiene otro
+  // rol con canViewPanel true, esta bandera se ignora (getEffectivePermissions).
+  isApplicantRole  Boolean  @default(false)
   updatedAt        DateTime @updatedAt
+}
+
+enum ApplicationStatus {
+  PENDING
+  APPROVED
+  WAITLISTED
+}
+
+// Postulación de ingreso a la guild, enviada desde /panel/postulacion por
+// alguien con un rol marcado `isApplicantRole` (ej. Pronterian@s). Datos de
+// Discord denormalizados igual que LeadershipMember, no hace falta un FK a
+// User. Solo puede haber una postulación activa por discordId.
+model GuildApplication {
+  id String @id @default(cuid())
+
+  discordId         String  @unique
+  discordUsername   String
+  discordAvatarHash String?
+
+  characterName String
+  className     String
+  levelText     String @default("")
+  availability  String
+  aboutYou      String @default("")
+
+  status     ApplicationStatus @default(PENDING)
+  // Mensaje que ve el postulante junto al estado (ej. el texto de lista de
+  // espera). Vacío mientras está PENDING.
+  reviewNote String            @default("")
+
+  reviewedByDiscordId String?
+  reviewedByUsername  String?
+  reviewedAt          DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+// Administradores adicionales otorgados desde /admin/roles (además de la
+// lista fija de ADMIN_DISCORD_IDS en env, que sigue siendo la única forma
+// de ser "dueño" — nadie puede tocar esa lista desde la UI). Ver
+// src/lib/discord-auth.ts (isAllowedAdminId) e isDbAdmin en permissions.ts.
+model AdminGrant {
+  id String @id @default(cuid())
+
+  discordId  String  @unique
+  username   String
+  avatarHash String?
+
+  grantedByDiscordId String?
+
+  createdAt DateTime @default(now())
 }
 
 model PartyTemplate {

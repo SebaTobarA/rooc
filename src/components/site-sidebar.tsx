@@ -87,8 +87,26 @@ function NavAccordionGroup({
   );
 }
 
-function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
+// Qué permiso habilita cada link de siteConfig.navGroups — un item sin
+// entrada acá se muestra siempre que el grupo sea visible.
+const NAV_ITEM_PERMISSION: Record<string, keyof SidebarSession> = {
+  "/panel/party": "canViewParty",
+  "/panel/eventos": "canManageParty",
+};
+
+function NavLinks({ session, onNavigate }: { session?: SidebarSession | null; onNavigate?: () => void }) {
   const pathname = usePathname();
+
+  const navGroups = siteConfig.navGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => {
+        const requiredPermission = NAV_ITEM_PERMISSION[item.href];
+        if (!requiredPermission) return true;
+        return Boolean(session?.[requiredPermission]);
+      }),
+    }))
+    .filter((group) => group.items.length > 0);
 
   return (
     <nav className="flex flex-col gap-4">
@@ -98,7 +116,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
         ))}
       </div>
 
-      {siteConfig.navGroups.map((group) => (
+      {navGroups.map((group) => (
         <NavAccordionGroup key={group.label} group={group} pathname={pathname} onNavigate={onNavigate} />
       ))}
     </nav>
@@ -111,6 +129,10 @@ export type SidebarSession = {
   avatarUrl: string | null;
   job: string | null;
   isAdmin: boolean;
+  canViewParty: boolean;
+  canManageParty: boolean;
+  canManageRecruitment: boolean;
+  isApplicantOnly: boolean;
 };
 
 function ProfileCard({ session }: { session: SidebarSession }) {
@@ -177,13 +199,22 @@ function ProfileCard({ session }: { session: SidebarSession }) {
 function AccountBlock({ session }: { session: SidebarSession }) {
   return (
     <div className="mt-auto flex flex-col gap-2 border-t border-border pt-4 text-sm">
-      {session.isAdmin && (
+      {session.isAdmin ? (
         <Link
           href="/admin"
           className="rounded-[10px] px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-accent hover:bg-surface"
         >
           Panel de Admin
         </Link>
+      ) : (
+        session.canManageRecruitment && (
+          <Link
+            href="/admin/recruitment"
+            className="rounded-[10px] px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-accent hover:bg-surface"
+          >
+            Reclutamiento
+          </Link>
+        )
       )}
       <form action="/api/auth/logout" method="POST">
         <button
@@ -197,9 +228,26 @@ function AccountBlock({ session }: { session: SidebarSession }) {
   );
 }
 
+// Un rol "solo postulante" (ver isApplicantOnly en permissions.ts) no tiene
+// nada más que ver en el panel — el resto de las rutas lo rebotan de vuelta
+// acá igual (proxy.ts), así que ni tiene sentido mostrarle el resto del nav.
+function ApplicantNavLinks({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
+  return (
+    <nav className="flex flex-col gap-1">
+      <NavItemLink
+        href="/panel/postulacion"
+        label="Tu postulación"
+        pathname={pathname}
+        onNavigate={onNavigate}
+      />
+    </nav>
+  );
+}
+
 /** Menú lateral izquierdo (desktop) con menú deslizable equivalente en mobile. */
 export function SiteSidebar({ session }: { session?: SidebarSession | null }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const pathname = usePathname();
 
   return (
     <>
@@ -207,7 +255,11 @@ export function SiteSidebar({ session }: { session?: SidebarSession | null }) {
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col gap-6 border-r border-border bg-background p-5 sm:flex">
         <Brand />
         {session && <ProfileCard session={session} />}
-        <NavLinks />
+        {session?.isApplicantOnly ? (
+          <ApplicantNavLinks pathname={pathname} />
+        ) : (
+          <NavLinks session={session} />
+        )}
         {session && <AccountBlock session={session} />}
       </aside>
 
@@ -251,7 +303,11 @@ export function SiteSidebar({ session }: { session?: SidebarSession | null }) {
               </button>
             </div>
             {session && <ProfileCard session={session} />}
-            <NavLinks onNavigate={() => setDrawerOpen(false)} />
+            {session?.isApplicantOnly ? (
+              <ApplicantNavLinks pathname={pathname} onNavigate={() => setDrawerOpen(false)} />
+            ) : (
+              <NavLinks session={session} onNavigate={() => setDrawerOpen(false)} />
+            )}
             {session && <AccountBlock session={session} />}
           </div>
         </div>

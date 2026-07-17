@@ -8,7 +8,7 @@ export default async function PanelLayout({ children }: { children: React.ReactN
 
   return (
     <div className="flex min-h-screen flex-col">
-      <div className="flex flex-1">
+      <div className="flex flex-1 flex-col sm:flex-row">
         <SiteSidebar session={sidebarSession} />
         <div className="flex min-w-0 flex-1 flex-col">
           <main className="flex-1">{children}</main>

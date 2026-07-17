@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const links = [
+const FULL_ADMIN_LINKS = [
   { href: "/admin", label: "Resumen", exact: true },
   { href: "/admin/items", label: "Equipamiento" },
   { href: "/admin/cards", label: "Cartas" },
@@ -14,11 +14,15 @@ const links = [
   { href: "/admin/import", label: "Importar CSV/JSON" },
   { href: "/admin/leadership", label: "Liderazgo" },
   { href: "/admin/members", label: "Miembros" },
+  { href: "/admin/recruitment", label: "Reclutamiento" },
   { href: "/admin/roles", label: "Roles y permisos" },
 ];
 
-export function AdminNav() {
+const RECRUITMENT_ONLY_LINKS = [{ href: "/admin/recruitment", label: "Reclutamiento", exact: true }];
+
+export function AdminNav({ fullAdmin }: { fullAdmin: boolean }) {
   const pathname = usePathname();
+  const links = fullAdmin ? FULL_ADMIN_LINKS : RECRUITMENT_ONLY_LINKS;
 
   return (
     <nav className="flex flex-wrap gap-1 border-b border-border pb-4">
