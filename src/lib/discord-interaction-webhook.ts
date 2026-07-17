@@ -17,19 +17,36 @@ function getApplicationId(): string {
   return id;
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function editInteractionOriginal(
   interactionToken: string,
   body: { content?: string; embeds?: DiscordEmbed[]; components?: DiscordActionRow[] }
 ): Promise<void> {
-  const response = await fetch(
-    `${DISCORD_API}/webhooks/${getApplicationId()}/${interactionToken}/messages/@original`,
-    {
+  const url = `${DISCORD_API}/webhooks/${getApplicationId()}/${interactionToken}/messages/@original`;
+
+  // Justo después de reconocer la interacción (type 5/6) puede pasar que
+  // Discord todavía no haya terminado de registrar el mensaje diferido del
+  // lado de ellos — el primer intento de editarlo devuelve 404 aunque el
+  // token sea válido. Se reintenta un par de veces con una espera corta en
+  // vez de fallar directo; cualquier otro código de error no se reintenta.
+  const delaysMs = [0, 400, 900];
+
+  let lastStatus = 0;
+  for (const delay of delaysMs) {
+    if (delay > 0) await sleep(delay);
+
+    const response = await fetch(url, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
-    }
-  );
-  if (!response.ok) {
-    throw new Error(`No se pudo editar la respuesta de la interacción (${response.status}).`);
+    });
+    if (response.ok) return;
+    lastStatus = response.status;
+    if (response.status !== 404) break;
   }
+
+  throw new Error(`No se pudo editar la respuesta de la interacción (${lastStatus}).`);
 }
