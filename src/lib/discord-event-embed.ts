@@ -12,13 +12,13 @@ import { JOB_ROLE_NAMES } from "@/lib/discord-job-roles";
 const FALLBACK_COLOR = 0x6fe0f5;
 const MAX_FIELD_VALUE = 1024;
 
-export const DATE_FORMATTER = new Intl.DateTimeFormat("es-AR", {
+export const DATE_FORMATTER = new Intl.DateTimeFormat("es-419", {
   day: "2-digit",
   month: "2-digit",
   year: "numeric",
   timeZone: "America/Argentina/Buenos_Aires",
 });
-export const TIME_FORMATTER = new Intl.DateTimeFormat("es-AR", {
+export const TIME_FORMATTER = new Intl.DateTimeFormat("es-419", {
   hour: "2-digit",
   minute: "2-digit",
   hour12: false,

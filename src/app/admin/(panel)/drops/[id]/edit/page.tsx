@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { DropForm } from "@/components/forms/drop-form";
 import { updateDrop } from "@/lib/actions/drops";
-import { BackLink } from "@/components/admin/back-link";
+import { BackLink } from "@/components/back-link";
 
 export const metadata = { title: "Editar drop" };
 export const dynamic = "force-dynamic";

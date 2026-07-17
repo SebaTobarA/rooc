@@ -66,7 +66,7 @@ export function EmperiumOverrun({
         </div>
       ) : (
         <p className="campo-hint">
-          Todavía no hay eventos de Emperium Overrun enviados a Discord — podés importar jugadores a
+          Todavía no hay eventos de Emperium Overrun enviados a Discord — puedes importar jugadores a
           mano abajo.
         </p>
       )}

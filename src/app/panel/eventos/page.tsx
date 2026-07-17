@@ -13,7 +13,7 @@ import { createEventTemplate, updateEventTemplate } from "@/lib/actions/event-te
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Eventos" };
 
-const DATE_FORMATTER = new Intl.DateTimeFormat("es-AR", {
+const DATE_FORMATTER = new Intl.DateTimeFormat("es-419", {
   day: "2-digit",
   month: "2-digit",
   year: "numeric",
@@ -36,7 +36,7 @@ export default async function EventosPage({
         <h1 className="text-xl font-bold text-foreground">Sin acceso</h1>
         <p className="mt-2 text-sm text-muted">
           Tu rol no tiene habilitada la administración de eventos. Si crees que es un error,
-          consultá con un administrador del server.
+          consulta con un administrador del server.
         </p>
       </div>
     );

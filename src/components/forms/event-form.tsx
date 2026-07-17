@@ -32,7 +32,7 @@ export function EventForm({
       <Field label="Template" hint="Define el color, ícono y categoría del embed en Discord.">
         <select name="templateId" defaultValue={event?.templateId} required className={inputClass}>
           <option value="" disabled>
-            Elegí un template
+            Elige un template
           </option>
           {templates.map((template) => (
             <option key={template.id} value={template.id}>

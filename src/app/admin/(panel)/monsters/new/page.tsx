@@ -1,6 +1,6 @@
 import { MonsterForm } from "@/components/forms/monster-form";
 import { createMonster } from "@/lib/actions/monsters";
-import { BackLink } from "@/components/admin/back-link";
+import { BackLink } from "@/components/back-link";
 
 export const metadata = { title: "Nuevo monstruo" };
 

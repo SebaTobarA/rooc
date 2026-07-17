@@ -5,11 +5,12 @@ import { prisma } from "@/lib/prisma";
 import { EVENT_CATEGORY_LABEL, EVENT_STATUS_LABEL } from "@/lib/labels";
 import { JOB_ROLE_NAMES } from "@/lib/discord-job-roles";
 import { sendEvent, deleteEvent } from "@/lib/actions/events";
+import { BackLink } from "@/components/back-link";
 
 export const metadata = { title: "Detalle de evento" };
 export const dynamic = "force-dynamic";
 
-const DATE_FORMATTER = new Intl.DateTimeFormat("es-AR", {
+const DATE_FORMATTER = new Intl.DateTimeFormat("es-419", {
   day: "2-digit",
   month: "2-digit",
   year: "numeric",
@@ -57,6 +58,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+      <BackLink href="/panel/eventos" label="Eventos" />
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-lg font-semibold text-foreground">
           {event.template.icon ? `${event.template.icon} ` : ""}

@@ -1,6 +1,6 @@
 import { ItemSetForm } from "@/components/forms/item-set-form";
 import { createItemSet } from "@/lib/actions/item-sets";
-import { BackLink } from "@/components/admin/back-link";
+import { BackLink } from "@/components/back-link";
 
 export const metadata = { title: "Nuevo set" };
 

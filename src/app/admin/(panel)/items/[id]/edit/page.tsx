@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { ItemForm } from "@/components/forms/item-form";
 import { updateItem } from "@/lib/actions/items";
-import { BackLink } from "@/components/admin/back-link";
+import { BackLink } from "@/components/back-link";
 
 export const metadata = { title: "Editar ítem" };
 export const dynamic = "force-dynamic";

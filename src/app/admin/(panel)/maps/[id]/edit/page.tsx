@@ -5,7 +5,7 @@ import { MapForm } from "@/components/forms/map-form";
 import { addNpc, deleteNpc, updateMap } from "@/lib/actions/maps";
 import { addMonsterToMap, removeMonsterFromMap } from "@/lib/actions/monsters";
 import { inputClass } from "@/components/forms/form-fields";
-import { BackLink } from "@/components/admin/back-link";
+import { BackLink } from "@/components/back-link";
 
 export const metadata = { title: "Editar mapa" };
 export const dynamic = "force-dynamic";
@@ -97,7 +97,7 @@ export default async function EditMapPage({
         {availableMonsters.length > 0 && (
           <form action={addMonsterAction} className="flex gap-2">
             <select name="monsterId" required className={`${inputClass} flex-1`}>
-              <option value="">Elegí un monstruo...</option>
+              <option value="">Elige un monstruo...</option>
               {availableMonsters.map((monster) => (
                 <option key={monster.id} value={monster.id}>
                   {monster.name}

@@ -4,6 +4,7 @@ import { getEffectivePermissions } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { EventForm } from "@/components/forms/event-form";
 import { createEvent } from "@/lib/actions/events";
+import { BackLink } from "@/components/back-link";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Nuevo evento" };
@@ -27,14 +28,15 @@ export default async function NewEventPage() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
+      <BackLink href="/panel/eventos" label="Eventos" />
       <h1 className="mb-4 text-lg font-semibold text-foreground">Nuevo evento</h1>
       {templates.length === 0 ? (
         <p className="text-sm text-muted">
-          Todavía no hay ningún template creado — andá a{" "}
+          Todavía no hay ningún template creado — ve a{" "}
           <Link href="/panel/eventos" className="text-accent hover:underline">
             Eventos
           </Link>{" "}
-          y creá uno primero.
+          y crea uno primero.
         </p>
       ) : (
         <EventForm templates={templates} action={createEvent} />

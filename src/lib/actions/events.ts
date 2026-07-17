@@ -18,7 +18,7 @@ const eventSchema = z
   .object({
     title: z.string().min(1, "El título es obligatorio"),
     description: z.string().default(""),
-    templateId: z.string().min(1, "Elegí un template"),
+    templateId: z.string().min(1, "Elige un template"),
     startsAtDate: z.string().min(1, "La fecha de inicio es obligatoria"),
     startsAtTime: z.string().min(1, "La hora de inicio es obligatoria"),
     endsAtDate: z.string().min(1, "La fecha de fin es obligatoria"),

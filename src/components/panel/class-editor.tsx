@@ -43,7 +43,7 @@ export function ClassEditor({
           className="rounded-[10px] border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-accent"
         >
           <option value="" disabled>
-            Elegí tu clase
+            Elige tu clase
           </option>
           {jobRoles.map((role) => (
             <option key={role.id} value={role.id}>
@@ -66,8 +66,8 @@ export function ClassEditor({
         </p>
       )}
       <p className="text-xs text-muted">
-        Esto está vinculado con Discord: cambiarla acá actualiza tu rol en el server, y si cambiás
-        tu rol de clase directamente en Discord, se refleja acá al volver a entrar a esta página.
+        Esto está vinculado con Discord: cambiarla aquí actualiza tu rol en el server, y si cambias
+        tu rol de clase directamente en Discord, se refleja aquí al volver a entrar a esta página.
       </p>
     </div>
   );

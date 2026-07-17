@@ -14,7 +14,7 @@ export function ChannelSettingsForm({
       <Field label="Canal de Discord para publicar eventos" hint="Se usa para todos los eventos nuevos.">
         <select name="channelId" defaultValue={currentChannelId ?? ""} required className={inputClass}>
           <option value="" disabled>
-            Elegí un canal
+            Elige un canal
           </option>
           {channels.map((channel) => (
             <option key={channel.id} value={channel.id}>

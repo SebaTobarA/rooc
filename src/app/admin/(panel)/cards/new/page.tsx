@@ -1,6 +1,6 @@
 import { CardForm } from "@/components/forms/card-form";
 import { createCard } from "@/lib/actions/cards";
-import { BackLink } from "@/components/admin/back-link";
+import { BackLink } from "@/components/back-link";
 
 export const metadata = { title: "Nueva carta" };
 export const dynamic = "force-dynamic";

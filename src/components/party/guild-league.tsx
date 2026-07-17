@@ -174,7 +174,7 @@ export function GuildLeague({
         </div>
       ) : (
         <p className="campo-hint">
-          Todavía no hay eventos de Guild League enviados a Discord — podés cargar jugadores a mano
+          Todavía no hay eventos de Guild League enviados a Discord — puedes cargar jugadores a mano
           más abajo.
         </p>
       )}

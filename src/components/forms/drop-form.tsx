@@ -17,7 +17,7 @@ export function DropForm({
       <Field label="Monstruo">
         <select name="monsterId" defaultValue={drop?.monsterId ?? ""} required className={inputClass}>
           <option value="" disabled>
-            Elegí un monstruo...
+            Elige un monstruo...
           </option>
           {monsters.map((monster) => (
             <option key={monster.id} value={monster.id}>
@@ -30,7 +30,7 @@ export function DropForm({
       <Field label="Ítem">
         <select name="itemId" defaultValue={drop?.itemId ?? ""} required className={inputClass}>
           <option value="" disabled>
-            Elegí un ítem...
+            Elige un ítem...
           </option>
           {items.map((item) => (
             <option key={item.id} value={item.id}>

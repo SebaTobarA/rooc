@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { ItemForm } from "@/components/forms/item-form";
 import { createItem } from "@/lib/actions/items";
-import { BackLink } from "@/components/admin/back-link";
+import { BackLink } from "@/components/back-link";
 
 export const metadata = { title: "Nuevo ítem" };
 export const dynamic = "force-dynamic";

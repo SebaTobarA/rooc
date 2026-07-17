@@ -6,8 +6,8 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 
 const dropSchema = z.object({
-  monsterId: z.string().min(1, "Elegí un monstruo"),
-  itemId: z.string().min(1, "Elegí un ítem"),
+  monsterId: z.string().min(1, "Elige un monstruo"),
+  itemId: z.string().min(1, "Elige un ítem"),
   rate: z.coerce.number().min(0).max(100),
 });
 

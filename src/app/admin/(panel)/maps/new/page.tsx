@@ -1,6 +1,6 @@
 import { MapForm } from "@/components/forms/map-form";
 import { createMap } from "@/lib/actions/maps";
-import { BackLink } from "@/components/admin/back-link";
+import { BackLink } from "@/components/back-link";
 
 export const metadata = { title: "Nuevo mapa" };
 

@@ -123,7 +123,7 @@ export function MemberPicker({
           </div>
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-xs text-muted">
-              Apodo a mostrar (podés cambiarlo si no coincide con el del juego)
+              Apodo a mostrar (puedes cambiarlo si no coincide con el del juego)
             </span>
             <input
               type="text"

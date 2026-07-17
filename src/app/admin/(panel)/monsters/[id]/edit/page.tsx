@@ -7,7 +7,7 @@ import {
   updateMonster,
 } from "@/lib/actions/monsters";
 import { inputClass } from "@/components/forms/form-fields";
-import { BackLink } from "@/components/admin/back-link";
+import { BackLink } from "@/components/back-link";
 
 export const metadata = { title: "Editar monstruo" };
 export const dynamic = "force-dynamic";
@@ -61,7 +61,7 @@ export default async function EditMonsterPage({
         {availableMaps.length > 0 && (
           <form action={addToMapAction} className="flex gap-2">
             <select name="mapId" required className={`${inputClass} flex-1`}>
-              <option value="">Elegí un mapa...</option>
+              <option value="">Elige un mapa...</option>
               {availableMaps.map((map) => (
                 <option key={map.id} value={map.id}>
                   {map.name}

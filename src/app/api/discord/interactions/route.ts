@@ -105,17 +105,17 @@ async function handleComponent(interaction: Required<DiscordInteraction>) {
           const currentJob = resolveJobFromRoles(interaction.member.roles, guildRoles);
           if (!currentJob) {
             await editInteractionOriginal(token, {
-              content: "Todavía no tenés una clase asignada en Discord — elegí la tuya:",
+              content: "Todavía no tienes una clase asignada en Discord — elige la tuya:",
               components: buildClassPickerComponents(eventId, listJobGuildRoles(guildRoles)),
             });
             return;
           }
           await editInteractionOriginal(token, {
-            content: `¿Seguís siendo **${currentJob}**?`,
+            content: `¿Sigues siendo **${currentJob}**?`,
             components: buildConfirmComponents(eventId),
           });
         } catch (err) {
-          await safeEdit(token, err instanceof Error ? err.message : "Ocurrió un error, probá de nuevo.");
+          await safeEdit(token, err instanceof Error ? err.message : "Ocurrió un error, intenta de nuevo.");
         }
       });
       return Response.json({ type: 5, data: { flags: 64 } });
@@ -132,7 +132,7 @@ async function handleComponent(interaction: Required<DiscordInteraction>) {
           const currentRoleId = interaction.member.roles.find((id) => jobIds.has(id));
           const currentJob = jobRoles.find((role) => role.id === currentRoleId);
           if (!currentJob) {
-            await safeEdit(token, "No se encontró tu clase actual — probá de nuevo desde \"Participar\".");
+            await safeEdit(token, "No se encontró tu clase actual — intenta de nuevo desde \"Participar\".");
             return;
           }
           await upsertEventSignup(eventId, actorId, {
@@ -144,7 +144,7 @@ async function handleComponent(interaction: Required<DiscordInteraction>) {
           await renderAndPublishEmbed(eventId);
           await editInteractionOriginal(token, { content: `Listo ✅ Anotado como ${currentJob.name}.`, components: [] });
         } catch (err) {
-          await safeEdit(token, err instanceof Error ? err.message : "Ocurrió un error, probá de nuevo.");
+          await safeEdit(token, err instanceof Error ? err.message : "Ocurrió un error, intenta de nuevo.");
         }
       });
       return Response.json({ type: 6 });
@@ -157,7 +157,7 @@ async function handleComponent(interaction: Required<DiscordInteraction>) {
       return Response.json({
         type: 7,
         data: {
-          content: "Elegí tu clase actual:",
+          content: "Elige tu clase actual:",
           components: buildClassPickerComponents(eventId, listJobGuildRoles(guildRoles)),
         },
       });
@@ -190,11 +190,11 @@ async function handleComponent(interaction: Required<DiscordInteraction>) {
           });
           await renderAndPublishEmbed(eventId);
           await editInteractionOriginal(token, {
-            content: `Listo ✅ Ahora sos ${className} y quedaste anotado.`,
+            content: `Listo ✅ Ahora eres ${className} y quedaste anotado.`,
             components: [],
           });
         } catch (err) {
-          await safeEdit(token, err instanceof Error ? err.message : "Ocurrió un error, probá de nuevo.");
+          await safeEdit(token, err instanceof Error ? err.message : "Ocurrió un error, intenta de nuevo.");
         }
       });
       return Response.json({ type: 6 });
