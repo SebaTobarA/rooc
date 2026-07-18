@@ -277,10 +277,10 @@ export async function importDrops(rows: RawRow[]): Promise<ImportSummary> {
       if (rate < 0 || rate > 100) throw new Error(`"rate" debe estar entre 0 y 100 (recibido ${rate})`);
 
       const monster = await findMonsterByNameOrSlug(monsterRef);
-      if (!monster) throw new Error(`no se encontró el monstruo "${monsterRef}" (cargalo antes que sus drops)`);
+      if (!monster) throw new Error(`no se encontró el monstruo "${monsterRef}" (cárgalo antes que sus drops)`);
 
       const item = await findItemByNameOrSlug(itemRef);
-      if (!item) throw new Error(`no se encontró el ítem "${itemRef}" (cargalo antes que sus drops)`);
+      if (!item) throw new Error(`no se encontró el ítem "${itemRef}" (cárgalo antes que sus drops)`);
 
       const existing = await prisma.drop.findUnique({
         where: { monsterId_itemId: { monsterId: monster.id, itemId: item.id } },
@@ -301,7 +301,97 @@ export async function importDrops(rows: RawRow[]): Promise<ImportSummary> {
   return summary;
 }
 
-export type ImportEntity = "items" | "cards" | "monsters" | "maps" | "drops";
+// ---------------------------------------------------------------------------
+// Habilidades (Build PVP) — a diferencia de las demás, referencia otra
+// tabla (Job, por nombre) y tiene sus propias relaciones (prerequisitos),
+// así que se resuelve en dos pasadas: primero se crean/actualizan todas las
+// skills del archivo, después se resuelven los prerequisitos por nombre
+// (ya con todas las filas del archivo existiendo, sin importar el orden).
+// ---------------------------------------------------------------------------
+
+function parsePrerequisitePairs(raw: string): { name: string; level: number }[] {
+  return raw
+    .split(",")
+    .map((pair) => pair.trim())
+    .filter(Boolean)
+    .map((pair) => {
+      const [name, levelRaw] = pair.split(":").map((part) => part.trim());
+      return { name, level: Math.max(1, Number(levelRaw) || 1) };
+    })
+    .filter((entry) => entry.name);
+}
+
+export async function importSkills(rows: RawRow[]): Promise<ImportSummary> {
+  const summary = newSummary();
+  const pendingPrerequisites: { index: number; skillId: string; jobId: string; raw: string }[] = [];
+
+  for (const [index, row] of rows.entries()) {
+    try {
+      const jobName = requireField(row, "job");
+      const name = requireField(row, "name");
+
+      const job = await prisma.job.findFirst({ where: { name: jobName } });
+      if (!job) {
+        throw new Error(`no se encontró la clase "${jobName}" (créala primero en /admin/build-pvp)`);
+      }
+
+      const data = {
+        jobId: job.id,
+        name,
+        maxLevel: optionalNumber(row, "maxLevel") ?? 10,
+        col: optionalNumber(row, "col") ?? 0,
+        row: optionalNumber(row, "row") ?? 0,
+        iconUrl: row.iconUrl?.trim() || null,
+        levelDescriptions: row.levelDescriptions
+          ? row.levelDescriptions.split("|").map((desc) => desc.trim())
+          : [],
+      };
+
+      const existing = await prisma.skill.findFirst({ where: { jobId: job.id, name } });
+      let skillId: string;
+      if (existing) {
+        await prisma.skill.update({ where: { id: existing.id }, data });
+        skillId = existing.id;
+        summary.updated++;
+      } else {
+        const created = await prisma.skill.create({ data });
+        skillId = created.id;
+        summary.created++;
+      }
+
+      if (row.prerequisites?.trim()) {
+        pendingPrerequisites.push({ index, skillId, jobId: job.id, raw: row.prerequisites });
+      }
+    } catch (err) {
+      summary.errors.push(`Fila ${index + 2}: ${(err as Error).message}`);
+    }
+  }
+
+  for (const { index, skillId, jobId, raw } of pendingPrerequisites) {
+    try {
+      const pairs = parsePrerequisitePairs(raw);
+      const entries: { requiresSkillId: string; requiredLevel: number }[] = [];
+      for (const pair of pairs) {
+        const requiredSkill = await prisma.skill.findFirst({ where: { jobId, name: pair.name } });
+        if (!requiredSkill) {
+          throw new Error(`prerequisito "${pair.name}" no encontrado en la misma clase`);
+        }
+        entries.push({ requiresSkillId: requiredSkill.id, requiredLevel: pair.level });
+      }
+
+      await prisma.$transaction([
+        prisma.skillPrerequisite.deleteMany({ where: { skillId } }),
+        ...entries.map((entry) => prisma.skillPrerequisite.create({ data: { skillId, ...entry } })),
+      ]);
+    } catch (err) {
+      summary.errors.push(`Fila ${index + 2} (prerequisitos): ${(err as Error).message}`);
+    }
+  }
+
+  return summary;
+}
+
+export type ImportEntity = "items" | "cards" | "monsters" | "maps" | "drops" | "skills";
 
 export const importersByEntity: Record<ImportEntity, (rows: RawRow[]) => Promise<ImportSummary>> = {
   items: importItems,
@@ -309,4 +399,5 @@ export const importersByEntity: Record<ImportEntity, (rows: RawRow[]) => Promise
   monsters: importMonsters,
   maps: importMaps,
   drops: importDrops,
+  skills: importSkills,
 };

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { detectFormat, parseRows } from "@/lib/import/parse";
 import { importersByEntity, type ImportEntity } from "@/lib/import/importers";
 
-const VALID_ENTITIES: ImportEntity[] = ["items", "cards", "monsters", "maps", "drops"];
+const VALID_ENTITIES: ImportEntity[] = ["items", "cards", "monsters", "maps", "drops", "skills"];
 
 /**
  * Endpoint de importación masiva usado por /admin/import. Protegido por

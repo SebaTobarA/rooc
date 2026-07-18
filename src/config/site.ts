@@ -22,6 +22,7 @@ export const siteConfig = {
       items: [
         { href: "/panel/party", label: "Party Builder" },
         { href: "/panel/eventos", label: "Eventos" },
+        { href: "/panel/build-pvp", label: "Build PVP" },
       ],
     },
   ],

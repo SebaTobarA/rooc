@@ -92,6 +92,7 @@ function NavAccordionGroup({
 const NAV_ITEM_PERMISSION: Record<string, keyof SidebarSession> = {
   "/panel/party": "canViewParty",
   "/panel/eventos": "canManageParty",
+  "/panel/build-pvp": "canViewParty",
 };
 
 function NavLinks({ session, onNavigate }: { session?: SidebarSession | null; onNavigate?: () => void }) {

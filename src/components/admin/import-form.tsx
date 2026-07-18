@@ -1,27 +1,32 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { inputClass } from "@/components/forms/form-fields";
+import { IMPORT_ENTITIES, getImportEntity } from "@/lib/import/formats";
 
 type ImportSummary = { created: number; updated: number; errors: string[] };
 type ApiResponse =
   | { ok: true; rowCount: number; summary: ImportSummary }
   | { error: string };
 
-const ENTITIES = [
-  { value: "items", label: "Ítems" },
-  { value: "cards", label: "Cartas" },
-  { value: "monsters", label: "Monstruos" },
-  { value: "maps", label: "Mapas" },
-  { value: "drops", label: "Drops" },
-] as const;
+function downloadTextFile(filename: string, content: string, mime: string) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
 
 export function ImportForm() {
   const router = useRouter();
-  const [entity, setEntity] = useState<string>("items");
+  const [entity, setEntity] = useState<string>(IMPORT_ENTITIES[0].value);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ApiResponse | null>(null);
+
+  const entityDef = useMemo(() => getImportEntity(entity), [entity]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -47,9 +52,25 @@ export function ImportForm() {
     }
   }
 
+  function downloadCsvTemplate() {
+    if (!entityDef) return;
+    const header = entityDef.fields.map((field) => field.name).join(",");
+    downloadTextFile(`plantilla-${entityDef.value}.csv`, `${header}\n`, "text/csv");
+  }
+
+  function downloadJsonTemplate() {
+    if (!entityDef) return;
+    const example = Object.fromEntries(entityDef.fields.map((field) => [field.name, ""]));
+    downloadTextFile(
+      `plantilla-${entityDef.value}.json`,
+      JSON.stringify([example], null, 2),
+      "application/json"
+    );
+  }
+
   return (
     <div>
-      <form onSubmit={handleSubmit} className="grid max-w-xl gap-4">
+      <form onSubmit={handleSubmit} className="grid max-w-2xl gap-4">
         <label className="flex flex-col gap-1 text-sm">
           <span className="font-medium text-foreground">Tabla a importar</span>
           <select
@@ -58,13 +79,54 @@ export function ImportForm() {
             onChange={(e) => setEntity(e.target.value)}
             className={inputClass}
           >
-            {ENTITIES.map((e) => (
+            {IMPORT_ENTITIES.map((e) => (
               <option key={e.value} value={e.value}>
                 {e.label}
               </option>
             ))}
           </select>
         </label>
+
+        {entityDef && (
+          <div className="rounded-xl border border-dashed border-border p-4 text-sm text-muted">
+            <p className="font-medium text-foreground">
+              Formato esperado — {entityDef.label} (columnas):
+            </p>
+            <ul className="mt-2 space-y-1.5">
+              {entityDef.fields.map((field) => (
+                <li key={field.name}>
+                  <code className="rounded bg-background-elevated px-1 py-0.5 text-foreground">
+                    {field.name}
+                  </code>{" "}
+                  {field.required ? (
+                    <span className="text-accent">obligatoria</span>
+                  ) : (
+                    <span>opcional</span>
+                  )}
+                  {field.hint && <span> — {field.hint}</span>}
+                </li>
+              ))}
+            </ul>
+            {entityDef.notes && <p className="mt-2">{entityDef.notes}</p>}
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={downloadCsvTemplate}
+                className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-surface-hover"
+              >
+                Descargar plantilla CSV vacía
+              </button>
+              <button
+                type="button"
+                onClick={downloadJsonTemplate}
+                className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-surface-hover"
+              >
+                Descargar plantilla JSON vacía
+              </button>
+            </div>
+          </div>
+        )}
 
         <label className="flex flex-col gap-1 text-sm">
           <span className="font-medium text-foreground">Archivo (.csv o .json)</span>
@@ -81,7 +143,7 @@ export function ImportForm() {
       </form>
 
       {result && (
-        <div className="mt-6 max-w-xl rounded-xl border border-border bg-surface p-4 text-sm">
+        <div className="mt-6 max-w-2xl rounded-xl border border-border bg-surface p-4 text-sm">
           {"error" in result ? (
             <p className="text-accent">{result.error}</p>
           ) : (

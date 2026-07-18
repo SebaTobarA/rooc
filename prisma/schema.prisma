@@ -624,3 +624,89 @@ model ItemSetPieceBonus {
 
   @@unique([setId, pieceCount])
 }
+
+// ---------------------------------------------------------------------------
+// Build PVP: árbol de clases y de habilidades para el simulador de
+// /panel/build-pvp, armado desde /admin/build-pvp. Un "build" completo
+// recorre 3 Job en cadena (primera clase -> segunda clase -> segunda clase
+// transcendente, ej. Swordsman -> Knight -> Lord Knight), cada uno con su
+// propio árbol de hasta 40 puntos. La asignación de puntos del jugador es
+// efímera (solo en el cliente, sin guardar) — acá solo se persiste la
+// definición del árbol en sí.
+// ---------------------------------------------------------------------------
+
+enum JobTier {
+  FIRST
+  SECOND
+  TRANSCENDENT
+}
+
+model Job {
+  id   String  @id @default(cuid())
+  name String
+  tier JobTier
+  // Orden entre hermanos (columnas en el selector, o ramas dentro de una
+  // misma clase base, ej. Knight antes que Crusader).
+  order Int    @default(0)
+
+  iconUrl     String?
+  // Retrato de cuerpo/busto mostrado en la tarjeta de personaje del
+  // simulador cuando este Job (siempre TRANSCENDENT) está seleccionado.
+  portraitUrl String?
+
+  parentId String?
+  parent   Job?    @relation("JobTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children Job[]   @relation("JobTree")
+
+  skills Skill[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([parentId])
+  @@index([tier])
+}
+
+model Skill {
+  id    String @id @default(cuid())
+  jobId String
+  job   Job    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  name     String
+  iconUrl  String?
+  maxLevel Int     @default(10)
+  // Descripción de cada nivel (índice 0 = nivel 1, etc.) — se muestra la
+  // que corresponda al nivel actualmente invertido en el simulador.
+  levelDescriptions String[] @default([])
+
+  // Posición en la grilla del árbol (columna/fila), igual que en el
+  // cliente del juego — la editás a mano desde /admin/build-pvp.
+  col Int @default(0)
+  row Int @default(0)
+
+  // Skills que dependen de esta (para borrar/editar desde cualquier lado).
+  requiredBy    SkillPrerequisite[] @relation("RequiredSkill")
+  // Prerequisitos de esta skill.
+  prerequisites SkillPrerequisite[] @relation("DependentSkill")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([jobId])
+}
+
+// Relación N:N con nivel mínimo requerido — una skill puede necesitar
+// varias otras (ej. Spear Stab necesita Spear Mastery Y Pierce).
+model SkillPrerequisite {
+  id String @id @default(cuid())
+
+  skillId String
+  skill   Skill  @relation("DependentSkill", fields: [skillId], references: [id], onDelete: Cascade)
+
+  requiresSkillId String
+  requiresSkill   Skill  @relation("RequiredSkill", fields: [requiresSkillId], references: [id], onDelete: Cascade)
+
+  requiredLevel Int @default(1)
+
+  @@unique([skillId, requiresSkillId])
+}
