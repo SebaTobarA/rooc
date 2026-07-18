@@ -1,8 +1,10 @@
 import { getSession } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { getEffectivePermissions } from "@/lib/permissions";
 import { getJobTree, getJobChain } from "@/lib/skill-tree";
 import { JobSelector } from "@/components/panel/build-pvp/job-selector";
 import { SkillPlanner } from "@/components/panel/build-pvp/skill-planner";
+import { BuildHistoryTable } from "@/components/panel/build-pvp/build-history-table";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +15,7 @@ export const metadata = {
 export default async function BuildPvpPage({
   searchParams,
 }: {
-  searchParams: Promise<{ job?: string }>;
+  searchParams: Promise<{ job?: string; build?: string }>;
 }) {
   const session = await getSession();
   const permissions = await getEffectivePermissions(session);
@@ -30,10 +32,21 @@ export default async function BuildPvpPage({
     );
   }
 
-  const { job: selectedJobId } = await searchParams;
-  const [baseJobs, chain] = await Promise.all([
+  const { job: jobParam, build: buildParam } = await searchParams;
+
+  // Si viene ?build=, esa build guardada manda: se carga su clase y su
+  // asignación de puntos aunque el link no haya pasado también ?job=.
+  const loadedBuild = buildParam
+    ? await prisma.savedBuild.findUnique({ where: { id: buildParam } })
+    : null;
+  const selectedJobId = loadedBuild?.jobId ?? jobParam;
+
+  const [baseJobs, chain, savedBuilds] = await Promise.all([
     getJobTree(),
     selectedJobId ? getJobChain(selectedJobId) : Promise.resolve(null),
+    permissions.canManageParty
+      ? prisma.savedBuild.findMany({ include: { job: true }, orderBy: { createdAt: "desc" } })
+      : Promise.resolve(null),
   ]);
 
   return (
@@ -51,11 +64,29 @@ export default async function BuildPvpPage({
 
       <div className="mt-6">
         {chain ? (
-          <SkillPlanner key={selectedJobId} chain={chain} />
+          <SkillPlanner
+            key={selectedJobId}
+            chain={chain}
+            initialLevels={loadedBuild?.allocations as Record<string, number> | undefined}
+            loadedBuildName={loadedBuild?.name}
+          />
         ) : (
           <p className="text-sm text-muted">Elige una clase transcendente arriba para empezar.</p>
         )}
       </div>
+
+      {savedBuilds && (
+        <div className="mt-10">
+          <h2 className="text-lg font-bold text-foreground">Historial de builds</h2>
+          <p className="mt-1 text-sm text-muted">
+            Al enviar una build, queda visible para cualquier jugador cuyo rol de clase en Discord
+            coincida con la clase de la build.
+          </p>
+          <div className="mt-4">
+            <BuildHistoryTable builds={savedBuilds} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

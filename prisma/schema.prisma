@@ -630,9 +630,9 @@ model ItemSetPieceBonus {
 // /panel/build-pvp, armado desde /admin/build-pvp. Un "build" completo
 // recorre 3 Job en cadena (primera clase -> segunda clase -> segunda clase
 // transcendente, ej. Swordsman -> Knight -> Lord Knight), cada uno con su
-// propio árbol de hasta 40 puntos. La asignación de puntos del jugador es
-// efímera (solo en el cliente, sin guardar) — acá solo se persiste la
-// definición del árbol en sí.
+// propio árbol de hasta 40 puntos. La asignación de puntos en sí se arma en
+// el cliente (SkillPlanner) y solo se persiste como SavedBuild cuando el
+// jugador decide guardarla.
 // ---------------------------------------------------------------------------
 
 enum JobTier {
@@ -659,6 +659,7 @@ model Job {
   children Job[]   @relation("JobTree")
 
   skills Skill[]
+  builds SavedBuild[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -709,4 +710,40 @@ model SkillPrerequisite {
   requiredLevel Int @default(1)
 
   @@unique([skillId, requiresSkillId])
+}
+
+// Build guardada desde el simulador (jugador que arma y le pone nombre a
+// una asignación de puntos). Arranca en DRAFT — solo la ve el historial de
+// /panel/build-pvp (canManageParty). Al pasar a SENT, se libera a la vista
+// de cualquier jugador cuyo rol de clase en Discord coincida con `job`
+// (mismo cruce que ya usa /panel/perfil vía discord-job-roles.ts) — no solo
+// a quien la creó. DEACTIVATED la vuelve a ocultar sin borrarla.
+enum BuildStatus {
+  DRAFT
+  SENT
+  DEACTIVATED
+}
+
+model SavedBuild {
+  id   String @id @default(cuid())
+  name String
+
+  // Siempre la clase TRANSCENDENT elegida en el selector — el resto de la
+  // cadena (1st/2nd) se deriva de su parent/parent.parent.
+  jobId String
+  job   Job    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  // { [skillId]: nivel } de las 3 clases de la cadena.
+  allocations Json
+
+  createdByDiscordId String
+  createdByUsername  String
+
+  status BuildStatus @default(DRAFT)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([jobId])
+  @@index([status])
 }

@@ -8,16 +8,22 @@ function JobIcon({
   job,
   size,
   ring,
+  selected,
 }: {
   job: Job;
   size: number;
   ring: boolean;
+  selected?: boolean;
 }) {
   const imageUrl = job.portraitUrl ?? job.iconUrl;
   return (
     <span
-      className={`flex shrink-0 items-center justify-center overflow-hidden rounded-full border-2 bg-background-elevated ${
-        ring ? "border-focus" : "border-border"
+      className={`flex shrink-0 items-center justify-center overflow-hidden rounded-full border-2 bg-background-elevated transition-all ${
+        selected
+          ? "border-accent shadow-[0_0_0_3px_rgba(111,224,245,0.35)]"
+          : ring
+            ? "border-focus/40"
+            : "border-border"
       }`}
       style={{ width: size, height: size }}
     >
@@ -61,10 +67,10 @@ export function JobSelector({ baseJobs, selectedJobId }: { baseJobs: BaseJob[]; 
                         scroll={false}
                         className="flex flex-col items-center gap-1"
                       >
-                        <JobIcon job={trans} size={44} ring />
+                        <JobIcon job={trans} size={44} ring selected={selectedJobId === trans.id} />
                         <span
                           className={`text-center text-[10px] font-medium leading-tight ${
-                            selectedJobId === trans.id ? "text-focus" : "text-foreground"
+                            selectedJobId === trans.id ? "text-accent" : "text-foreground"
                           }`}
                         >
                           {trans.name}

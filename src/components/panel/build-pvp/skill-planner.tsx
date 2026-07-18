@@ -1,17 +1,30 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import type { JobWithSkills } from "@/lib/skill-tree";
 import { POINTS_PER_TIER } from "@/lib/skill-tree";
 import { SkillTreeCanvas } from "@/components/panel/build-pvp/skill-tree-canvas";
+import { saveBuild } from "@/lib/actions/build-history";
 
 const TIER_LABELS = ["1st Job", "2nd Job", "Trans. 2nd"];
 const TOTAL_POINTS = POINTS_PER_TIER * 3;
 
-export function SkillPlanner({ chain }: { chain: [JobWithSkills, JobWithSkills, JobWithSkills] }) {
-  const [levels, setLevels] = useState<Record<string, number>>({});
+export function SkillPlanner({
+  chain,
+  initialLevels,
+  loadedBuildName,
+}: {
+  chain: [JobWithSkills, JobWithSkills, JobWithSkills];
+  initialLevels?: Record<string, number>;
+  loadedBuildName?: string;
+}) {
+  const [levels, setLevels] = useState<Record<string, number>>(initialLevels ?? {});
   const [activeTier, setActiveTier] = useState(0);
   const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
+  const [savingOpen, setSavingOpen] = useState(false);
+  const [buildName, setBuildName] = useState("");
+  const [saveState, setSaveState] = useState<"idle" | "saved" | "error">("idle");
+  const [isSaving, startSaving] = useTransition();
 
   const skillById = useMemo(() => {
     const map = new Map<string, JobWithSkills["skills"][number]>();
@@ -29,6 +42,10 @@ export function SkillPlanner({ chain }: { chain: [JobWithSkills, JobWithSkills, 
     return chain[tierIndex].skills.reduce((sum, skill) => sum + (levels[skill.id] ?? 0), 0);
   }
 
+  // 40 es el mínimo para desbloquear el tier siguiente, no un tope — un
+  // tier puede terminar con más de 40 (ver Crusader en el ejemplo de
+  // Sebaa: 49/40). Solo Trans. 2nd puede quedar por debajo de 40, porque
+  // no desbloquea nada después. El único tope real es el total del build.
   function isTierUnlocked(tierIndex: number): boolean {
     for (let i = 0; i < tierIndex; i++) {
       if (spentInTier(i) < POINTS_PER_TIER) return false;
@@ -44,7 +61,7 @@ export function SkillPlanner({ chain }: { chain: [JobWithSkills, JobWithSkills, 
     const tierIndex = tierIndexBySkillId.get(skillId);
     if (!skill || tierIndex === undefined) return false;
     if (!isTierUnlocked(tierIndex)) return false;
-    if (spentInTier(tierIndex) >= POINTS_PER_TIER) return false;
+    if (totalSpent >= TOTAL_POINTS) return false;
     const level = levels[skillId] ?? 0;
     if (level >= skill.maxLevel) return false;
     return skill.prerequisites.every((p) => (levels[p.requiresSkillId] ?? 0) >= p.requiredLevel);
@@ -56,13 +73,25 @@ export function SkillPlanner({ chain }: { chain: [JobWithSkills, JobWithSkills, 
     const tierIndex = tierIndexBySkillId.get(skillId);
     if (tierIndex === undefined) return false;
     const newLevel = level - 1;
-    return chain[tierIndex].skills.every((other) => {
+
+    const sameTierOk = chain[tierIndex].skills.every((other) => {
       if (other.id === skillId) return true;
       if ((levels[other.id] ?? 0) <= 0) return true;
       const dependency = other.prerequisites.find((p) => p.requiresSkillId === skillId);
       if (!dependency) return true;
       return newLevel >= dependency.requiredLevel;
     });
+    if (!sameTierOk) return false;
+
+    // Si este punto bajado deja el tier por debajo del mínimo de
+    // desbloqueo (40) y ya hay puntos gastados en un tier posterior, ese
+    // tier posterior quedaría "huérfano" (con puntos pero sin desbloquear) — no se permite.
+    if (tierIndex < chain.length - 1 && spentInTier(tierIndex) - 1 < POINTS_PER_TIER) {
+      const laterTierHasPoints = chain.slice(tierIndex + 1).some((_, offset) => spentInTier(tierIndex + 1 + offset) > 0);
+      if (laterTierHasPoints) return false;
+    }
+
+    return true;
   }
 
   function increment(skillId: string) {
@@ -79,6 +108,23 @@ export function SkillPlanner({ chain }: { chain: [JobWithSkills, JobWithSkills, 
     setLevels({});
     setActiveTier(0);
     setSelectedSkillId(null);
+    setSavingOpen(false);
+    setBuildName("");
+    setSaveState("idle");
+  }
+
+  function handleSave() {
+    if (!buildName.trim()) return;
+    startSaving(async () => {
+      try {
+        await saveBuild(chain[2].id, buildName.trim(), levels);
+        setSaveState("saved");
+        setSavingOpen(false);
+        setBuildName("");
+      } catch {
+        setSaveState("error");
+      }
+    });
   }
 
   const tierJob = chain[activeTier];
@@ -123,6 +169,12 @@ export function SkillPlanner({ chain }: { chain: [JobWithSkills, JobWithSkills, 
 
       {/* --- Árbol --- */}
       <div className="min-w-0 flex-1 rounded-2xl border border-border bg-surface p-4 sm:p-5">
+        {loadedBuildName && (
+          <p className="mb-3 rounded-md border border-accent/30 bg-accent/5 px-3 py-2 text-xs text-accent">
+            Viendo la build <span className="font-semibold">&quot;{loadedBuildName}&quot;</span>. Puedes
+            seguir ajustándola y guardarla con otro nombre.
+          </p>
+        )}
         <div className="flex flex-wrap gap-2">
           {chain.map((job, i) => {
             const tierUnlocked = isTierUnlocked(i);
@@ -177,6 +229,62 @@ export function SkillPlanner({ chain }: { chain: [JobWithSkills, JobWithSkills, 
             </p>
           </div>
         )}
+
+        {/* --- Guardar build --- */}
+        <div className="mt-4 border-t border-border pt-4">
+          {saveState === "saved" && (
+            <p className="mb-3 rounded-md border border-accent/30 bg-accent/5 px-3 py-2 text-xs text-accent">
+              Build guardada. Un oficial la revisa y la envía para que la vean los jugadores de esta clase.
+            </p>
+          )}
+          {saveState === "error" && (
+            <p className="mb-3 rounded-md border border-border bg-background-elevated px-3 py-2 text-xs text-muted">
+              No se pudo guardar la build. Intenta de nuevo.
+            </p>
+          )}
+
+          {savingOpen ? (
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <input
+                autoFocus
+                type="text"
+                value={buildName}
+                onChange={(e) => setBuildName(e.target.value)}
+                placeholder="Nombre de la build, ej: PVP full ofensivo"
+                className="flex-1 rounded-md border border-border bg-background-elevated px-3 py-2 text-sm text-foreground outline-none focus:border-accent"
+              />
+              <div className="flex shrink-0 gap-2">
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={isSaving || !buildName.trim()}
+                  className="btn-brand px-4 py-2 text-sm disabled:opacity-50"
+                >
+                  {isSaving ? "Guardando…" : "Guardar"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSavingOpen(false)}
+                  className="rounded-[10px] border border-border px-4 py-2 text-sm text-muted hover:text-foreground"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              disabled={totalSpent === 0}
+              onClick={() => {
+                setSavingOpen(true);
+                setSaveState("idle");
+              }}
+              className="rounded-[10px] border border-accent/40 px-4 py-2 text-sm font-semibold text-accent hover:bg-accent/10 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              ¿Quieres guardar esta build?
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

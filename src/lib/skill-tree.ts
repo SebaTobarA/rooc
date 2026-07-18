@@ -1,5 +1,8 @@
 import { prisma } from "@/lib/prisma";
-import type { Job, Skill, SkillPrerequisite } from "@prisma/client";
+import type { Job, SavedBuild, Skill, SkillPrerequisite } from "@prisma/client";
+import type { SessionPayload } from "@/lib/session";
+import { getGuildRolesCached } from "@/lib/discord-bot";
+import { resolveJobFromRoles } from "@/lib/discord-job-roles";
 
 /** Puntos disponibles por tier (1st / 2nd / Trans. 2nd) — fijo, no configurable. */
 export const POINTS_PER_TIER = 40;
@@ -56,4 +59,40 @@ export async function getJobTree() {
       },
     },
   });
+}
+
+/**
+ * Builds SENT visibles para la sesión actual: se cruza la clase de Discord
+ * del jugador (mismo mecanismo que /panel/perfil, vía discord-job-roles.ts)
+ * con la clase (Job transcendente) de cada SavedBuild — no importa quién la
+ * haya creado, solo que el jugador tenga el rol de esa clase puesto.
+ */
+export async function getActiveBuildsForSession(
+  session: SessionPayload | null
+): Promise<{ className: string | null; builds: (SavedBuild & { job: Job })[] }> {
+  if (!session?.discordId) return { className: null, builds: [] };
+
+  const user = await prisma.user.findUnique({ where: { discordId: session.discordId } });
+  if (!user) return { className: null, builds: [] };
+
+  let className: string | null = null;
+  try {
+    const guildRoles = await getGuildRolesCached();
+    className = resolveJobFromRoles(user.roles, guildRoles);
+  } catch {
+    className = null;
+  }
+
+  if (!className) return { className: null, builds: [] };
+
+  const job = await prisma.job.findFirst({ where: { name: className, tier: "TRANSCENDENT" } });
+  if (!job) return { className, builds: [] };
+
+  const builds = await prisma.savedBuild.findMany({
+    where: { jobId: job.id, status: "SENT" },
+    include: { job: true },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return { className, builds };
 }
