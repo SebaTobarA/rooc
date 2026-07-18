@@ -20,6 +20,10 @@ function downloadTextFile(filename: string, content: string, mime: string) {
   URL.revokeObjectURL(url);
 }
 
+function csvEscape(value: string): string {
+  return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+}
+
 export function ImportForm() {
   const router = useRouter();
   const [entity, setEntity] = useState<string>(IMPORT_ENTITIES[0].value);
@@ -55,12 +59,13 @@ export function ImportForm() {
   function downloadCsvTemplate() {
     if (!entityDef) return;
     const header = entityDef.fields.map((field) => field.name).join(",");
-    downloadTextFile(`plantilla-${entityDef.value}.csv`, `${header}\n`, "text/csv");
+    const exampleRow = entityDef.fields.map((field) => csvEscape(field.example)).join(",");
+    downloadTextFile(`plantilla-${entityDef.value}.csv`, `${header}\n${exampleRow}\n`, "text/csv");
   }
 
   function downloadJsonTemplate() {
     if (!entityDef) return;
-    const example = Object.fromEntries(entityDef.fields.map((field) => [field.name, ""]));
+    const example = Object.fromEntries(entityDef.fields.map((field) => [field.name, field.example]));
     downloadTextFile(
       `plantilla-${entityDef.value}.json`,
       JSON.stringify([example], null, 2),
@@ -104,6 +109,15 @@ export function ImportForm() {
                     <span>opcional</span>
                   )}
                   {field.hint && <span> — {field.hint}</span>}
+                  {field.example && (
+                    <span>
+                      {" "}
+                      — ej:{" "}
+                      <code className="rounded bg-background-elevated px-1 py-0.5 text-foreground">
+                        {field.example}
+                      </code>
+                    </span>
+                  )}
                 </li>
               ))}
             </ul>
@@ -115,14 +129,14 @@ export function ImportForm() {
                 onClick={downloadCsvTemplate}
                 className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-surface-hover"
               >
-                Descargar plantilla CSV vacía
+                Descargar plantilla CSV con ejemplo
               </button>
               <button
                 type="button"
                 onClick={downloadJsonTemplate}
                 className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-surface-hover"
               >
-                Descargar plantilla JSON vacía
+                Descargar plantilla JSON con ejemplo
               </button>
             </div>
           </div>
