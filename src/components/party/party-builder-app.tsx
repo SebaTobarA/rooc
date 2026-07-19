@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { ArrowLeft } from "lucide-react";
 import type { Event, EventSignup } from "@prisma/client";
 import type { EventType } from "@/types/party";
@@ -20,15 +20,25 @@ export function PartyBuilderApp({
   canManageParty,
   guildLeagueEvents,
   emperiumEvents,
+  history,
 }: {
   canManageParty: boolean;
   guildLeagueEvents: EventWithSignups[];
   emperiumEvents: EventWithSignups[];
+  /** Historial de composiciones guardadas (Server Component ya renderizado
+   * en page.tsx) — se muestra solo en la pantalla inicial, debajo de los
+   * botones de selección de evento. */
+  history: ReactNode;
 }) {
   const [event, setEvent] = useState<EventType>(null);
 
   if (!event) {
-    return <EventSelector onSelect={setEvent} />;
+    return (
+      <>
+        <EventSelector onSelect={setEvent} />
+        {history}
+      </>
+    );
   }
 
   return (

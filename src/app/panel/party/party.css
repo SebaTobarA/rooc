@@ -265,18 +265,6 @@
 .event-layout {
   width: 100%;
 }
-.guild-layout {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-.campo-divider {
-  border: none;
-  height: 1px;
-  background: linear-gradient(90deg, transparent 0%, var(--pb-accent) 40%, var(--pb-accent-hover) 60%, transparent 100%);
-  margin: 40px 0;
-  opacity: 0.5;
-}
 
 /* ---------- Campo ---------- */
 .campo {
@@ -480,21 +468,6 @@
   border-color: var(--pb-flex);
   background: var(--pb-flex-dim);
   color: var(--pb-flex);
-}
-
-.copy-slots-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  color: var(--pb-text-secondary);
-  cursor: pointer;
-  padding-top: 12px;
-  border-top: 1px solid var(--pb-border);
-  transition: color var(--pb-transition);
-}
-.copy-slots-label:hover {
-  color: var(--foreground, #e9edf1);
 }
 
 .composition-card {
@@ -799,33 +772,6 @@
   padding: 7px 10px;
 }
 
-/* ---------- Guild League — import dual ---------- */
-.gl-import-section {
-  margin-bottom: 24px;
-  background: var(--pb-surface-1);
-  border: 1px solid var(--pb-border);
-  border-radius: var(--pb-radius);
-  padding: 18px;
-}
-.gl-import-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-  margin-bottom: 10px;
-}
-.gl-import-col {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.gl-import-heading {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--pb-text-secondary);
-}
-
 /* ---------- Plantillas guardadas ---------- */
 .saved-templates {
   margin-top: 32px;
@@ -847,6 +793,113 @@
   border: 1px solid var(--pb-border);
   border-radius: var(--pb-radius);
   padding: 10px 14px;
+}
+.saved-template-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.communicate-template {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+/* ---------- Asignación a Campo Principal/Secundario ---------- */
+.campo-assignment {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--pb-border);
+}
+.campo-assignment-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 12px;
+}
+.campo-column {
+  background: var(--pb-surface-2);
+  border: 1px solid var(--pb-border);
+  border-radius: var(--pb-radius);
+  padding: 12px;
+}
+.campo-column-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.campo-column-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--pb-accent);
+}
+.campo-column-count {
+  font-size: 11px;
+  color: var(--pb-text-secondary);
+}
+.campo-column-drop {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 80px;
+  border: 1px dashed var(--pb-border-hover);
+  border-radius: var(--pb-radius);
+  padding: 10px;
+  transition: border-color var(--pb-transition);
+}
+.campo-column-drop--armed {
+  border-style: solid;
+  border-color: var(--pb-accent);
+  background: var(--pb-accent-dim);
+  cursor: pointer;
+}
+
+/* ---------- Party completa arrastrable (asignación a campo) ---------- */
+.party-card {
+  cursor: grab;
+}
+.party-card:active {
+  cursor: grabbing;
+}
+.party-card--selected {
+  border-color: var(--pb-accent);
+  box-shadow: 0 0 0 2px var(--pb-accent), 0 0 16px var(--pb-accent-glow);
+}
+.party-card-grip {
+  color: var(--pb-text-muted);
+  margin-right: 2px;
+}
+.parties-grid--armed {
+  outline: 1px dashed var(--pb-accent);
+  outline-offset: 6px;
+  border-radius: var(--pb-radius);
+  cursor: pointer;
+}
+
+/* ---------- Banner "usar última composición guardada" ---------- */
+.last-composition-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--pb-accent-dim);
+  border: 1px solid var(--pb-border-hover);
+  border-radius: var(--pb-radius);
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  font-size: 12px;
+  color: var(--pb-text-secondary);
+}
+.last-composition-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 /* ---------- Responsive ---------- */
@@ -872,8 +925,16 @@
   .slot-btn {
     width: 56px;
   }
-  .gl-import-grid {
+  .campo-assignment-columns {
     grid-template-columns: 1fr;
+  }
+  .saved-template-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .saved-template-actions {
+    align-self: stretch;
+    justify-content: flex-end;
   }
 }
 

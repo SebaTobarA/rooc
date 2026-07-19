@@ -25,7 +25,7 @@ export function EmperiumOverrun({
   function handleLoadEvent() {
     if (!selectedEvent) return;
     campo.addPlayers(signupsToPlayers(selectedEvent.signups));
-    setMsg(`${selectedEvent.signups.length} inscripto(s) cargado(s).`);
+    setMsg(`${selectedEvent.signups.length} inscrito(s) cargado(s).`);
     setTimeout(() => setMsg(""), 4000);
   }
 
@@ -35,7 +35,7 @@ export function EmperiumOverrun({
     const knownIds = new Set(campo.players.map((p) => p.id));
     const newOnes = signupsToPlayers(fresh).filter((p) => !knownIds.has(p.id));
     if (newOnes.length > 0) campo.addPlayers(newOnes);
-    setMsg(newOnes.length > 0 ? `${newOnes.length} inscripto(s) nuevo(s) agregado(s).` : "No hay inscriptos nuevos.");
+    setMsg(newOnes.length > 0 ? `${newOnes.length} inscrito(s) nuevo(s) agregado(s).` : "No hay inscritos nuevos.");
     setTimeout(() => setMsg(""), 4000);
   }
 
@@ -52,16 +52,16 @@ export function EmperiumOverrun({
             >
               {events.map((event) => (
                 <option key={event.id} value={event.id}>
-                  {event.title} ({event.signups.length} inscriptos)
+                  {event.title} ({event.signups.length} inscritos)
                 </option>
               ))}
             </select>
           </label>
           <button type="button" className="btn btn-primary" onClick={handleLoadEvent}>
-            Cargar inscriptos del evento
+            Cargar inscritos del evento
           </button>
           <button type="button" className="btn btn-secondary" onClick={handleRefresh}>
-            Actualizar inscriptos
+            Actualizar inscritos
           </button>
         </div>
       ) : (
@@ -75,8 +75,6 @@ export function EmperiumOverrun({
       <Campo
         label="Jugadores del gremio"
         campo={campo}
-        origin="campo1"
-        onDropPlayer={(payload, partyId) => campo.assignPlayer(payload.id, partyId)}
         showSlotsImmediately
         saveTemplate={{ event: "EMPERIUM_OVERRUN", canManageParty, eventId: selectedEvent?.id }}
       />

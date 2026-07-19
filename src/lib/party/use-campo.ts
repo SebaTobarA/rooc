@@ -28,6 +28,11 @@ const ROLE_ORDER: Record<Role, number> = {
   Flexible: 3,
 };
 
+// 16 parties totales en Guild League = 8 por campo. Emperium Overrun no
+// tiene campos, así que assignPartyCampo/applySavedComposition nunca se
+// llaman ahí.
+const MAX_PARTIES_PER_CAMPO = 8;
+
 const uidRef = { current: 0 };
 function nextId(prefix: string): string {
   return `${prefix}_${++uidRef.current}`;
@@ -57,6 +62,7 @@ function pickUnique(pool: Player[], usedClasses: Set<string>): Player | undefine
 export interface UseCampoOptions {
   maxPlayers?: number; // alerta si se supera en importación
   minPlayers?: number; // alerta si no se alcanza en organización
+  maxParties?: number; // tope duro de parties (ej. 16 en Guild League = 8 por campo x 2)
 }
 
 export interface UseCampoReturn {
@@ -66,18 +72,20 @@ export interface UseCampoReturn {
   setCompositions: (c: SlotLabel[][]) => void;
   importPlayers: (raw: string) => ImportResult;
   addPlayers: (players: Player[]) => void;
-  organizeParties: () => string | null; // null = ok, string = error
-  suggestDistribution: () => void;
+  organizeParties: () => string | null; // null = ok, string = error/aviso
+  suggestDistribution: () => string | null; // null = ok, string = aviso
   assignPlayer: (playerId: string, partyId: string | null) => void;
+  assignPartyCampo: (partyId: string, campo: Party["campo"]) => string | null; // null = ok, string = error
   removePlayer: (playerId: string) => void;
-  addParty: () => void;
+  addParty: () => string | null; // null = ok, string = error
+  applySavedComposition: (groups: { campo: Party["campo"]; players: Player[] }[]) => string | null;
   unassigned: Player[];
   completeCount: number;
   hasPlayers: boolean;
 }
 
 export function useCampo(initialSlots?: SlotLabel[], options: UseCampoOptions = {}): UseCampoReturn {
-  const { maxPlayers, minPlayers } = options;
+  const { maxPlayers, minPlayers, maxParties } = options;
 
   const [players, setPlayers] = useState<Player[]>([]);
   const [parties, setParties] = useState<Party[]>([]);
@@ -209,8 +217,14 @@ export function useCampo(initialSlots?: SlotLabel[], options: UseCampoOptions = 
     const assignments: Record<string, string> = {};
     const roleOverrides: Record<string, Role> = {};
     let index = 0;
+    let cappedOut = false;
 
     for (;;) {
+      if (maxParties !== undefined && newParties.length >= maxParties) {
+        cappedOut = true;
+        break;
+      }
+
       const currentSlots = comps[index % comps.length];
       const quota = computeQuota(currentSlots);
       const partySize = currentSlots.length;
@@ -235,7 +249,7 @@ export function useCampo(initialSlots?: SlotLabel[], options: UseCampoOptions = 
       if (!hasEssentialTank || !hasEssentialSupport) break;
 
       index++;
-      const party: Party = { id: nextId("party"), name: `Party ${index}`, capacity: partySize };
+      const party: Party = { id: nextId("party"), name: `Party ${index}`, capacity: partySize, campo: null };
       const usedClasses = new Set<string>();
 
       // Tank: Paladines primero, LKs de emergencia
@@ -303,15 +317,31 @@ export function useCampo(initialSlots?: SlotLabel[], options: UseCampoOptions = 
         ...(roleOverrides[p.id] ? { rol: roleOverrides[p.id] } : {}),
       }))
     );
-    return null;
-  }, [minPlayers]);
 
-  const suggestDistribution = useCallback(() => {
+    if (cappedOut) {
+      const leftover = all.length - Object.keys(assignments).length;
+      if (leftover > 0) {
+        return `Se alcanzó el límite de ${maxParties} parties — ${leftover} jugador(es) quedaron sin asignar.`;
+      }
+    }
+
+    return null;
+  }, [minPlayers, maxParties]);
+
+  const suggestDistribution = useCallback((): string | null => {
     const unassignedPlayers = playersRef.current.filter((p) => !p.partyId);
-    if (!unassignedPlayers.length) return;
+    if (!unassignedPlayers.length) return null;
 
     const targetSize = Math.max(1, compositionsRef.current[0].length);
-    const numGroups = Math.ceil(unassignedPlayers.length / targetSize);
+    let numGroups = Math.ceil(unassignedPlayers.length / targetSize);
+
+    const existingCount = partiesRef.current.length;
+    let cappedMsg: string | null = null;
+    if (maxParties !== undefined && existingCount + numGroups > maxParties) {
+      numGroups = Math.max(0, maxParties - existingCount);
+      cappedMsg = `Se alcanzó el límite de ${maxParties} parties — algunos jugadores quedaron sin asignar.`;
+    }
+    if (numGroups === 0) return cappedMsg;
 
     // Ordena por rol y luego por clase para que el round-robin reparta clases
     // iguales entre grupos distintos en vez de agruparlas en el mismo.
@@ -321,12 +351,16 @@ export function useCampo(initialSlots?: SlotLabel[], options: UseCampoOptions = 
       return a.clase.localeCompare(b.clase);
     });
 
+    // Si el tope de parties obliga a reducir numGroups, solo entran los
+    // primeros (numGroups * targetSize) jugadores — el resto queda sin
+    // asignar en vez de sobrecargar cada grupo por encima de su capacidad.
+    const toPlace = cappedMsg ? sorted.slice(0, numGroups * targetSize) : sorted;
+
     const groups: Player[][] = Array.from({ length: numGroups }, () => []);
-    sorted.forEach((p, i) => groups[i % numGroups].push(p));
+    toPlace.forEach((p, i) => groups[i % numGroups].push(p));
 
     const newParties: Party[] = [];
     const assignments: Record<string, string> = {};
-    const existingCount = partiesRef.current.length;
 
     groups.forEach((group, gi) => {
       if (!group.length) return;
@@ -334,6 +368,7 @@ export function useCampo(initialSlots?: SlotLabel[], options: UseCampoOptions = 
         id: nextId("party"),
         name: `Party ${existingCount + gi + 1} (sugerida)`,
         capacity: targetSize,
+        campo: null,
       };
       newParties.push(party);
       group.forEach((p) => {
@@ -343,22 +378,96 @@ export function useCampo(initialSlots?: SlotLabel[], options: UseCampoOptions = 
 
     setParties((prev) => [...prev, ...newParties]);
     setPlayers((prev) => prev.map((p) => ({ ...p, partyId: assignments[p.id] ?? p.partyId })));
-  }, []);
+
+    return cappedMsg;
+  }, [maxParties]);
 
   const assignPlayer = useCallback((playerId: string, partyId: string | null) => {
     setPlayers((prev) => prev.map((p) => (p.id === playerId ? { ...p, partyId } : p)));
+  }, []);
+
+  // Asigna una party completa a un campo (Guild League) — ver
+  // campo-assignment.tsx, que es el único llamador real; Emperium Overrun
+  // no tiene campos y nunca llama esto.
+  const assignPartyCampo = useCallback((partyId: string, campo: Party["campo"]): string | null => {
+    if (campo !== null) {
+      const countInCampo = partiesRef.current.filter((p) => p.campo === campo && p.id !== partyId).length;
+      if (countInCampo >= MAX_PARTIES_PER_CAMPO) {
+        const label = campo === "principal" ? "Campo Principal" : "Campo Secundario";
+        return `${label} ya tiene ${MAX_PARTIES_PER_CAMPO} parties — ese es el máximo.`;
+      }
+    }
+    setParties((prev) => prev.map((p) => (p.id === partyId ? { ...p, campo } : p)));
+    return null;
   }, []);
 
   const removePlayer = useCallback((playerId: string) => {
     setPlayers((prev) => prev.filter((p) => p.id !== playerId));
   }, []);
 
-  const addParty = useCallback(() => {
+  const addParty = useCallback((): string | null => {
+    if (maxParties !== undefined && partiesRef.current.length >= maxParties) {
+      return `Se alcanzó el límite de ${maxParties} parties.`;
+    }
     setParties((prev) => [
       ...prev,
-      { id: nextId("party"), name: `Party ${prev.length + 1}`, capacity: 12 },
+      { id: nextId("party"), name: `Party ${prev.length + 1}`, capacity: 12, campo: null },
     ]);
-  }, []);
+    return null;
+  }, [maxParties]);
+
+  // Recrea la agrupación de una plantilla guardada anterior, para los
+  // jugadores del evento actual que coinciden (por id = discordId) con esa
+  // plantilla — ver "Usar última composición guardada" en guild-league.tsx.
+  // Cada grupo mantiene el campo que tenía, salvo que ese campo ya esté
+  // lleno (8 parties), en cuyo caso queda sin asignar en vez de romper el
+  // tope.
+  const applySavedComposition = useCallback(
+    (groups: { campo: Party["campo"]; players: Player[] }[]): string | null => {
+      const nonEmptyGroups = groups.filter((g) => g.players.length > 0);
+      const existingCount = partiesRef.current.length;
+
+      let groupsToApply = nonEmptyGroups;
+      let cappedMsg: string | null = null;
+      if (maxParties !== undefined && existingCount + nonEmptyGroups.length > maxParties) {
+        const allowed = Math.max(0, maxParties - existingCount);
+        groupsToApply = nonEmptyGroups.slice(0, allowed);
+        cappedMsg = `Se alcanzó el límite de ${maxParties} parties — algunos grupos de la composición anterior no se pudieron recrear.`;
+      }
+      if (groupsToApply.length === 0) return cappedMsg;
+
+      const sideCounts: Record<"principal" | "secundario", number> = {
+        principal: partiesRef.current.filter((p) => p.campo === "principal").length,
+        secundario: partiesRef.current.filter((p) => p.campo === "secundario").length,
+      };
+
+      const newParties: Party[] = [];
+      const assignments: Record<string, string> = {};
+
+      groupsToApply.forEach((group, gi) => {
+        let campo = group.campo;
+        if (campo && sideCounts[campo] >= MAX_PARTIES_PER_CAMPO) campo = null;
+        if (campo) sideCounts[campo]++;
+
+        const party: Party = {
+          id: nextId("party"),
+          name: `Party ${existingCount + gi + 1}`,
+          capacity: group.players.length,
+          campo,
+        };
+        newParties.push(party);
+        group.players.forEach((p) => {
+          assignments[p.id] = party.id;
+        });
+      });
+
+      setParties((prev) => [...prev, ...newParties]);
+      setPlayers((prev) => prev.map((p) => (assignments[p.id] ? { ...p, partyId: assignments[p.id] } : p)));
+
+      return cappedMsg;
+    },
+    [maxParties]
+  );
 
   return {
     players,
@@ -370,8 +479,10 @@ export function useCampo(initialSlots?: SlotLabel[], options: UseCampoOptions = 
     organizeParties,
     suggestDistribution,
     assignPlayer,
+    assignPartyCampo,
     removePlayer,
     addParty,
+    applySavedComposition,
     unassigned,
     completeCount,
     hasPlayers,

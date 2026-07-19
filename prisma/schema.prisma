@@ -434,6 +434,13 @@ model PartyTemplate {
   eventId     String?
   sourceEvent Event?  @relation(fields: [eventId], references: [id], onDelete: SetNull)
 
+  // Publicación del roster en Discord (botón "Comunicar partys"): mismo
+  // patrón que Event.channelId/messageId — primera vez se postea, las
+  // siguientes se edita el mensaje guardado en vez de duplicarlo.
+  channelId      String?
+  messageId      String?
+  communicatedAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

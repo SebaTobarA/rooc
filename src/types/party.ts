@@ -12,10 +12,16 @@ export interface Player {
   partyId: string | null;
 }
 
+export type CampoSide = "principal" | "secundario";
+
 export interface Party {
   id: string;
   name: string;
   capacity: number;
+  // A qué campo está asignada esta party en Guild League (null = todavía en
+  // el grid "sin asignar a campo"). Emperium Overrun no usa campos, así que
+  // sus parties quedan siempre en null.
+  campo: CampoSide | null;
 }
 
 export interface ImportResult {

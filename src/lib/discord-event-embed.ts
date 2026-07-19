@@ -7,32 +7,10 @@
 
 import type { Event, EventSignup, EventTemplate } from "@prisma/client";
 import type { DiscordActionRow, DiscordButton, DiscordButtonStyle, DiscordEmbed } from "@/lib/discord-bot";
-import { JOB_ROLE_NAMES } from "@/lib/discord-job-roles";
+import { JOB_ROLE_NAMES, JOB_ROLE_EMOJI } from "@/lib/discord-job-roles";
 
 const FALLBACK_COLOR = 0x6fe0f5;
 const MAX_FIELD_VALUE = 1024;
-
-// Emojis personalizados del server de Special Delivery, uno por clase — se
-// anteponen al nombre de cada jugador en el roster. Los ids son específicos
-// de ese server; si algún emoji se borra o se sube de nuevo con otro id, hay
-// que actualizar esta lista a mano (la API del bot no expone un lookup por
-// nombre para emojis de servidor).
-const JOB_ROLE_EMOJI: Record<string, string> = {
-  "Lord Knight": "<:LordKnight:1522043803240763512>",
-  "Paladín": "<:Paladin:1522043805040115802>",
-  Gypsy: "<:Gypsy:1522043823268696178>",
-  Clown: "<:Clown:1522043819707601026>",
-  Stalker: "<:Stalker:1522043812040409098>",
-  Champion: "<:Champion:1522043817639936104>",
-  "High Priest": "<:HighPriest:1522043866478284850>",
-  Creator: "<:Creator:1522043821410615446>",
-  "Assassin Cross": "<:AssassinCross:1522043816398557366>",
-  Sniper: "<:Sniper:1522043809519767582>",
-  Professor: "<:Professor:1522043807091265659>",
-  "High Wizard": "<:HighWizard:1522043801483481160>",
-  Doram: "<:doram:1519150730764619817>",
-  Whitesmith: "<:Whitesmith:1522043814162727103>",
-};
 
 export const DATE_FORMATTER = new Intl.DateTimeFormat("es-419", {
   day: "2-digit",

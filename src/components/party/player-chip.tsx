@@ -3,7 +3,7 @@
 import { X } from "lucide-react";
 import type { KeyboardEvent } from "react";
 import type { Player } from "@/types/party";
-import { setDragPayload, type DragOrigin } from "@/lib/party/drag-payload";
+import { setDragPayload } from "@/lib/party/drag-payload";
 import { usePlayerSelection } from "@/lib/party/selection-context";
 
 const ROLE_CLASS: Record<Player["rol"], string> = {
@@ -15,16 +15,15 @@ const ROLE_CLASS: Record<Player["rol"], string> = {
 
 interface PlayerChipProps {
   player: Player;
-  origin: DragOrigin;
   onRemove?: (id: string) => void;
 }
 
-export function PlayerChip({ player, origin, onRemove }: PlayerChipProps) {
+export function PlayerChip({ player, onRemove }: PlayerChipProps) {
   const { selected, selectPlayer } = usePlayerSelection();
-  const isSelected = selected?.id === player.id;
+  const isSelected = selected?.kind === "player" && selected.id === player.id;
 
   function handleSelect() {
-    selectPlayer({ id: player.id, origin });
+    selectPlayer({ kind: "player", id: player.id });
   }
 
   function handleKeyDown(e: KeyboardEvent) {
@@ -38,7 +37,7 @@ export function PlayerChip({ player, origin, onRemove }: PlayerChipProps) {
     <div
       className={`player-chip ${ROLE_CLASS[player.rol]} ${isSelected ? "player-chip--selected" : ""}`}
       draggable
-      onDragStart={(e) => setDragPayload(e, { id: player.id, origin })}
+      onDragStart={(e) => setDragPayload(e, { kind: "player", id: player.id })}
       onClick={(e) => {
         e.stopPropagation();
         handleSelect();

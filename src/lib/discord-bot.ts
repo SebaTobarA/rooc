@@ -136,7 +136,7 @@ export async function removeGuildMemberRole(discordId: string, roleId: string): 
 /** Postea un mensaje nuevo (con embed y/o botones) en un canal. Devuelve el ID del mensaje creado. */
 export async function postChannelMessage(
   channelId: string,
-  body: { embeds?: DiscordEmbed[]; components?: DiscordActionRow[] }
+  body: { content?: string; embeds?: DiscordEmbed[]; components?: DiscordActionRow[] }
 ): Promise<{ id: string }> {
   const response = await discordBotFetch(`/channels/${channelId}/messages`, {
     method: "POST",
@@ -153,7 +153,7 @@ export async function postChannelMessage(
 export async function editChannelMessage(
   channelId: string,
   messageId: string,
-  body: { embeds?: DiscordEmbed[]; components?: DiscordActionRow[] }
+  body: { content?: string; embeds?: DiscordEmbed[]; components?: DiscordActionRow[] }
 ): Promise<void> {
   const response = await discordBotFetch(`/channels/${channelId}/messages/${messageId}`, {
     method: "PATCH",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type DragEvent, type ReactNode } from "react";
+import { useState, type DragEvent } from "react";
 import { Wand2, FolderPlus, Sparkles, Save } from "lucide-react";
 import type { UseCampoReturn } from "@/lib/party/use-campo";
 import { StatsBar } from "@/components/party/stats-bar";
@@ -9,37 +9,18 @@ import { SlotPicker } from "@/components/party/slot-picker";
 import { PlayerChip } from "@/components/party/player-chip";
 import { PartyCard } from "@/components/party/party-card";
 import { createPartyTemplate } from "@/lib/actions/party-templates";
-import { readDragPayload, type DragOrigin, type DragPayload } from "@/lib/party/drag-payload";
+import { readDragPayload } from "@/lib/party/drag-payload";
 import { usePlayerSelection } from "@/lib/party/selection-context";
 
 interface CampoProps {
   label: string;
   campo: UseCampoReturn;
-  /** Con qué se taggean los chips propios de este campo al arrastrarlos afuera. */
-  origin: DragOrigin;
-  /** A quién avisar cuando algo se suelta acá adentro — el padre decide de dónde sacarlo. */
-  onDropPlayer: (payload: DragPayload, partyId: string | null) => void;
   showSlotsImmediately?: boolean;
-  slotPickerFooter?: ReactNode;
-  onAfterImport?: () => void;
-  hideImport?: boolean;
-  hideSlotPicker?: boolean;
   /** Si se pasa, habilita el botón "Guardar como plantilla" para este campo. */
   saveTemplate?: { event: "GUILD_LEAGUE" | "EMPERIUM_OVERRUN"; canManageParty: boolean; eventId?: string };
 }
 
-export function Campo({
-  label,
-  campo,
-  origin,
-  onDropPlayer,
-  showSlotsImmediately = false,
-  slotPickerFooter,
-  onAfterImport,
-  hideImport = false,
-  hideSlotPicker = false,
-  saveTemplate,
-}: CampoProps) {
+export function Campo({ label, campo, showSlotsImmediately = false, saveTemplate }: CampoProps) {
   const {
     players,
     parties,
@@ -49,6 +30,7 @@ export function Campo({
     organizeParties,
     suggestDistribution,
     assignPlayer,
+    assignPartyCampo,
     removePlayer,
     addParty,
     unassigned,
@@ -64,29 +46,39 @@ export function Campo({
   const { selected, clearSelection } = usePlayerSelection();
 
   const showSlots = showSlotsImmediately || hasPlayers;
-
-  // Punto único al que llegan tanto el drop nativo (mouse) como el tap de
-  // selección (táctil) — misma lógica de asignación para los dos caminos.
-  function placePlayer(payload: DragPayload, partyId: string | null) {
-    // Reasignación dentro del propio campo: no hace falta pasar por el padre.
-    if (payload.origin === origin) {
-      assignPlayer(payload.id, partyId);
-    } else {
-      onDropPlayer(payload, partyId);
-    }
-    clearSelection();
-  }
+  // Parties todavía no asignadas a un campo (o, en Emperium, todas — ahí
+  // `campo` nunca se setea porque no existe esa etapa).
+  const stagedParties = parties.filter((p) => !p.campo);
 
   function handleZoneDrop(e: DragEvent, partyId: string | null) {
     e.preventDefault();
     const payload = readDragPayload(e);
-    if (!payload) return;
-    placePlayer(payload, partyId);
+    if (!payload || payload.kind !== "player") return;
+    assignPlayer(payload.id, partyId);
+    clearSelection();
   }
 
   function handleZoneClick(partyId: string | null) {
-    if (!selected) return;
-    placePlayer(selected, partyId);
+    if (!selected || selected.kind !== "player") return;
+    assignPlayer(selected.id, partyId);
+    clearSelection();
+  }
+
+  // La grilla de parties sin campo también acepta que se suelte ahí una
+  // party completa que estaba asignada a Campo Principal/Secundario, para
+  // devolverla a la etapa "sin asignar a campo".
+  function handleGridDrop(e: DragEvent) {
+    e.preventDefault();
+    const payload = readDragPayload(e);
+    if (!payload || payload.kind !== "party") return;
+    assignPartyCampo(payload.partyId, null);
+    clearSelection();
+  }
+
+  function handleGridClick() {
+    if (!selected || selected.kind !== "party") return;
+    assignPartyCampo(selected.partyId, null);
+    clearSelection();
   }
 
   function handleOrganize() {
@@ -101,14 +93,14 @@ export function Campo({
       setSuggestMsg("No hay jugadores sin asignar.");
       return;
     }
-    suggestDistribution();
-    setSuggestMsg("Distribución sugerida aplicada. Puedes ajustar arrastrando jugadores.");
+    const warning = suggestDistribution();
+    setSuggestMsg(warning ?? "Distribución sugerida aplicada. Puedes ajustar arrastrando jugadores.");
   }
 
-  function handleImport(raw: string) {
-    const result = importPlayers(raw);
-    if (result.added > 0 && onAfterImport) onAfterImport();
-    return result;
+  function handleAddParty() {
+    setOrganizeError("");
+    const error = addParty();
+    if (error) setOrganizeError(error);
   }
 
   async function handleSaveTemplate() {
@@ -119,7 +111,7 @@ export function Campo({
     setSaving(true);
     setSaveMsg("");
     try {
-      await createPartyTemplate(saveTemplate.event, name, { players, parties, compositions }, saveTemplate.eventId);
+      await createPartyTemplate(saveTemplate.event, name, { players, parties }, saveTemplate.eventId);
       setSaveMsg("Plantilla guardada.");
     } catch (err) {
       setSaveMsg(err instanceof Error ? err.message : "No se pudo guardar la plantilla.");
@@ -140,16 +132,12 @@ export function Campo({
         completeCount={completeCount}
       />
 
-      {!hideImport && (
-        <details className="import-collapse">
-          <summary className="import-collapse-summary">Importar manualmente (nick, clase)</summary>
-          <ImportBox onImport={handleImport} />
-        </details>
-      )}
+      <details className="import-collapse">
+        <summary className="import-collapse-summary">Importar manualmente (nick, clase)</summary>
+        <ImportBox onImport={importPlayers} />
+      </details>
 
-      {!hideSlotPicker && showSlots && (
-        <SlotPicker compositions={compositions} onChange={setCompositions} extraFooter={slotPickerFooter} />
-      )}
+      {showSlots && <SlotPicker compositions={compositions} onChange={setCompositions} />}
 
       {showSlots && (
         <>
@@ -159,7 +147,7 @@ export function Campo({
               <Wand2 size={14} />
               Organizar parties
             </button>
-            <button className="btn btn-secondary" onClick={addParty}>
+            <button className="btn btn-secondary" onClick={handleAddParty}>
               <FolderPlus size={14} />
               Nueva party
             </button>
@@ -184,7 +172,7 @@ export function Campo({
         </div>
         {suggestMsg && <p className="suggest-msg">{suggestMsg}</p>}
         <div
-          className={`player-pool ${selected ? "player-pool--armed" : ""}`}
+          className={`player-pool ${selected?.kind === "player" ? "player-pool--armed" : ""}`}
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => handleZoneDrop(e, null)}
           onClick={() => handleZoneClick(null)}
@@ -192,25 +180,32 @@ export function Campo({
           aria-label="Jugadores sin asignar. Toca un jugador seleccionado para moverlo acá."
         >
           {unassigned.map((p) => (
-            <PlayerChip key={p.id} player={p} origin={origin} onRemove={removePlayer} />
+            <PlayerChip key={p.id} player={p} onRemove={removePlayer} />
           ))}
           {unassigned.length === 0 && <p className="pool-empty">Sin jugadores pendientes</p>}
         </div>
       </div>
 
       {parties.length > 0 && (
-        <div className="parties-grid">
-          {parties.map((party) => (
+        <div
+          className={`parties-grid ${selected?.kind === "party" ? "parties-grid--armed" : ""}`}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={handleGridDrop}
+          onClick={handleGridClick}
+        >
+          {stagedParties.map((party) => (
             <PartyCard
               key={party.id}
               party={party}
               members={players.filter((p) => p.partyId === party.id)}
-              origin={origin}
               onDrop={handleZoneDrop}
               onClickAssign={() => handleZoneClick(party.id)}
               onRemovePlayer={removePlayer}
             />
           ))}
+          {stagedParties.length === 0 && (
+            <p className="pool-empty">Todas las parties fueron asignadas a un campo</p>
+          )}
         </div>
       )}
 

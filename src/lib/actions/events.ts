@@ -96,7 +96,7 @@ export async function resendEvent(id: string) {
 
 /**
  * Lectura fresca de los signups de un evento — usada por el Party Builder
- * para "Actualizar inscriptos" sin recargar la página. Requiere el mismo
+ * para "Actualizar inscritos" sin recargar la página. Requiere el mismo
  * permiso que gestionar parties, aunque sea de solo lectura.
  */
 export async function getEventSignups(eventId: string) {

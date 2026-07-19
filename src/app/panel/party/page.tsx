@@ -46,8 +46,8 @@ export default async function PartyPage() {
         canManageParty={permissions.canManageParty}
         guildLeagueEvents={guildLeagueEvents}
         emperiumEvents={emperiumEvents}
+        history={<SavedTemplates canManageParty={permissions.canManageParty} />}
       />
-      <SavedTemplates canManageParty={permissions.canManageParty} />
     </div>
   );
 }
