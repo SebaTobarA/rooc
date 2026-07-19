@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { Sword, Gem, Skull, Map as MapIcon, Users, CalendarDays, ClipboardList, Sparkles } from "lucide-react";
+import { Sword, Gem, Skull, Map as MapIcon, Users, CalendarDays, ClipboardList } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { siteConfig } from "@/config/site";
 import { getSidebarSession } from "@/lib/sidebar-session";
 import { getSession } from "@/lib/auth";
-import { getActiveBuildsForSession } from "@/lib/skill-tree";
+import { getActiveBuildsForSession, getJobChain } from "@/lib/skill-tree";
+import { BuildClassTabs } from "@/components/panel/build-class-tabs";
 
 // Los contadores deben reflejar siempre el estado actual de la base, así
 // que evitamos el prerenderizado estático de esta página.
@@ -22,6 +23,10 @@ export default async function HomePage() {
   ]);
 
   const { className, builds: activeBuilds } = await getActiveBuildsForSession(session);
+  // La build más reciente enviada para la clase del jugador — es la que se
+  // muestra desglosada en la pestaña "Skills" de Build Class PVP.
+  const primaryBuild = activeBuilds[0] ?? null;
+  const primaryBuildChain = primaryBuild ? await getJobChain(primaryBuild.jobId) : null;
 
   const pillars = [
     {
@@ -215,30 +220,10 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* ============ SKILLS ============ */}
-      {activeBuilds.length > 0 && (
-        <section className="mt-10">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">Skills</h2>
-          <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {activeBuilds.map((build) => (
-              <Link
-                key={build.id}
-                href={`/panel/build-pvp?build=${build.id}`}
-                className="group flex items-start gap-3 rounded-xl border border-accent/30 bg-surface p-5 transition-all hover:-translate-y-0.5 hover:border-accent/60 hover:bg-surface-hover hover:shadow-lg hover:shadow-accent/10"
-              >
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent">
-                  <Sparkles className="h-5 w-5" strokeWidth={2.2} />
-                </span>
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-accent">{className}</p>
-                  <h3 className="font-semibold text-foreground group-hover:text-accent">{build.name}</h3>
-                  <p className="mt-1 text-sm text-muted">Build de PVP enviada por la guild — click para verla.</p>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
+      {/* ============ BUILD CLASS PVP ============ */}
+      <div className="mt-10">
+        <BuildClassTabs className={className} chain={primaryBuildChain} build={primaryBuild} />
+      </div>
 
       <section className="mt-10 rounded-xl border border-dashed border-border p-5">
         <h2 className="font-semibold text-foreground">Próximamente</h2>
