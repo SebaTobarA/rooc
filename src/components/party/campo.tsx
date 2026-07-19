@@ -10,6 +10,7 @@ import { PlayerChip } from "@/components/party/player-chip";
 import { PartyCard } from "@/components/party/party-card";
 import { createPartyTemplate } from "@/lib/actions/party-templates";
 import { readDragPayload, type DragOrigin, type DragPayload } from "@/lib/party/drag-payload";
+import { usePlayerSelection } from "@/lib/party/selection-context";
 
 interface CampoProps {
   label: string;
@@ -60,18 +61,32 @@ export function Campo({
   const [saveMsg, setSaveMsg] = useState("");
   const [saving, setSaving] = useState(false);
 
+  const { selected, clearSelection } = usePlayerSelection();
+
   const showSlots = showSlotsImmediately || hasPlayers;
+
+  // Punto único al que llegan tanto el drop nativo (mouse) como el tap de
+  // selección (táctil) — misma lógica de asignación para los dos caminos.
+  function placePlayer(payload: DragPayload, partyId: string | null) {
+    // Reasignación dentro del propio campo: no hace falta pasar por el padre.
+    if (payload.origin === origin) {
+      assignPlayer(payload.id, partyId);
+    } else {
+      onDropPlayer(payload, partyId);
+    }
+    clearSelection();
+  }
 
   function handleZoneDrop(e: DragEvent, partyId: string | null) {
     e.preventDefault();
     const payload = readDragPayload(e);
     if (!payload) return;
-    // Reasignación dentro del propio campo: no hace falta pasar por el padre.
-    if (payload.origin === origin) {
-      assignPlayer(payload.id, partyId);
-      return;
-    }
-    onDropPlayer(payload, partyId);
+    placePlayer(payload, partyId);
+  }
+
+  function handleZoneClick(partyId: string | null) {
+    if (!selected) return;
+    placePlayer(selected, partyId);
   }
 
   function handleOrganize() {
@@ -169,11 +184,12 @@ export function Campo({
         </div>
         {suggestMsg && <p className="suggest-msg">{suggestMsg}</p>}
         <div
-          className="player-pool"
+          className={`player-pool ${selected ? "player-pool--armed" : ""}`}
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => handleZoneDrop(e, null)}
+          onClick={() => handleZoneClick(null)}
           role="list"
-          aria-label="Jugadores sin asignar"
+          aria-label="Jugadores sin asignar. Toca un jugador seleccionado para moverlo acá."
         >
           {unassigned.map((p) => (
             <PlayerChip key={p.id} player={p} origin={origin} onRemove={removePlayer} />
@@ -191,6 +207,7 @@ export function Campo({
               members={players.filter((p) => p.partyId === party.id)}
               origin={origin}
               onDrop={handleZoneDrop}
+              onClickAssign={() => handleZoneClick(party.id)}
               onRemovePlayer={removePlayer}
             />
           ))}

@@ -7,6 +7,7 @@ import type { EventType } from "@/types/party";
 import { EventSelector } from "@/components/party/event-selector";
 import { GuildLeague } from "@/components/party/guild-league";
 import { EmperiumOverrun } from "@/components/party/emperium-overrun";
+import { PlayerSelectionProvider } from "@/lib/party/selection-context";
 
 const EVENT_LABEL: Record<NonNullable<EventType>, string> = {
   guild: "Guild League",
@@ -41,10 +42,12 @@ export function PartyBuilderApp({
       </header>
 
       <main className="app-main">
-        {event === "guild" && <GuildLeague canManageParty={canManageParty} events={guildLeagueEvents} />}
-        {event === "emperium" && (
-          <EmperiumOverrun canManageParty={canManageParty} events={emperiumEvents} />
-        )}
+        <PlayerSelectionProvider key={event}>
+          {event === "guild" && <GuildLeague canManageParty={canManageParty} events={guildLeagueEvents} />}
+          {event === "emperium" && (
+            <EmperiumOverrun canManageParty={canManageParty} events={emperiumEvents} />
+          )}
+        </PlayerSelectionProvider>
       </main>
     </div>
   );

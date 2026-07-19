@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type DragEvent, type KeyboardEvent } from "react";
+import { useState, type KeyboardEvent } from "react";
 import { Upload } from "lucide-react";
 import type { Event, EventSignup } from "@prisma/client";
 import { Campo } from "@/components/party/campo";
@@ -9,7 +9,7 @@ import { SlotPicker } from "@/components/party/slot-picker";
 import { useCampo } from "@/lib/party/use-campo";
 import type { Player, SlotLabel } from "@/types/party";
 import { signupsToPlayers } from "@/lib/party/from-signups";
-import { readDragPayload, type DragOrigin, type DragPayload } from "@/lib/party/drag-payload";
+import type { DragOrigin, DragPayload } from "@/lib/party/drag-payload";
 import { getEventSignups } from "@/lib/actions/events";
 
 const PLACEHOLDER = "Nick1,Crusader;Nick2,Wizard";
@@ -91,10 +91,8 @@ export function GuildLeague({
     }
   }
 
-  function handlePoolDrop(e: DragEvent) {
-    e.preventDefault();
-    const payload = readDragPayload(e);
-    if (payload && payload.origin !== "source") routeDrop(payload, "source", null);
+  function handlePoolDrop(payload: DragPayload) {
+    if (payload.origin !== "source") routeDrop(payload, "source", null);
   }
 
   function handleImport() {
@@ -180,7 +178,12 @@ export function GuildLeague({
       )}
       {refreshMsg && <p className="suggest-msg">{refreshMsg}</p>}
 
-      <EventSignupPool players={sourcePlayers} onDrop={handlePoolDrop} />
+      <p className="campo-hint">
+        Arrastra un jugador para moverlo de campo, o tócalo para seleccionarlo y luego toca el campo
+        destino (útil en celular).
+      </p>
+
+      <EventSignupPool players={sourcePlayers} onDropPayload={handlePoolDrop} />
 
       {/* ── Importación manual (alternativa) ── */}
       <details className="import-collapse">

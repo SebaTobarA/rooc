@@ -601,6 +601,12 @@
 .player-pool:hover {
   border-color: rgba(111, 224, 245, 0.5);
 }
+.player-pool--armed {
+  border-style: solid;
+  border-color: var(--pb-accent);
+  background: var(--pb-accent-dim);
+  cursor: pointer;
+}
 .pool-empty {
   font-size: 12px;
   color: var(--pb-text-muted);
@@ -631,6 +637,10 @@
 .player-chip:active {
   cursor: grabbing;
   opacity: 0.7;
+}
+.player-chip--selected {
+  box-shadow: 0 0 0 2px var(--pb-accent), 0 0 10px var(--pb-accent-glow);
+  transform: translateY(-1px);
 }
 .chip-tank {
   background: var(--pb-tank-dim);
@@ -739,6 +749,12 @@
   border-radius: var(--pb-radius-sm);
   padding: 7px;
   transition: var(--pb-transition);
+}
+.party-dropzone--armed {
+  border-style: solid;
+  border-color: var(--pb-accent);
+  background: var(--pb-accent-dim);
+  cursor: pointer;
 }
 .party-empty {
   font-size: 11px;
