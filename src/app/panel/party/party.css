@@ -683,11 +683,15 @@
 }
 .party-card-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 6px;
   margin-bottom: 10px;
 }
+.party-card--compact {
+  padding: 10px 14px;
+}
 .party-card-name {
+  flex: 1;
   font-size: 13px;
   font-weight: 600;
   color: var(--foreground, #e9edf1);
@@ -695,6 +699,32 @@
 .party-card-count {
   font-size: 11px;
   color: var(--pb-text-secondary);
+}
+.party-card-status {
+  display: flex;
+  align-items: center;
+}
+.party-card-status--ok {
+  color: var(--pb-success);
+}
+.party-card-status--warn {
+  color: var(--pb-danger);
+}
+.party-card-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  padding: 2px;
+  color: var(--pb-text-secondary);
+  cursor: pointer;
+}
+.party-card-toggle svg {
+  transition: transform var(--pb-transition);
+}
+.party-card-toggle-icon--open {
+  transform: rotate(180deg);
 }
 .party-notice {
   display: flex;

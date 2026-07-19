@@ -76,6 +76,7 @@ export interface UseCampoReturn {
   suggestDistribution: () => string | null; // null = ok, string = aviso
   assignPlayer: (playerId: string, partyId: string | null) => void;
   assignPartyCampo: (partyId: string, campo: Party["campo"]) => string | null; // null = ok, string = error
+  distributeCampos: () => { text: string; ok: boolean };
   removePlayer: (playerId: string) => void;
   addParty: () => string | null; // null = ok, string = error
   applySavedComposition: (groups: { campo: Party["campo"]; players: Player[] }[]) => string | null;
@@ -401,6 +402,50 @@ export function useCampo(initialSlots?: SlotLabel[], options: UseCampoOptions = 
     return null;
   }, []);
 
+  // Reparto automático de las parties todavía sin campo ("Distribuir
+  // campos" en campo-assignment.tsx): prioriza las completas hacia Campo
+  // Principal y llena hasta 8 por campo. Si hay pocas parties en total
+  // (menos de 6) evita volcarlas todas a un mismo campo — reparte ~80/20
+  // en su lugar (ej. 6 parties -> 4 y 2). No toca parties que ya tengan
+  // campo asignado a mano.
+  const distributeCampos = useCallback((): { text: string; ok: boolean } => {
+    const staged = partiesRef.current.filter((p) => !p.campo);
+    if (staged.length === 0) {
+      return { text: "No hay parties sin asignar a un campo.", ok: false };
+    }
+
+    const membersCount = (party: Party) =>
+      playersRef.current.filter((p) => p.partyId === party.id).length;
+    const isComplete = (party: Party) => membersCount(party) >= party.capacity;
+
+    // Completas primero — así son las primeras en entrar a Campo Principal.
+    const sorted = [...staged].sort((a, b) => Number(isComplete(b)) - Number(isComplete(a)));
+
+    const capPrincipal = MAX_PARTIES_PER_CAMPO - partiesRef.current.filter((p) => p.campo === "principal").length;
+    const capSecundario =
+      MAX_PARTIES_PER_CAMPO - partiesRef.current.filter((p) => p.campo === "secundario").length;
+
+    const total = sorted.length;
+    const desiredPrincipal = total < 6 ? Math.floor(total * 0.8) : total;
+
+    const wantPrincipal = Math.max(0, Math.min(desiredPrincipal, capPrincipal));
+    const remaining = total - wantPrincipal;
+    const wantSecundario = Math.max(0, Math.min(remaining, capSecundario));
+    const leftover = total - wantPrincipal - wantSecundario;
+
+    const assignments = new Map<string, "principal" | "secundario">();
+    sorted.slice(0, wantPrincipal).forEach((p) => assignments.set(p.id, "principal"));
+    sorted.slice(wantPrincipal, wantPrincipal + wantSecundario).forEach((p) => assignments.set(p.id, "secundario"));
+
+    setParties((prev) => prev.map((p) => (assignments.has(p.id) ? { ...p, campo: assignments.get(p.id)! } : p)));
+
+    const text =
+      leftover > 0
+        ? `Se distribuyeron ${wantPrincipal} party(s) a Campo Principal y ${wantSecundario} a Campo Secundario — ${leftover} quedaron sin asignar porque ambos campos están al límite.`
+        : `Se distribuyeron ${wantPrincipal} party(s) a Campo Principal y ${wantSecundario} a Campo Secundario.`;
+    return { text, ok: leftover === 0 };
+  }, []);
+
   const removePlayer = useCallback((playerId: string) => {
     setPlayers((prev) => prev.filter((p) => p.id !== playerId));
   }, []);
@@ -480,6 +525,7 @@ export function useCampo(initialSlots?: SlotLabel[], options: UseCampoOptions = 
     suggestDistribution,
     assignPlayer,
     assignPartyCampo,
+    distributeCampos,
     removePlayer,
     addParty,
     applySavedComposition,

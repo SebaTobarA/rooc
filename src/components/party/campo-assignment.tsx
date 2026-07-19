@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type DragEvent } from "react";
+import { Shuffle } from "lucide-react";
 import type { UseCampoReturn } from "@/lib/party/use-campo";
 import type { CampoSide } from "@/types/party";
 import { PartyCard } from "@/components/party/party-card";
@@ -75,6 +76,7 @@ function CampoColumn({ side, campo }: { side: CampoSide; campo: UseCampoReturn }
             onDrop={handlePlayerDrop}
             onClickAssign={() => handlePlayerClickAssign(party.id)}
             onRemovePlayer={removePlayer}
+            compact
           />
         ))}
         {partiesInSide.length === 0 && (
@@ -92,7 +94,15 @@ function CampoColumn({ side, campo }: { side: CampoSide; campo: UseCampoReturn }
  * reforzado por useCampo.assignPartyCampo.
  */
 export function CampoAssignment({ campo }: { campo: UseCampoReturn }) {
+  const [distributeMsg, setDistributeMsg] = useState<{ text: string; ok: boolean } | null>(null);
+
   if (campo.parties.length === 0) return null;
+
+  function handleDistribute() {
+    const result = campo.distributeCampos();
+    setDistributeMsg(result);
+    setTimeout(() => setDistributeMsg(null), 5000);
+  }
 
   return (
     <div className="campo-assignment">
@@ -101,6 +111,15 @@ export function CampoAssignment({ campo }: { campo: UseCampoReturn }) {
         Arrastra una party completa (o tócala y luego toca la columna destino) para asignarla a Campo
         Principal o Campo Secundario. Máximo 8 parties por campo.
       </p>
+      <div className="campo-actions">
+        <button type="button" className="btn btn-secondary" onClick={handleDistribute}>
+          <Shuffle size={14} />
+          Distribuir campos
+        </button>
+      </div>
+      {distributeMsg && (
+        <p className={distributeMsg.ok ? "suggest-msg" : "campo-error"}>{distributeMsg.text}</p>
+      )}
       <div className="campo-assignment-columns">
         <CampoColumn side="principal" campo={campo} />
         <CampoColumn side="secundario" campo={campo} />
