@@ -67,31 +67,14 @@ export function SkillPlanner({
     return skill.prerequisites.every((p) => (levels[p.requiresSkillId] ?? 0) >= p.requiredLevel);
   }
 
+  // La edición siempre es completa: bajar un punto nunca se bloquea por
+  // prerequisitos de otras skills ni por dejar un tier posterior "huérfano".
+  // Es la única forma de poder corregir un error de carga sin quedar
+  // trabado — el estado intermedio puede ser temporalmente inválido, pero
+  // el jugador lo termina de acomodar subiendo puntos de nuevo.
   function canDecrement(skillId: string): boolean {
     const level = levels[skillId] ?? 0;
-    if (level <= 0) return false;
-    const tierIndex = tierIndexBySkillId.get(skillId);
-    if (tierIndex === undefined) return false;
-    const newLevel = level - 1;
-
-    const sameTierOk = chain[tierIndex].skills.every((other) => {
-      if (other.id === skillId) return true;
-      if ((levels[other.id] ?? 0) <= 0) return true;
-      const dependency = other.prerequisites.find((p) => p.requiresSkillId === skillId);
-      if (!dependency) return true;
-      return newLevel >= dependency.requiredLevel;
-    });
-    if (!sameTierOk) return false;
-
-    // Si este punto bajado deja el tier por debajo del mínimo de
-    // desbloqueo (40) y ya hay puntos gastados en un tier posterior, ese
-    // tier posterior quedaría "huérfano" (con puntos pero sin desbloquear) — no se permite.
-    if (tierIndex < chain.length - 1 && spentInTier(tierIndex) - 1 < POINTS_PER_TIER) {
-      const laterTierHasPoints = chain.slice(tierIndex + 1).some((_, offset) => spentInTier(tierIndex + 1 + offset) > 0);
-      if (laterTierHasPoints) return false;
-    }
-
-    return true;
+    return level > 0;
   }
 
   function increment(skillId: string) {
