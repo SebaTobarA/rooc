@@ -25,22 +25,29 @@ function NavItemLink({
   label,
   pathname,
   onNavigate,
+  badge,
 }: {
   href: string;
   label: string;
   pathname: string;
   onNavigate?: () => void;
+  badge?: number;
 }) {
   const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
   return (
     <Link
       href={href}
       onClick={onNavigate}
-      className={`rounded-[10px] px-3 py-2 text-sm font-medium uppercase tracking-wide transition-colors ${
+      className={`flex items-center justify-between gap-2 rounded-[10px] px-3 py-2 text-sm font-medium uppercase tracking-wide transition-colors ${
         active ? "bg-surface text-accent" : "text-muted hover:bg-surface hover:text-foreground"
       }`}
     >
       {label}
+      {Boolean(badge) && (
+        <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-[11px] font-bold normal-case text-accent-foreground">
+          {badge}
+        </span>
+      )}
     </Link>
   );
 }
@@ -113,7 +120,13 @@ function NavLinks({ session, onNavigate }: { session?: SidebarSession | null; on
     <nav className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
         {siteConfig.nav.map((item) => (
-          <NavItemLink key={item.href} {...item} pathname={pathname} onNavigate={onNavigate} />
+          <NavItemLink
+            key={item.href}
+            {...item}
+            pathname={pathname}
+            onNavigate={onNavigate}
+            badge={item.href === "/panel" ? session?.pendingEventsCount : undefined}
+          />
         ))}
       </div>
 
@@ -134,6 +147,7 @@ export type SidebarSession = {
   canManageParty: boolean;
   canManageRecruitment: boolean;
   isApplicantOnly: boolean;
+  pendingEventsCount: number;
 };
 
 function ProfileCard({ session }: { session: SidebarSession }) {

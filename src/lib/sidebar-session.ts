@@ -4,6 +4,7 @@ import { getGuildRolesCached } from "@/lib/discord-bot";
 import { resolveJobFromRoles } from "@/lib/discord-job-roles";
 import { discordAvatarUrl } from "@/lib/discord-avatar";
 import { getEffectivePermissions } from "@/lib/permissions";
+import { getPendingEventsForDiscordId } from "@/lib/events";
 import type { SidebarSession } from "@/components/site-sidebar";
 
 /**
@@ -34,6 +35,13 @@ export async function getSidebarSession(): Promise<SidebarSession | null> {
 
   const permissions = await getEffectivePermissions(session);
 
+  // Cuántos eventos con inscripciones todavía abiertas no tienen respuesta
+  // de este jugador — solo aplica a quien puede ver el Party Builder (los
+  // eventos son para eso). Se muestra como badge en el nav de "Inicio".
+  const pendingEventsCount = permissions.canViewParty
+    ? (await getPendingEventsForDiscordId(session.discordId)).length
+    : 0;
+
   return {
     label: user?.globalName ?? user?.username ?? session.username ?? "Cuenta",
     username: user?.username ?? null,
@@ -44,5 +52,6 @@ export async function getSidebarSession(): Promise<SidebarSession | null> {
     canManageParty: permissions.canManageParty,
     canManageRecruitment: permissions.canManageRecruitment,
     isApplicantOnly: permissions.isApplicantOnly,
+    pendingEventsCount,
   };
 }

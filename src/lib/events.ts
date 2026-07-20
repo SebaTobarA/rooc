@@ -6,7 +6,7 @@
  * cruda, no un form submit), y ahí ese directive no aplica.
  */
 
-import type { EventSignupStatus } from "@prisma/client";
+import type { EventCategory, EventSignupStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { editChannelMessage, postChannelMessage } from "@/lib/discord-bot";
 import { buildEventEmbed, buildRosterComponents } from "@/lib/discord-event-embed";
@@ -52,6 +52,58 @@ export async function renderAndPublishEmbed(eventId: string): Promise<void> {
     where: { id: eventId },
     data: { channelId, messageId: message.id, status: "PUBLISHED", publishedAt: new Date() },
   });
+}
+
+export type PendingEvent = {
+  id: string;
+  title: string;
+  icon: string | null;
+  category: EventCategory;
+  signupsCloseAt: Date;
+  discordUrl: string | null;
+};
+
+/**
+ * Eventos PUBLISHED cuyas inscripciones siguen abiertas (signupsCloseAt en
+ * el futuro) para los que este discordId todavía no tiene un EventSignup —
+ * es decir, "pendiente de responder" en el canal de asistencias. La fuente
+ * de verdad es la propia tabla EventSignup, que ya queda sincronizada en
+ * vivo con cada clic de los botones de Discord (ver
+ * src/app/api/discord/interactions/route.ts), así que no hace falta una
+ * consulta aparte al bot.
+ */
+export async function getPendingEventsForDiscordId(
+  discordId: string | null | undefined
+): Promise<PendingEvent[]> {
+  if (!discordId) return [];
+
+  const openEvents = await prisma.event.findMany({
+    where: { status: "PUBLISHED", signupsCloseAt: { gt: new Date() } },
+    include: { template: true },
+    orderBy: { signupsCloseAt: "asc" },
+  });
+  if (openEvents.length === 0) return [];
+
+  const responded = await prisma.eventSignup.findMany({
+    where: { discordId, eventId: { in: openEvents.map((event) => event.id) } },
+    select: { eventId: true },
+  });
+  const respondedIds = new Set(responded.map((signup) => signup.eventId));
+
+  const guildId = process.env.DISCORD_GUILD_ID;
+  return openEvents
+    .filter((event) => !respondedIds.has(event.id))
+    .map((event) => ({
+      id: event.id,
+      title: event.title,
+      icon: event.template.icon,
+      category: event.category,
+      signupsCloseAt: event.signupsCloseAt,
+      discordUrl:
+        event.channelId && event.messageId && guildId
+          ? `https://discord.com/channels/${guildId}/${event.channelId}/${event.messageId}`
+          : null,
+    }));
 }
 
 export async function upsertEventSignup(

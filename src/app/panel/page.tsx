@@ -1,10 +1,12 @@
 import Link from "next/link";
-import { Sword, Gem, Skull, Map as MapIcon, Users, CalendarDays, ClipboardList } from "lucide-react";
+import { Sword, Gem, Skull, Map as MapIcon, Users, CalendarDays, ClipboardList, BellRing } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { siteConfig } from "@/config/site";
 import { getSidebarSession } from "@/lib/sidebar-session";
 import { getSession } from "@/lib/auth";
 import { getActiveBuildsForSession, getJobChain } from "@/lib/skill-tree";
+import { getPendingEventsForDiscordId } from "@/lib/events";
+import { EVENT_CATEGORY_LABEL } from "@/lib/labels";
 import { BuildClassTabs } from "@/components/panel/build-class-tabs";
 
 // Los contadores deben reflejar siempre el estado actual de la base, así
@@ -27,6 +29,18 @@ export default async function HomePage() {
   // muestra desglosada en la pestaña "Skills" de Build Class PVP.
   const primaryBuild = activeBuilds[0] ?? null;
   const primaryBuildChain = primaryBuild ? await getJobChain(primaryBuild.jobId) : null;
+
+  const pendingEvents = sidebarSession?.canViewParty
+    ? await getPendingEventsForDiscordId(session?.discordId)
+    : [];
+
+  const EVENT_DATE_FORMATTER = new Intl.DateTimeFormat("es-419", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "America/Argentina/Buenos_Aires",
+  });
 
   const pillars = [
     {
@@ -151,6 +165,55 @@ export default async function HomePage() {
         </div>
       </section>
 
+      {/* ============ NOTIFICACIONES: EVENTOS SIN RESPONDER ============ */}
+      {pendingEvents.length > 0 && (
+        <section className="mt-10 rounded-2xl border border-accent/40 bg-accent/5 p-5 sm:p-6">
+          <div className="flex items-center gap-2">
+            <BellRing className="h-5 w-5 text-accent" strokeWidth={2.2} />
+            <h2 className="font-semibold text-foreground">
+              Tenés {pendingEvents.length} evento{pendingEvents.length === 1 ? "" : "s"} sin responder
+            </h2>
+          </div>
+          <p className="mt-1 text-sm text-muted">
+            Todavía no marcaste tu asistencia en el canal de Discord para estos eventos — las
+            inscripciones siguen abiertas.
+          </p>
+          <div className="mt-4 flex flex-col gap-2">
+            {pendingEvents.map((event) => (
+              <div
+                key={event.id}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-surface px-4 py-3"
+              >
+                <div>
+                  <p className="font-medium text-foreground">
+                    {event.icon ? `${event.icon} ` : ""}
+                    {event.title}
+                  </p>
+                  <p className="text-xs text-muted">
+                    {EVENT_CATEGORY_LABEL[event.category]} — cierra el {EVENT_DATE_FORMATTER.format(event.signupsCloseAt)}
+                  </p>
+                </div>
+                {event.discordUrl && (
+                  <a
+                    href={event.discordUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn-brand px-3 py-1.5 text-xs"
+                  >
+                    Responder en Discord
+                  </a>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ============ BUILD CLASS PVP ============ */}
+      <div className="mt-10">
+        <BuildClassTabs className={className} chain={primaryBuildChain} build={primaryBuild} />
+      </div>
+
       {/* ============ BASE DE DATOS ============ */}
       <section className="mt-10">
         <div className="flex items-baseline justify-between gap-3">
@@ -219,11 +282,6 @@ export default async function HomePage() {
           </div>
         </section>
       )}
-
-      {/* ============ BUILD CLASS PVP ============ */}
-      <div className="mt-10">
-        <BuildClassTabs className={className} chain={primaryBuildChain} build={primaryBuild} />
-      </div>
 
       <section className="mt-10 rounded-xl border border-dashed border-border p-5">
         <h2 className="font-semibold text-foreground">Próximamente</h2>
