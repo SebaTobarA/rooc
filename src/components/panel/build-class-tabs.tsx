@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import type { SavedBuild } from "@prisma/client";
 import type { JobWithSkills } from "@/lib/skill-tree";
 import { SkillTreeCanvas } from "@/components/panel/build-pvp/skill-tree-canvas";
@@ -18,6 +17,60 @@ const TABS = [
 ] as const;
 
 const TIER_LABELS = ["1st Job", "2nd Job", "Trans. 2nd"];
+
+function BuildSkillsView({
+  className,
+  chain,
+  build,
+}: {
+  className: string | null;
+  chain: [JobWithSkills, JobWithSkills, JobWithSkills];
+  build: SavedBuild;
+}) {
+  const [activeTier, setActiveTier] = useState(0);
+  const allocations = build.allocations as Record<string, number>;
+
+  function spentInTier(tierIndex: number): number {
+    return chain[tierIndex].skills.reduce((sum, skill) => sum + (allocations[skill.id] ?? 0), 0);
+  }
+
+  const tierJob = chain[activeTier];
+
+  return (
+    <div className="mt-5">
+      {/* Solo muestra el resultado — editar una build enviada se hace desde
+          el panel de administración, no acá. */}
+      <p className="text-xs text-muted">
+        Build enviada por la guild para <span className="font-semibold text-accent">{className}</span>:{" "}
+        <span className="font-semibold text-foreground">{build.name}</span>
+      </p>
+
+      <div className="mt-4 rounded-xl border border-border bg-background-elevated p-4">
+        <div className="flex flex-wrap gap-2">
+          {chain.map((job, i) => (
+            <button
+              key={job.id}
+              type="button"
+              onClick={() => setActiveTier(i)}
+              className={`rounded-[10px] px-3 py-2 text-xs font-semibold uppercase tracking-wide transition-colors ${
+                activeTier === i
+                  ? "bg-accent text-accent-foreground"
+                  : "bg-surface text-muted hover:text-foreground"
+              }`}
+            >
+              {TIER_LABELS[i]} {spentInTier(i)}/40
+            </button>
+          ))}
+        </div>
+
+        <h3 className="mt-4 font-semibold text-foreground">{tierJob.name}</h3>
+        <div className="mt-3">
+          <SkillTreeCanvas skills={tierJob.skills} levels={allocations} />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function BuildClassTabs({
   className,
@@ -53,29 +106,7 @@ export function BuildClassTabs({
 
       {active === "Skills" ? (
         chain && build ? (
-          <div className="mt-5">
-            <p className="text-xs text-muted">
-              Build enviada por la guild para <span className="font-semibold text-accent">{className}</span>:{" "}
-              <span className="font-semibold text-foreground">{build.name}</span> —{" "}
-              <Link href={`/panel/build-pvp?build=${build.id}`} className="text-accent hover:underline">
-                editar en el simulador
-              </Link>
-            </p>
-            <div className="mt-4 grid gap-4 lg:grid-cols-3">
-              {chain.map((tierJob, i) => (
-                <div key={tierJob.id} className="rounded-lg border border-border bg-background-elevated p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted">{TIER_LABELS[i]}</p>
-                  <h3 className="font-semibold text-foreground">{tierJob.name}</h3>
-                  <div className="mt-3">
-                    <SkillTreeCanvas
-                      skills={tierJob.skills}
-                      levels={build.allocations as Record<string, number>}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <BuildSkillsView className={className} chain={chain} build={build} />
         ) : (
           <div className="mt-5 rounded-xl border border-dashed border-border p-6 text-center">
             <p className="font-semibold text-foreground">Todavía no hay una build enviada para tu clase</p>

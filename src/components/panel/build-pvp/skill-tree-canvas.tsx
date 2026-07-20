@@ -10,8 +10,8 @@ export type CanvasSkill = {
   prerequisites: { requiresSkillId: string; requiredLevel: number }[];
 };
 
-const CELL_W = 104;
-const CELL_H = 96;
+const CELL_W = 116;
+const CELL_H = 132;
 const NODE_SIZE = 60;
 
 /**
@@ -124,7 +124,7 @@ export function SkillTreeCanvas({
                   <span className="text-[10px] text-muted">{skill.name.slice(0, 2).toUpperCase()}</span>
                 )}
               </button>
-              <span className="max-w-full truncate text-[11px] text-muted" title={skill.name}>
+              <span className="w-full break-words text-center text-[11px] leading-tight text-muted">
                 {skill.name}
               </span>
               {interactive && (
