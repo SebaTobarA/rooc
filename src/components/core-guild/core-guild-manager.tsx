@@ -308,7 +308,7 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
                         name={`group-${member.discordId}`}
                         checked={member.groupMode === "SOLO"}
                         disabled={locked}
-                        onChange={() => updateMember(member.discordId, { groupMode: "SOLO" })}
+                        onChange={() => updateMember(member.discordId, { groupMode: "SOLO", groupTag: "" })}
                         aria-label="Solitario"
                       />
                     </td>
@@ -323,18 +323,21 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
                       />
                     </td>
                     <td data-label="Etiqueta">
-                      {member.groupMode === "GROUP" ? (
-                        <input
-                          className="core-input"
-                          list="core-guild-tags"
-                          defaultValue={member.groupTag}
-                          disabled={locked}
-                          placeholder="Nombre del grupo"
-                          onBlur={(e) => updateMember(member.discordId, { groupTag: e.target.value.trim() })}
-                        />
-                      ) : (
-                        <span className="core-muted">—</span>
-                      )}
+                      <input
+                        key={`tag-${member.discordId}-${member.groupTag}`}
+                        className="core-input"
+                        list="core-guild-tags"
+                        defaultValue={member.groupTag}
+                        disabled={locked}
+                        placeholder="Sin etiqueta (solitario)"
+                        onBlur={(e) => {
+                          const value = e.target.value.trim();
+                          updateMember(member.discordId, {
+                            groupTag: value,
+                            groupMode: value ? "GROUP" : "SOLO",
+                          });
+                        }}
+                      />
                     </td>
                     <td data-label="Wallet">
                       <div className="core-wallet-toggle">
