@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, type DragEvent, type FormEvent } from "react";
-import { Wand2, FolderPlus, Save, Pencil, Plus } from "lucide-react";
+import { Wand2, FolderPlus, Save, Pencil, Plus, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import type { Player, Party } from "@/types/party";
 import { inferRole } from "@/lib/party/infer-role";
 import { discordAvatarUrl } from "@/lib/discord-avatar";
@@ -22,6 +22,19 @@ const WALLET_OPTIONS: { value: WalletType; label: string }[] = [
   { value: "MS", label: "MS" },
   { value: "BALLENA", label: "Ballena" },
 ];
+
+// Cuántos miembros se muestran por hoja en la tabla — únicas opciones
+// permitidas, empezando en 5.
+const PAGE_SIZE_OPTIONS = [5, 10, 15, 20, 25, 50] as const;
+
+// Insensible a mayúsculas/acentos, mismo truco que discord-job-roles.ts.
+function normalizeSearch(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(new RegExp("[\\u0300-\\u036f]", "g"), "")
+    .toLowerCase()
+    .trim();
+}
 
 function toPlayerView(member: CoreMember): Player {
   return {
@@ -83,6 +96,9 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
   const { selected, clearSelection } = usePlayerSelection();
   const [organizeMsg, setOrganizeMsg] = useState("");
   const [guildForm, setGuildForm] = useState(false);
+  const [search, setSearch] = useState("");
+  const [pageSize, setPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(5);
+  const [page, setPage] = useState(1);
 
   const existingTags = useMemo(
     () => [...new Set(members.filter((m) => m.groupTag.trim()).map((m) => m.groupTag.trim()))],
@@ -99,6 +115,33 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
       }),
     [members]
   );
+
+  const filteredMembers = useMemo(() => {
+    const query = normalizeSearch(search);
+    if (!query) return sortedMembers;
+    return sortedMembers.filter((m) => {
+      const displayName = m.nick ?? m.globalName ?? m.username;
+      return (
+        normalizeSearch(displayName).includes(query) ||
+        normalizeSearch(m.username).includes(query) ||
+        normalizeSearch(m.jobRole).includes(query)
+      );
+    });
+  }, [sortedMembers, search]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredMembers.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const pagedMembers = filteredMembers.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  function handleSearchChange(value: string) {
+    setSearch(value);
+    setPage(1);
+  }
+
+  function handlePageSizeChange(value: (typeof PAGE_SIZE_OPTIONS)[number]) {
+    setPageSize(value);
+    setPage(1);
+  }
 
   const allPlayers = activeMembers.map(toPlayerView);
   const partyViews = parties.map(toPartyView);
@@ -187,6 +230,33 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
       {/* ---------- Sección 1: miembros ---------- */}
       <section className="core-guild-section">
         <h2 className="campo-label">Miembros Core</h2>
+
+        <div className="core-member-toolbar">
+          <div className="core-search">
+            <Search size={14} className="core-search-icon" />
+            <input
+              type="text"
+              className="core-input core-search-input"
+              placeholder="Buscar por nombre, usuario o clase…"
+              value={search}
+              onChange={(e) => handleSearchChange(e.target.value)}
+            />
+          </div>
+          <label className="core-page-size">
+            Por hoja
+            <select
+              value={pageSize}
+              onChange={(e) => handlePageSizeChange(Number(e.target.value) as (typeof PAGE_SIZE_OPTIONS)[number])}
+            >
+              {PAGE_SIZE_OPTIONS.map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
         <div className="core-member-table-wrap">
           <table className="core-member-table">
             <thead>
@@ -201,7 +271,7 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
               </tr>
             </thead>
             <tbody>
-              {sortedMembers.map((member) => {
+              {pagedMembers.map((member) => {
                 const avatar = discordAvatarUrl(member.discordId, member.avatarHash, 32);
                 const displayName = member.nick ?? member.globalName ?? member.username;
                 return (
@@ -294,16 +364,44 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
                   </tr>
                 );
               })}
-              {sortedMembers.length === 0 && (
+              {filteredMembers.length === 0 && (
                 <tr>
                   <td colSpan={7} className="core-muted">
-                    Nadie tiene el rol [SD] Core todavía.
+                    {search.trim()
+                      ? "Ningún miembro coincide con la búsqueda."
+                      : "Nadie tiene el rol [SD] Core todavía."}
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
+
+        {filteredMembers.length > 0 && (
+          <div className="core-pagination">
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage <= 1}
+              aria-label="Hoja anterior"
+            >
+              <ChevronLeft size={14} />
+            </button>
+            <span className="core-pagination-info">
+              Hoja {currentPage} de {totalPages} · {filteredMembers.length} miembro(s)
+            </span>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage >= totalPages}
+              aria-label="Hoja siguiente"
+            >
+              <ChevronRight size={14} />
+            </button>
+          </div>
+        )}
       </section>
 
       {/* ---------- Sección 2: organizador de parties ---------- */}

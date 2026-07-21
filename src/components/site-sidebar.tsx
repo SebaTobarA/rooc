@@ -215,12 +215,20 @@ function AccountBlock({ session }: { session: SidebarSession }) {
   return (
     <div className="mt-auto flex flex-col gap-2 border-t border-border pt-4 text-sm">
       {session.isAdmin ? (
-        <Link
-          href="/admin"
-          className="rounded-[10px] px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-accent hover:bg-surface"
-        >
-          Panel de Admin
-        </Link>
+        <>
+          <Link
+            href="/admin"
+            className="rounded-[10px] px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-accent hover:bg-surface"
+          >
+            Panel de Admin
+          </Link>
+          <Link
+            href="/admin/core-guild"
+            className="rounded-[10px] px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-accent hover:bg-surface"
+          >
+            Core Guild
+          </Link>
+        </>
       ) : (
         session.canManageRecruitment && (
           <Link

@@ -50,6 +50,65 @@
   border-top: none;
 }
 
+/* ---------- Buscador + selector de hoja ---------- */
+.core-member-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.core-search {
+  position: relative;
+  flex: 1;
+  min-width: 220px;
+}
+.core-search-icon {
+  position: absolute;
+  top: 50%;
+  left: 10px;
+  transform: translateY(-50%);
+  color: var(--pb-text-muted);
+  pointer-events: none;
+}
+.core-search-input {
+  width: 100%;
+  padding-left: 30px;
+}
+
+.core-page-size {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--pb-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.core-page-size select {
+  background: var(--pb-surface-1);
+  border: 1px solid var(--pb-border);
+  border-radius: var(--pb-radius-sm);
+  color: var(--foreground, #e9edf1);
+  padding: 5px 8px;
+  font-size: 12px;
+}
+
+.core-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+.core-pagination-info {
+  font-size: 12px;
+  color: var(--pb-text-secondary);
+}
+
 /* ---------- Tabla de miembros ---------- */
 .core-member-table-wrap {
   overflow-x: auto;
