@@ -415,3 +415,72 @@
   flex: 1;
   min-width: 140px;
 }
+
+/* ---------- Responsive: tabla de miembros en mobile ---------- */
+/* Debajo de 640px la tabla no entra en pantalla (7 columnas) — se
+   convierte en una lista de tarjetas, una por miembro, con cada celda
+   mostrando su propia etiqueta (mismo dato que el <th>, vía data-label). */
+@media (max-width: 640px) {
+  .core-member-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .core-page-size {
+    justify-content: space-between;
+  }
+
+  .core-member-table-wrap {
+    overflow-x: visible;
+  }
+  .core-member-table thead {
+    display: none;
+  }
+  .core-member-table,
+  .core-member-table tbody,
+  .core-member-table tr,
+  .core-member-table td {
+    display: block;
+    width: 100%;
+  }
+  .core-member-table tr {
+    padding: 12px 12px 14px;
+    border-top: 1px solid var(--pb-border);
+  }
+  .core-member-table tr:first-child {
+    border-top: none;
+  }
+  .core-member-table td {
+    padding: 6px 0;
+    border-top: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .core-member-table td::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--pb-text-muted);
+  }
+  .core-member-table td[data-label=""]::before {
+    content: none;
+  }
+  .core-member-table td:first-child {
+    display: block;
+    padding-bottom: 10px;
+  }
+  .core-member-table td:first-child::before {
+    content: none;
+  }
+  .core-member-table .core-input,
+  .core-member-table select {
+    max-width: 60%;
+  }
+  .core-member-table .core-wallet-toggle {
+    flex-shrink: 0;
+  }
+}

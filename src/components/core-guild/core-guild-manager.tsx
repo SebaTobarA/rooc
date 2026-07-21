@@ -276,7 +276,7 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
                 const displayName = member.nick ?? member.globalName ?? member.username;
                 return (
                   <tr key={member.discordId} className={member.inCore ? "" : "core-member-row--inactive"}>
-                    <td>
+                    <td data-label="Miembro">
                       <div className="core-member-identity">
                         {avatar ? (
                           <img src={avatar} alt="" className="core-member-avatar" />
@@ -292,7 +292,7 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
                         </div>
                       </div>
                     </td>
-                    <td>
+                    <td data-label="Rol de juego">
                       <input
                         className="core-input"
                         list="core-guild-job-roles"
@@ -302,7 +302,7 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
                         onBlur={(e) => updateMember(member.discordId, { jobRole: e.target.value.trim() })}
                       />
                     </td>
-                    <td className="core-radio-cell">
+                    <td className="core-radio-cell" data-label="Solitario">
                       <input
                         type="radio"
                         name={`group-${member.discordId}`}
@@ -312,7 +312,7 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
                         aria-label="Solitario"
                       />
                     </td>
-                    <td className="core-radio-cell">
+                    <td className="core-radio-cell" data-label="En grupo">
                       <input
                         type="radio"
                         name={`group-${member.discordId}`}
@@ -322,7 +322,7 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
                         aria-label="En grupo"
                       />
                     </td>
-                    <td>
+                    <td data-label="Etiqueta">
                       {member.groupMode === "GROUP" ? (
                         <input
                           className="core-input"
@@ -336,7 +336,7 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
                         <span className="core-muted">—</span>
                       )}
                     </td>
-                    <td>
+                    <td data-label="Wallet">
                       <div className="core-wallet-toggle">
                         {WALLET_OPTIONS.map((option) => (
                           <button
@@ -351,7 +351,7 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
                         ))}
                       </div>
                     </td>
-                    <td>
+                    <td data-label="">
                       {!locked && !member.inCore && (
                         <button
                           className="btn btn-ghost btn-sm"
