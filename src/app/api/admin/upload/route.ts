@@ -25,7 +25,8 @@ export async function POST(request: Request) {
       addRandomSuffix: false,
     });
     return NextResponse.json({ url: blob.url });
-  } catch {
+  } catch (err) {
+    console.error("admin/upload failed:", err);
     return NextResponse.json(
       { error: "No se pudo subir la imagen. Verifica que BLOB_READ_WRITE_TOKEN esté configurado." },
       { status: 500 }
