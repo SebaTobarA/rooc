@@ -1,0 +1,358 @@
+/*
+ * Estilos propios de /admin/core-guild. Reusa las clases de party.css
+ * (.campo, .player-chip, .party-card, .slot-picker, .btn*, etc.) para el
+ * organizador de parties — acá solo lo que no existe todavía: la tabla de
+ * miembros, el toggle de wallet, la etiqueta de grupo y las guild cards.
+ */
+
+/* .party-page trae los estilos de .btn/.btn-primary/etc. y de
+   input[type=checkbox], pero también su propio layout de página completa
+   (max-width/margin/padding) — se neutraliza acá porque este módulo ya
+   vive dentro del layout del panel admin. */
+.core-guild-manager.party-page {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
+.core-guild-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-bottom: 16px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--pb-border);
+}
+
+.core-guild-status {
+  font-size: 13px;
+  color: var(--pb-text-secondary);
+}
+
+.core-guild-status-meta {
+  color: var(--pb-text-muted);
+}
+
+.core-guild-save-btn {
+  white-space: nowrap;
+}
+
+.core-guild-section {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--pb-border);
+}
+.core-guild-section:first-of-type {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+/* ---------- Tabla de miembros ---------- */
+.core-member-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--pb-border);
+  border-radius: var(--pb-radius);
+  margin-top: 10px;
+}
+
+.core-member-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.core-member-table th {
+  text-align: left;
+  padding: 10px 12px;
+  background: var(--pb-surface-2);
+  color: var(--pb-text-muted);
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.core-member-table td {
+  padding: 8px 12px;
+  border-top: 1px solid var(--pb-border);
+  vertical-align: middle;
+}
+
+.core-member-row--inactive {
+  opacity: 0.5;
+}
+
+.core-member-identity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 160px;
+}
+
+.core-member-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.core-member-avatar--fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--pb-surface-3);
+  color: var(--pb-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.core-member-name {
+  font-weight: 600;
+  color: var(--foreground, #e9edf1);
+  line-height: 1.3;
+}
+.core-member-username {
+  font-size: 11px;
+  color: var(--pb-text-muted);
+}
+.core-member-badge {
+  font-size: 10px;
+  color: var(--pb-danger);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.core-input {
+  width: 100%;
+  min-width: 120px;
+  background: var(--pb-surface-1);
+  border: 1px solid var(--pb-border);
+  border-radius: var(--pb-radius-sm);
+  color: var(--foreground, #e9edf1);
+  padding: 6px 8px;
+  font-size: 13px;
+  font-family: inherit;
+}
+.core-input:focus {
+  outline: none;
+  border-color: var(--pb-accent);
+  box-shadow: 0 0 0 3px var(--pb-accent-dim);
+}
+.core-input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.core-radio-cell {
+  text-align: center;
+}
+.core-radio-cell input {
+  accent-color: var(--pb-accent);
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+.core-radio-cell input:disabled {
+  cursor: not-allowed;
+}
+
+.core-muted {
+  color: var(--pb-text-muted);
+  font-size: 12px;
+}
+
+.core-wallet-toggle {
+  display: inline-flex;
+  border: 1px solid var(--pb-border);
+  border-radius: var(--pb-radius-sm);
+  overflow: hidden;
+}
+.core-wallet-btn {
+  background: var(--pb-surface-1);
+  color: var(--pb-text-secondary);
+  border: none;
+  border-right: 1px solid var(--pb-border);
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: var(--pb-transition);
+}
+.core-wallet-btn:last-child {
+  border-right: none;
+}
+.core-wallet-btn:hover {
+  background: var(--pb-surface-2);
+  color: var(--foreground, #e9edf1);
+}
+.core-wallet-btn.active {
+  background: var(--pb-accent-dim);
+  color: var(--pb-accent);
+}
+.core-wallet-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* ---------- Chip extras (etiqueta de grupo / wallet) ---------- */
+.chip-tag {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  padding: 2px 6px;
+}
+.chip-wallet {
+  font-size: 9px;
+  font-weight: 700;
+  opacity: 0.75;
+}
+.chip-wallet-ballena {
+  color: var(--pb-accent-hover);
+  opacity: 1;
+}
+
+/* ---------- Party -> guild (drag nativo o toque, ver PartyCard) ---------- */
+.core-party-guild-hint {
+  font-size: 10px;
+  color: var(--pb-text-muted);
+  padding: 0 2px 4px;
+}
+
+/* ---------- Guilds ---------- */
+.guilds-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.guild-card {
+  border: 1px solid var(--pb-border);
+  border-radius: var(--pb-radius);
+  background: var(--pb-surface-1);
+  padding: 12px;
+  transition: var(--pb-transition);
+}
+.guild-card--dragover {
+  border-color: var(--pb-accent);
+  box-shadow: 0 0 0 3px var(--pb-accent-dim);
+}
+.guild-card--armed {
+  border-style: solid;
+  border-color: var(--pb-accent);
+  cursor: pointer;
+}
+.guild-card--over .guild-occupancy {
+  color: var(--pb-danger);
+}
+
+.guild-card-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.guild-name-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--foreground, #e9edf1);
+  font-weight: 700;
+  font-size: 14px;
+  padding: 2px 0;
+}
+.guild-name-input:focus {
+  outline: none;
+  border-bottom: 1px solid var(--pb-accent);
+}
+
+.guild-card-meta {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.guild-card-meta label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 10px;
+  color: var(--pb-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.guild-card-meta select,
+.guild-card-meta input {
+  background: var(--pb-surface-2);
+  border: 1px solid var(--pb-border);
+  border-radius: var(--pb-radius-sm);
+  color: var(--foreground, #e9edf1);
+  padding: 4px 6px;
+  font-size: 12px;
+  width: 90px;
+}
+
+.guild-occupancy {
+  font-size: 12px;
+  color: var(--pb-text-secondary);
+  margin-bottom: 8px;
+}
+.guild-occupancy--over {
+  color: var(--pb-danger);
+  font-weight: 600;
+}
+
+.guild-parties {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 36px;
+  border: 1px dashed var(--pb-border);
+  border-radius: var(--pb-radius-sm);
+  padding: 6px;
+}
+
+.guild-party-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--foreground, #e9edf1);
+  background: var(--pb-surface-2);
+  border-radius: var(--pb-radius-sm);
+  padding: 4px 8px;
+}
+.guild-party-count {
+  margin-left: auto;
+  color: var(--pb-text-muted);
+}
+
+.guild-empty {
+  font-size: 11px;
+  color: var(--pb-text-muted);
+  text-align: center;
+  padding: 8px 0;
+}
+
+.guild-add-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  border: 1px dashed var(--pb-border);
+  border-radius: var(--pb-radius);
+  padding: 12px;
+}
+.guild-add-form .core-input {
+  width: auto;
+  flex: 1;
+  min-width: 140px;
+}

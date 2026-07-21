@@ -754,3 +754,24 @@ model SavedBuild {
   @@index([jobId])
   @@index([status])
 }
+
+// ---------------------------------------------------------------------------
+// Core Guild: identifica a los miembros con el rol de Discord "[SD] Core"
+// (ver CORE_GUILD_ROLE_ID en src/lib/core-guild/sync.ts), los clasifica
+// (clase, solitario/grupo, F2P/MS/Ballena) y arma parties + guilds desde
+// /admin/core-guild. Fila única, mismo patrón que GuildEventSettings — todo
+// el estado del armado (miembros, parties, composiciones, guilds) vive en
+// `data` como JSON y se sobreescribe entero al apretar "Guardar" (nada se
+// persiste antes de eso, ver CoreGuildManager). `locked` distingue el
+// estado "guardado/definitivo" (solo lectura) del estado "en edición".
+// ---------------------------------------------------------------------------
+
+model CoreGuildBoard {
+  id                 String   @id @default(cuid())
+  data               Json
+  locked             Boolean  @default(false)
+  updatedByDiscordId String?
+  updatedByUsername  String?
+  updatedAt          DateTime @updatedAt
+  createdAt          DateTime @default(now())
+}

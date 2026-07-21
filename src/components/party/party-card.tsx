@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type DragEvent, type KeyboardEvent } from "react";
+import { Fragment, useState, type DragEvent, type KeyboardEvent, type ReactNode } from "react";
 import { AlertTriangle, CheckCircle2, ChevronDown, GripVertical, Info } from "lucide-react";
 import type { Player, Party } from "@/types/party";
 import { PlayerChip } from "@/components/party/player-chip";
@@ -19,6 +19,8 @@ interface PartyCardProps {
    * importa más que tener los chips siempre visibles. Se expande al tocar
    * la flecha. */
   compact?: boolean;
+  /** Reemplaza el PlayerChip por defecto (ej. Core Guild agrega badges de grupo/wallet). */
+  renderMember?: (player: Player) => ReactNode;
 }
 
 export function PartyCard({
@@ -28,6 +30,7 @@ export function PartyCard({
   onClickAssign,
   onRemovePlayer,
   compact = false,
+  renderMember,
 }: PartyCardProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [expanded, setExpanded] = useState(!compact);
@@ -133,9 +136,13 @@ export function PartyCard({
             role="list"
             aria-label={`Miembros de ${party.name}. Toca un jugador seleccionado para agregarlo acá.`}
           >
-            {members.map((p) => (
-              <PlayerChip key={p.id} player={p} onRemove={onRemovePlayer} />
-            ))}
+            {members.map((p) =>
+              renderMember ? (
+                <Fragment key={p.id}>{renderMember(p)}</Fragment>
+              ) : (
+                <PlayerChip key={p.id} player={p} onRemove={onRemovePlayer} />
+              )
+            )}
             {members.length === 0 && <p className="party-empty">Arrastra jugadores aquí</p>}
           </div>
         </>

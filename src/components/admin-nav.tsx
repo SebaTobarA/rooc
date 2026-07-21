@@ -14,6 +14,7 @@ const FULL_ADMIN_LINKS = [
   { href: "/admin/import", label: "Importar CSV/JSON" },
   { href: "/admin/leadership", label: "Liderazgo" },
   { href: "/admin/members", label: "Miembros" },
+  { href: "/admin/core-guild", label: "Core Guild" },
   { href: "/admin/recruitment", label: "Reclutamiento" },
   { href: "/admin/build-pvp", label: "Build PVP" },
   { href: "/admin/roles", label: "Roles y permisos" },
