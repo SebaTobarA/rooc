@@ -20,15 +20,19 @@ export async function POST(request: Request) {
   }
 
   try {
+    // El store original (BLOB_READ_WRITE_TOKEN) quedó creado como Private y
+    // no admite `access: "public"` — las imágenes de equipamiento necesitan
+    // URLs públicas estables, así que se suben al store nuevo (Public).
     const blob = await put(`equipamiento/${crypto.randomUUID()}-${file.name}`, file, {
       access: "public",
       addRandomSuffix: false,
+      token: process.env.PUBLIC_BLOB_READ_WRITE_TOKEN,
     });
     return NextResponse.json({ url: blob.url });
   } catch (err) {
     console.error("admin/upload failed:", err);
     return NextResponse.json(
-      { error: "No se pudo subir la imagen. Verifica que BLOB_READ_WRITE_TOKEN esté configurado." },
+      { error: "No se pudo subir la imagen. Verifica que PUBLIC_BLOB_READ_WRITE_TOKEN esté configurado." },
       { status: 500 }
     );
   }
