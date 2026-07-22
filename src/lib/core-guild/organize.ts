@@ -158,9 +158,17 @@ export function organizeCoreParties(members: CoreMember[], compositions: SlotLab
     let usedMusician = musicianPool.length === 0;
     let usedHealer = healerPool.length === 0;
 
+    // Tope duro: un miembro "Sin clase" (rol Flexible) puede haber llenado un
+    // cupo de Tanque/Soporte/Daño como comodín en placeGroupChunk — ahí
+    // currentByRole lo cuenta como Flexible, no como el rol del cupo que
+    // realmente ocupa, así que el "missing" por rol puede quedar mal
+    // calculado. remainingCapacity evita que eso termine metiendo más gente
+    // de la que la party admite, sea cual sea el desajuste por rol.
+    let remainingCapacity = party.capacity - alreadyIn.length;
+
     (Object.keys(quota) as Role[]).forEach((role) => {
       let missing = quota[role] - currentByRole[role];
-      while (missing > 0) {
+      while (missing > 0 && remainingCapacity > 0) {
         let picked: CoreMember | undefined;
         if (role === "Tank") {
           picked = pickUnique(tankPool, usedClasses) ?? pickUnique(lordKnights, usedClasses);
@@ -189,6 +197,7 @@ export function organizeCoreParties(members: CoreMember[], compositions: SlotLab
         if (!picked) break;
         assignments[picked.discordId] = party.id;
         missing--;
+        remainingCapacity--;
       }
     });
   }
