@@ -48,7 +48,16 @@ export function CoreMemberChip({ player, member, draggable = true, onRemove }: C
     <div
       className={`player-chip core-member-chip ${ROLE_CLASS[player.rol]} ${isSelected ? "player-chip--selected" : ""}`}
       draggable={draggable}
-      onDragStart={(e) => draggable && setDragPayload(e, { kind: "player", id: player.id })}
+      onDragStart={(e) => {
+        if (!draggable) return;
+        // Sin esto, el dragstart burbujea hasta el <PartyCard> contenedor
+        // (también arrastrable, para llevarlo entero a una guild) y su
+        // propio onDragStart pisa este payload de "jugador" con uno de
+        // "party" antes de soltar — el drop entre parties quedaba
+        // rechazado en silencio.
+        e.stopPropagation();
+        setDragPayload(e, { kind: "player", id: player.id });
+      }}
       onClick={(e) => {
         e.stopPropagation();
         handleSelect();

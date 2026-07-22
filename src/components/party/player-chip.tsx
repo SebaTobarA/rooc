@@ -37,7 +37,15 @@ export function PlayerChip({ player, onRemove }: PlayerChipProps) {
     <div
       className={`player-chip ${ROLE_CLASS[player.rol]} ${isSelected ? "player-chip--selected" : ""}`}
       draggable
-      onDragStart={(e) => setDragPayload(e, { kind: "player", id: player.id })}
+      onDragStart={(e) => {
+        // Sin esto, el dragstart burbujea hasta el <PartyCard> contenedor
+        // (también arrastrable, para llevarlo entero a Campo Principal/
+        // Secundario) y su propio onDragStart pisa este payload de
+        // "jugador" con uno de "party" antes de soltar — el drop entre
+        // parties quedaba rechazado en silencio.
+        e.stopPropagation();
+        setDragPayload(e, { kind: "player", id: player.id });
+      }}
       onClick={(e) => {
         e.stopPropagation();
         handleSelect();

@@ -66,7 +66,16 @@ export function PartyCard({
     <div
       className={`party-card ${compact ? "party-card--compact" : ""} ${isDragOver ? "party-card--dragover" : ""} ${isPartySelected ? "party-card--selected" : ""}`}
       draggable
-      onDragStart={(e) => setDragPayload(e, { kind: "party", partyId: party.id })}
+      onDragStart={(e) => {
+        // e.target sigue siendo el chip de origen aunque el evento burbujee
+        // hasta acá — si el drag arrancó en un chip, ya cargó su propio
+        // payload de "jugador" en el dataTransfer; no pisarlo con el de la
+        // party completa (stopPropagation en el chip no alcanza a frenar
+        // este handler delegado por React, así que se chequea el target
+        // en vez de depender de la propagación).
+        if ((e.target as HTMLElement).closest(".player-chip")) return;
+        setDragPayload(e, { kind: "party", partyId: party.id });
+      }}
       onClick={handleSelectParty}
       onKeyDown={handleKeyDown}
       tabIndex={0}
