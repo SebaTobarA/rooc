@@ -21,6 +21,8 @@ interface PartyCardProps {
   compact?: boolean;
   /** Reemplaza el PlayerChip por defecto (ej. Core Guild agrega badges de grupo/wallet). */
   renderMember?: (player: Player) => ReactNode;
+  /** Reemplaza el <span> de nombre por defecto (ej. Core Guild lo hace editable). */
+  renderName?: () => ReactNode;
 }
 
 export function PartyCard({
@@ -31,6 +33,7 @@ export function PartyCard({
   onRemovePlayer,
   compact = false,
   renderMember,
+  renderName,
 }: PartyCardProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [expanded, setExpanded] = useState(!compact);
@@ -72,7 +75,7 @@ export function PartyCard({
     >
       <div className="party-card-header">
         <GripVertical size={13} className="party-card-grip" aria-hidden="true" />
-        <span className="party-card-name">{party.name}</span>
+        {renderName ? renderName() : <span className="party-card-name">{party.name}</span>}
         {compact && (
           <span
             className={`party-card-status ${isComplete ? "party-card-status--ok" : "party-card-status--warn"}`}

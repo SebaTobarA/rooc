@@ -1,7 +1,20 @@
 "use client";
 
 import { useMemo, useState, type DragEvent, type FormEvent } from "react";
-import { Wand2, FolderPlus, Save, Pencil, Plus, Search, ChevronLeft, ChevronRight, Lock, Unlock } from "lucide-react";
+import {
+  Wand2,
+  FolderPlus,
+  Save,
+  Pencil,
+  Plus,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  Lock,
+  Unlock,
+  Eraser,
+  X,
+} from "lucide-react";
 import type { Player, Party } from "@/types/party";
 import { inferRole } from "@/lib/party/infer-role";
 import { discordAvatarUrl } from "@/lib/discord-avatar";
@@ -84,7 +97,10 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
     removeMember,
     assignToParty,
     addParty,
+    removeParty,
     togglePartyLocked,
+    updatePartyName,
+    clearParties,
     organize,
     addGuild,
     updateGuild,
@@ -179,6 +195,13 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
     setOrganizeMsg("");
     organize();
     setOrganizeMsg("Parties organizadas — los grupos etiquetados quedaron priorizados juntos.");
+    setTimeout(() => setOrganizeMsg(""), 5000);
+  }
+
+  function handleClearParties() {
+    setOrganizeMsg("");
+    clearParties();
+    setOrganizeMsg("Parties sin bloquear borradas — sus miembros volvieron a \"Sin asignar\".");
     setTimeout(() => setOrganizeMsg(""), 5000);
   }
 
@@ -430,6 +453,14 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
             <FolderPlus size={14} />
             Nueva party
           </button>
+          <button
+            className="btn btn-secondary"
+            onClick={handleClearParties}
+            disabled={locked || parties.every((p) => p.locked)}
+          >
+            <Eraser size={14} />
+            Limpiar parties
+          </button>
         </div>
         {organizeMsg && <p className="suggest-msg">{organizeMsg}</p>}
 
@@ -463,16 +494,27 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
                 <div key={party.id} className={partyLocked ? "core-party-wrapper core-party-wrapper--locked" : "core-party-wrapper"}>
                   <div className="core-party-hint-row">
                     <p className="core-party-guild-hint">{guildName ? `En guild: ${guildName}` : "Sin guild asignada"}</p>
-                    <button
-                      type="button"
-                      className={`core-party-lock-btn${partyLocked ? " active" : ""}`}
-                      disabled={locked}
-                      onClick={() => togglePartyLocked(party.id)}
-                      aria-label={partyLocked ? `Desbloquear ${party.name}` : `Marcar ${party.name} como lista`}
-                    >
-                      {partyLocked ? <Lock size={12} /> : <Unlock size={12} />}
-                      {partyLocked ? "Lista" : "Marcar lista"}
-                    </button>
+                    <div className="core-party-hint-actions">
+                      <button
+                        type="button"
+                        className={`core-party-lock-btn${partyLocked ? " active" : ""}`}
+                        disabled={locked}
+                        onClick={() => togglePartyLocked(party.id)}
+                        aria-label={partyLocked ? `Desbloquear ${party.name}` : `Marcar ${party.name} como lista`}
+                      >
+                        {partyLocked ? <Lock size={12} /> : <Unlock size={12} />}
+                        {partyLocked ? "Lista" : "Marcar lista"}
+                      </button>
+                      <button
+                        type="button"
+                        className="core-party-delete-btn"
+                        disabled={locked}
+                        onClick={() => removeParty(party.id)}
+                        aria-label={`Eliminar ${party.name}`}
+                      >
+                        <X size={13} />
+                      </button>
+                    </div>
                   </div>
                   <PartyCard
                     party={party}
@@ -480,6 +522,21 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
                     onDrop={handleZoneDrop}
                     onClickAssign={() => handleZoneClick(party.id)}
                     onRemovePlayer={(id) => editable && assignToParty(id, null)}
+                    renderName={() => (
+                      <input
+                        key={`party-name-${party.id}-${party.name}`}
+                        className="core-party-name-input"
+                        defaultValue={party.name}
+                        disabled={locked}
+                        onClick={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onBlur={(e) => {
+                          const value = e.target.value.trim();
+                          if (value) updatePartyName(party.id, value);
+                        }}
+                        aria-label={`Nombre de ${party.name}`}
+                      />
+                    )}
                     renderMember={(player) => {
                       const member = activeMembers.find((m) => m.discordId === player.id);
                       if (!member) return null;

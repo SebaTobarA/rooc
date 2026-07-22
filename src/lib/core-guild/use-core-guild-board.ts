@@ -124,6 +124,22 @@ export function useCoreGuildBoard(roster: CoreGuildRosterEntry[], saved: SavedCo
     setParties((prev) => prev.map((p) => (p.id === partyId ? { ...p, locked: !p.locked } : p)));
   }, []);
 
+  const updatePartyName = useCallback((partyId: string, name: string) => {
+    setParties((prev) => prev.map((p) => (p.id === partyId ? { ...p, name } : p)));
+  }, []);
+
+  // Borra todas las parties SIN bloquear (las "lista" quedan intactas, con
+  // sus miembros) y devuelve a sus miembros al pool de "sin asignar".
+  const clearParties = useCallback(() => {
+    const removedIds = new Set(parties.filter((p) => !p.locked).map((p) => p.id));
+    if (removedIds.size === 0) return;
+    setParties((prev) => prev.filter((p) => p.locked));
+    setMembers((prev) =>
+      prev.map((m) => (m.partyId && removedIds.has(m.partyId) ? { ...m, partyId: null } : m))
+    );
+    setGuilds((prev) => prev.map((g) => ({ ...g, partyIds: g.partyIds.filter((id) => !removedIds.has(id)) })));
+  }, [parties]);
+
   // Las parties marcadas "lista" (locked) no se tocan: ni a ellas ni a sus
   // miembros. organizeCoreParties solo corre sobre el resto (sin asignar +
   // miembros de parties todavía no bloqueadas), y el resultado se agrega a
@@ -224,6 +240,8 @@ export function useCoreGuildBoard(roster: CoreGuildRosterEntry[], saved: SavedCo
     addParty,
     removeParty,
     togglePartyLocked,
+    updatePartyName,
+    clearParties,
     organize,
     addGuild,
     updateGuild,

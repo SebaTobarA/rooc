@@ -290,6 +290,58 @@
   font-size: 10px;
   color: var(--pb-text-muted);
 }
+.core-party-hint-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+/* ---------- Nombre editable de la party ---------- */
+.core-party-name-input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  border-bottom: 1px dashed transparent;
+  color: var(--foreground, #e9edf1);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0;
+}
+.core-party-name-input:hover:not(:disabled) {
+  border-bottom-color: var(--pb-border-hover);
+}
+.core-party-name-input:focus {
+  outline: none;
+  border-bottom-color: var(--pb-accent);
+}
+.core-party-name-input:disabled {
+  cursor: not-allowed;
+}
+
+/* ---------- Eliminar party ---------- */
+.core-party-delete-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--pb-border);
+  border-radius: var(--pb-radius-sm);
+  color: var(--pb-text-muted);
+  padding: 2px;
+  cursor: pointer;
+  transition: var(--pb-transition);
+}
+.core-party-delete-btn:hover {
+  color: var(--pb-danger);
+  border-color: var(--pb-danger);
+  background: var(--pb-danger-dim);
+}
+.core-party-delete-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
 
 /* ---------- Marcar party como lista (bloquear) ---------- */
 .core-party-lock-btn {
