@@ -31,6 +31,10 @@ export interface CorePartySlot {
   id: string;
   name: string;
   capacity: number;
+  // Party "lista" — el admin la marcó como terminada. "Organizar parties"
+  // no toca a sus miembros, y no se pueden arrastrar jugadores hacia
+  // adentro/afuera (sí se la puede seguir arrastrando entera a una guild).
+  locked: boolean;
 }
 
 export interface CoreGuild {

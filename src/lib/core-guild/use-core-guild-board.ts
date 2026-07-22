@@ -69,7 +69,8 @@ export function useCoreGuildBoard(roster: CoreGuildRosterEntry[], saved: SavedCo
     const base = saved?.data ?? emptyBoard();
     return {
       members: reconcileMembers(roster, base.members ?? []),
-      parties: base.parties ?? [],
+      // `locked` no existía en boards guardados antes de esta funcionalidad.
+      parties: (base.parties ?? []).map((p) => ({ ...p, locked: p.locked ?? false })),
       compositions: base.compositions?.length ? base.compositions : [[...DEFAULT_COMPOSITION]],
       guilds: base.guilds ?? [],
     };
@@ -108,6 +109,7 @@ export function useCoreGuildBoard(roster: CoreGuildRosterEntry[], saved: SavedCo
         id: `core_party_manual_${prev.length + 1}_${Date.now().toString(36)}`,
         name: `Party ${prev.length + 1}`,
         capacity: compositions[0]?.length ?? 5,
+        locked: false,
       },
     ]);
   }, [compositions]);
@@ -118,13 +120,34 @@ export function useCoreGuildBoard(roster: CoreGuildRosterEntry[], saved: SavedCo
     setGuilds((prev) => prev.map((g) => ({ ...g, partyIds: g.partyIds.filter((id) => id !== partyId) })));
   }, []);
 
+  const togglePartyLocked = useCallback((partyId: string) => {
+    setParties((prev) => prev.map((p) => (p.id === partyId ? { ...p, locked: !p.locked } : p)));
+  }, []);
+
+  // Las parties marcadas "lista" (locked) no se tocan: ni a ellas ni a sus
+  // miembros. organizeCoreParties solo corre sobre el resto (sin asignar +
+  // miembros de parties todavía no bloqueadas), y el resultado se agrega a
+  // las bloqueadas en vez de reemplazarlas.
   const organize = useCallback(() => {
-    const result = organizeCoreParties(members, compositions);
-    const validIds = new Set(result.parties.map((p) => p.id));
-    setParties(result.parties);
-    setMembers((prev) => prev.map((m) => ({ ...m, partyId: result.assignments[m.discordId] ?? null })));
+    const lockedParties = parties.filter((p) => p.locked);
+    const lockedPartyIds = new Set(lockedParties.map((p) => p.id));
+    const lockedMemberIds = new Set(
+      members.filter((m) => m.partyId && lockedPartyIds.has(m.partyId)).map((m) => m.discordId)
+    );
+    const poolMembers = members.filter((m) => !lockedMemberIds.has(m.discordId));
+
+    const result = organizeCoreParties(poolMembers, compositions);
+    const newParties = [...lockedParties, ...result.parties];
+    const validIds = new Set(newParties.map((p) => p.id));
+
+    setParties(newParties);
+    setMembers((prev) =>
+      prev.map((m) =>
+        lockedMemberIds.has(m.discordId) ? m : { ...m, partyId: result.assignments[m.discordId] ?? null }
+      )
+    );
     setGuilds((prev) => prev.map((g) => ({ ...g, partyIds: g.partyIds.filter((id) => validIds.has(id)) })));
-  }, [members, compositions]);
+  }, [members, compositions, parties]);
 
   const addGuild = useCallback((name: string, level: number, cap: number) => {
     setGuilds((prev) => [
@@ -200,6 +223,7 @@ export function useCoreGuildBoard(roster: CoreGuildRosterEntry[], saved: SavedCo
     assignToParty,
     addParty,
     removeParty,
+    togglePartyLocked,
     organize,
     addGuild,
     updateGuild,

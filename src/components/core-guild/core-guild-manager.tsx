@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, type DragEvent, type FormEvent } from "react";
-import { Wand2, FolderPlus, Save, Pencil, Plus, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Wand2, FolderPlus, Save, Pencil, Plus, Search, ChevronLeft, ChevronRight, Lock, Unlock } from "lucide-react";
 import type { Player, Party } from "@/types/party";
 import { inferRole } from "@/lib/party/infer-role";
 import { discordAvatarUrl } from "@/lib/discord-avatar";
@@ -48,8 +48,9 @@ function toPlayerView(member: CoreMember): Player {
 
 // Core Guild no tiene el concepto de Campo Principal/Secundario de Guild
 // League — se agrega `campo: null` solo para calzar con el tipo Party
-// compartido con el resto del party builder.
-function toPartyView(party: CorePartySlot): Party {
+// compartido con el resto del party builder. Se conserva `locked` (propio
+// de Core Guild) además.
+function toPartyView(party: CorePartySlot): Party & { locked: boolean } {
   return { ...party, campo: null };
 }
 
@@ -83,6 +84,7 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
     removeMember,
     assignToParty,
     addParty,
+    togglePartyLocked,
     organize,
     addGuild,
     updateGuild,
@@ -154,9 +156,13 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
     );
   }).length;
 
+  function isPartyLocked(partyId: string | null) {
+    return partyId !== null && parties.find((p) => p.id === partyId)?.locked === true;
+  }
+
   function handleZoneDrop(e: DragEvent, partyId: string | null) {
     e.preventDefault();
-    if (locked) return;
+    if (locked || isPartyLocked(partyId)) return;
     const payload = readDragPayload(e);
     if (!payload || payload.kind !== "player") return;
     assignToParty(payload.id, partyId);
@@ -164,7 +170,7 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
   }
 
   function handleZoneClick(partyId: string | null) {
-    if (locked || !selected || selected.kind !== "player") return;
+    if (locked || isPartyLocked(partyId) || !selected || selected.kind !== "player") return;
     assignToParty(selected.id, partyId);
     clearSelection();
   }
@@ -451,15 +457,29 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
             {partyViews.map((party) => {
               const guildId = guildIdForParty(party.id);
               const guildName = guildId ? guilds.find((g) => g.id === guildId)?.name : null;
+              const partyLocked = party.locked;
+              const editable = !locked && !partyLocked;
               return (
-                <div key={party.id}>
-                  <p className="core-party-guild-hint">{guildName ? `En guild: ${guildName}` : "Sin guild asignada"}</p>
+                <div key={party.id} className={partyLocked ? "core-party-wrapper core-party-wrapper--locked" : "core-party-wrapper"}>
+                  <div className="core-party-hint-row">
+                    <p className="core-party-guild-hint">{guildName ? `En guild: ${guildName}` : "Sin guild asignada"}</p>
+                    <button
+                      type="button"
+                      className={`core-party-lock-btn${partyLocked ? " active" : ""}`}
+                      disabled={locked}
+                      onClick={() => togglePartyLocked(party.id)}
+                      aria-label={partyLocked ? `Desbloquear ${party.name}` : `Marcar ${party.name} como lista`}
+                    >
+                      {partyLocked ? <Lock size={12} /> : <Unlock size={12} />}
+                      {partyLocked ? "Lista" : "Marcar lista"}
+                    </button>
+                  </div>
                   <PartyCard
                     party={party}
                     members={activeMembers.filter((m) => m.partyId === party.id).map(toPlayerView)}
                     onDrop={handleZoneDrop}
                     onClickAssign={() => handleZoneClick(party.id)}
-                    onRemovePlayer={(id) => !locked && assignToParty(id, null)}
+                    onRemovePlayer={(id) => editable && assignToParty(id, null)}
                     renderMember={(player) => {
                       const member = activeMembers.find((m) => m.discordId === player.id);
                       if (!member) return null;
@@ -467,8 +487,8 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
                         <CoreMemberChip
                           player={player}
                           member={member}
-                          draggable={!locked}
-                          onRemove={locked ? undefined : (id) => assignToParty(id, null)}
+                          draggable={editable}
+                          onRemove={editable ? (id) => assignToParty(id, null) : undefined}
                         />
                       );
                     }}

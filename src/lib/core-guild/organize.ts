@@ -75,14 +75,19 @@ export function organizeCoreParties(members: CoreMember[], compositions: SlotLab
   const slotsById = new Map<string, SlotLabel[]>();
   const assignments: Record<string, string | null> = {};
   let partyCount = 0;
+  // Prefijo único por corrida — "Organizar parties" puede correr varias
+  // veces dejando afuera a las parties bloqueadas (ver use-core-guild-board.ts),
+  // así que los IDs nuevos no pueden pisar los de una corrida anterior.
+  const runId = Date.now().toString(36);
 
   function createParty(): CorePartySlot {
     const slots = comps[partyCount % comps.length];
     partyCount++;
     const party: CorePartySlot = {
-      id: `core_party_${partyCount}`,
+      id: `core_party_${runId}_${partyCount}`,
       name: `Party ${partyCount}`,
       capacity: slots.length,
+      locked: false,
     };
     parties.push(party);
     slotsById.set(party.id, slots);

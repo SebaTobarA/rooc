@@ -279,10 +279,56 @@
 }
 
 /* ---------- Party -> guild (drag nativo o toque, ver PartyCard) ---------- */
+.core-party-hint-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 2px 4px;
+}
 .core-party-guild-hint {
   font-size: 10px;
   color: var(--pb-text-muted);
-  padding: 0 2px 4px;
+}
+
+/* ---------- Marcar party como lista (bloquear) ---------- */
+.core-party-lock-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: 1px solid var(--pb-border);
+  border-radius: var(--pb-radius-sm);
+  color: var(--pb-text-muted);
+  padding: 2px 7px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: var(--pb-transition);
+  white-space: nowrap;
+}
+.core-party-lock-btn:hover {
+  color: var(--foreground, #e9edf1);
+  border-color: var(--pb-border-hover);
+}
+.core-party-lock-btn.active {
+  background: var(--pb-success-dim);
+  border-color: var(--pb-success);
+  color: var(--pb-success);
+}
+.core-party-lock-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.core-party-wrapper--locked .party-card {
+  border-color: var(--pb-success);
+  background: var(--pb-success-dim);
+}
+.core-party-wrapper--locked .party-dropzone {
+  pointer-events: none;
 }
 
 /* ---------- Guilds ---------- */
