@@ -19,6 +19,10 @@ interface PartyCardProps {
    * importa más que tener los chips siempre visibles. Se expande al tocar
    * la flecha. */
   compact?: boolean;
+  /** Igual que `compact` pero sin arrancar colapsada — solo agrega el botón
+   * de achicar/expandir (ej. Core Guild, para no tener que arrastrar
+   * jugadores dentro de una party larga). */
+  collapsible?: boolean;
   /** Reemplaza el PlayerChip por defecto (ej. Core Guild agrega badges de grupo/wallet). */
   renderMember?: (player: Player) => ReactNode;
   /** Reemplaza el <span> de nombre por defecto (ej. Core Guild lo hace editable). */
@@ -32,9 +36,11 @@ export function PartyCard({
   onClickAssign,
   onRemovePlayer,
   compact = false,
+  collapsible = false,
   renderMember,
   renderName,
 }: PartyCardProps) {
+  const showToggle = compact || collapsible;
   const [isDragOver, setIsDragOver] = useState(false);
   const [expanded, setExpanded] = useState(!compact);
   const { selected, selectParty } = usePlayerSelection();
@@ -85,7 +91,7 @@ export function PartyCard({
       <div className="party-card-header">
         <GripVertical size={13} className="party-card-grip" aria-hidden="true" />
         {renderName ? renderName() : <span className="party-card-name">{party.name}</span>}
-        {compact && (
+        {showToggle && (
           <span
             className={`party-card-status ${isComplete ? "party-card-status--ok" : "party-card-status--warn"}`}
             aria-hidden="true"
@@ -96,7 +102,7 @@ export function PartyCard({
         <span className="party-card-count">
           {members.length}/{party.capacity}
         </span>
-        {compact && (
+        {showToggle && (
           <button
             type="button"
             className="party-card-toggle"

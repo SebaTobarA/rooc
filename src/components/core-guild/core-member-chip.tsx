@@ -20,15 +20,32 @@ const WALLET_LABEL: Record<CoreMember["walletType"], string> = {
   BALLENA: "Ballena",
 };
 
+export interface MoveTarget {
+  id: string;
+  name: string;
+}
+
 interface CoreMemberChipProps {
   player: Player;
   member: CoreMember;
   draggable?: boolean;
   onRemove?: (id: string) => void;
+  /** Parties a las que se puede mover este jugador con el selector — si no
+   * se pasa, no se muestra el selector (ej. chip dentro de una party
+   * bloqueada). "Sin asignar" siempre se agrega como primera opción. */
+  moveTargets?: MoveTarget[];
+  onMoveToParty?: (discordId: string, partyId: string | null) => void;
 }
 
-/** Como PlayerChip (drag & drop + selección táctil), más un badge de etiqueta de grupo y el tipo de wallet. */
-export function CoreMemberChip({ player, member, draggable = true, onRemove }: CoreMemberChipProps) {
+/** Como PlayerChip (drag & drop + selección táctil), más un badge de etiqueta de grupo, el tipo de wallet y un selector para moverlo sin arrastrar. */
+export function CoreMemberChip({
+  player,
+  member,
+  draggable = true,
+  onRemove,
+  moveTargets,
+  onMoveToParty,
+}: CoreMemberChipProps) {
   const { selected, selectPlayer } = usePlayerSelection();
   const isSelected = selected?.kind === "player" && selected.id === player.id;
 
@@ -77,6 +94,24 @@ export function CoreMemberChip({ player, member, draggable = true, onRemove }: C
       <span className={`chip-wallet chip-wallet-${member.walletType.toLowerCase()}`}>
         {WALLET_LABEL[member.walletType]}
       </span>
+      {moveTargets && onMoveToParty && (
+        <select
+          className="chip-move-select"
+          value={member.partyId ?? ""}
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onChange={(e) => onMoveToParty(player.id, e.target.value || null)}
+          aria-label={`Mover a ${player.nickname} a otra party`}
+          title="Mover a…"
+        >
+          <option value="">Sin asignar</option>
+          {moveTargets.map((target) => (
+            <option key={target.id} value={target.id}>
+              {target.name}
+            </option>
+          ))}
+        </select>
+      )}
       {onRemove && (
         <button
           className="chip-remove"

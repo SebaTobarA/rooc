@@ -278,6 +278,26 @@
   opacity: 1;
 }
 
+/* ---------- Mover jugador sin arrastrar (selector en el chip) ---------- */
+.chip-move-select {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: inherit;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  padding: 2px 4px;
+  max-width: 70px;
+  cursor: pointer;
+}
+.chip-move-select:hover,
+.chip-move-select:focus {
+  border-color: currentColor;
+  outline: none;
+}
+
 /* ---------- Party -> guild (drag nativo o toque, ver PartyCard) ---------- */
 .core-party-hint-row {
   display: flex;

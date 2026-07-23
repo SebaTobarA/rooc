@@ -27,7 +27,7 @@ import type { CorePartySlot, CoreMember, WalletType } from "@/lib/core-guild/typ
 import { PartyCard } from "@/components/party/party-card";
 import { SlotPicker } from "@/components/party/slot-picker";
 import { StatsBar } from "@/components/party/stats-bar";
-import { CoreMemberChip } from "@/components/core-guild/core-member-chip";
+import { CoreMemberChip, type MoveTarget } from "@/components/core-guild/core-member-chip";
 import { GuildCard } from "@/components/core-guild/guild-card";
 
 const WALLET_OPTIONS: { value: WalletType; label: string }[] = [
@@ -163,6 +163,10 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
 
   const allPlayers = activeMembers.map(toPlayerView);
   const partyViews = parties.map(toPartyView);
+  // Destinos válidos para el selector "mover a" de cada chip — parties
+  // bloqueadas no entran, ni como origen (no se muestra el selector) ni
+  // como destino.
+  const moveTargets: MoveTarget[] = parties.filter((p) => !p.locked).map((p) => ({ id: p.id, name: p.name }));
   const completeCount = parties.filter((party) => {
     const partyMembers = activeMembers.filter((m) => m.partyId === party.id);
     return (
@@ -477,7 +481,14 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
             aria-label="Miembros sin asignar. Toca un miembro seleccionado para moverlo acá."
           >
             {unassigned.map((m) => (
-              <CoreMemberChip key={m.discordId} player={toPlayerView(m)} member={m} draggable={!locked} />
+              <CoreMemberChip
+                key={m.discordId}
+                player={toPlayerView(m)}
+                member={m}
+                draggable={!locked}
+                moveTargets={locked ? undefined : moveTargets}
+                onMoveToParty={locked ? undefined : assignToParty}
+              />
             ))}
             {unassigned.length === 0 && <p className="pool-empty">Sin miembros pendientes</p>}
           </div>
@@ -522,6 +533,7 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
                     onDrop={handleZoneDrop}
                     onClickAssign={() => handleZoneClick(party.id)}
                     onRemovePlayer={(id) => editable && assignToParty(id, null)}
+                    collapsible
                     renderName={() => (
                       <input
                         key={`party-name-${party.id}-${party.name}`}
@@ -546,6 +558,8 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
                           member={member}
                           draggable={editable}
                           onRemove={editable ? (id) => assignToParty(id, null) : undefined}
+                          moveTargets={editable ? moveTargets.filter((t) => t.id !== party.id) : undefined}
+                          onMoveToParty={editable ? assignToParty : undefined}
                         />
                       );
                     }}
