@@ -27,6 +27,12 @@ interface PartyCardProps {
   renderMember?: (player: Player) => ReactNode;
   /** Reemplaza el <span> de nombre por defecto (ej. Core Guild lo hace editable). */
   renderName?: () => ReactNode;
+  /** Si se pasa (junto con onToggleExpanded), el expandido/colapsado lo
+   * maneja el padre — ej. Core Guild, para poder "Colapsar todas" de una.
+   * Sin esto, cada card mantiene su propio estado (Campo Principal/
+   * Secundario). */
+  expanded?: boolean;
+  onToggleExpanded?: () => void;
 }
 
 export function PartyCard({
@@ -39,10 +45,14 @@ export function PartyCard({
   collapsible = false,
   renderMember,
   renderName,
+  expanded: expandedProp,
+  onToggleExpanded,
 }: PartyCardProps) {
   const showToggle = compact || collapsible;
   const [isDragOver, setIsDragOver] = useState(false);
-  const [expanded, setExpanded] = useState(!compact);
+  const [expandedState, setExpandedState] = useState(!compact);
+  const isControlled = expandedProp !== undefined;
+  const expanded = isControlled ? expandedProp : expandedState;
   const { selected, selectParty } = usePlayerSelection();
 
   const isPartySelected = selected?.kind === "party" && selected.partyId === party.id;
@@ -108,7 +118,11 @@ export function PartyCard({
             className="party-card-toggle"
             onClick={(e) => {
               e.stopPropagation();
-              setExpanded((v) => !v);
+              if (isControlled) {
+                onToggleExpanded?.();
+              } else {
+                setExpandedState((v) => !v);
+              }
             }}
             aria-label={expanded ? `Contraer ${party.name}` : `Expandir ${party.name}`}
             aria-expanded={expanded}

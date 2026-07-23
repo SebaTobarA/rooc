@@ -14,6 +14,8 @@ import {
   Unlock,
   Eraser,
   X,
+  Minimize2,
+  Maximize2,
 } from "lucide-react";
 import type { Player, Party } from "@/types/party";
 import { inferRole } from "@/lib/party/infer-role";
@@ -117,6 +119,9 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
   const [search, setSearch] = useState("");
   const [pageSize, setPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(5);
   const [page, setPage] = useState(1);
+  // Colapsado/expandido es solo una preferencia de vista (no se guarda con
+  // el board) — qué parties están achicadas ahora mismo.
+  const [collapsedPartyIds, setCollapsedPartyIds] = useState<Set<string>>(new Set());
 
   const existingTags = useMemo(
     () => [...new Set(members.filter((m) => m.groupTag.trim()).map((m) => m.groupTag.trim()))],
@@ -200,6 +205,23 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
     organize();
     setOrganizeMsg("Parties organizadas — los grupos etiquetados quedaron priorizados juntos.");
     setTimeout(() => setOrganizeMsg(""), 5000);
+  }
+
+  function togglePartyCollapsed(partyId: string) {
+    setCollapsedPartyIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(partyId)) next.delete(partyId);
+      else next.add(partyId);
+      return next;
+    });
+  }
+
+  function collapseAllParties() {
+    setCollapsedPartyIds(new Set(parties.map((p) => p.id)));
+  }
+
+  function expandAllParties() {
+    setCollapsedPartyIds(new Set());
   }
 
   function handleClearParties() {
@@ -465,6 +487,14 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
             <Eraser size={14} />
             Limpiar parties
           </button>
+          <button className="btn btn-ghost" onClick={collapseAllParties} disabled={parties.length === 0}>
+            <Minimize2 size={14} />
+            Colapsar todas
+          </button>
+          <button className="btn btn-ghost" onClick={expandAllParties} disabled={parties.length === 0}>
+            <Maximize2 size={14} />
+            Expandir todas
+          </button>
         </div>
         {organizeMsg && <p className="suggest-msg">{organizeMsg}</p>}
 
@@ -534,6 +564,8 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
                     onClickAssign={() => handleZoneClick(party.id)}
                     onRemovePlayer={(id) => editable && assignToParty(id, null)}
                     collapsible
+                    expanded={!collapsedPartyIds.has(party.id)}
+                    onToggleExpanded={() => togglePartyCollapsed(party.id)}
                     renderName={() => (
                       <input
                         key={`party-name-${party.id}-${party.name}`}
