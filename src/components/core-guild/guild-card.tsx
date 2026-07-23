@@ -11,6 +11,8 @@ interface GuildCardProps {
   parties: CorePartySlot[];
   members: CoreMember[];
   locked: boolean;
+  /** Resto de las guilds, para el selector "mover a otra guild" de cada party. */
+  otherGuilds: { id: string; name: string }[];
   onDropParty: (partyId: string, guildId: string) => void;
   onUnassignParty: (partyId: string) => void;
   onUpdate: (patch: Partial<Omit<CoreGuild, "id" | "partyIds">>) => void;
@@ -22,6 +24,7 @@ export function GuildCard({
   parties,
   members,
   locked,
+  otherGuilds,
   onDropParty,
   onUnassignParty,
   onUpdate,
@@ -128,6 +131,27 @@ export function GuildCard({
                 <span className="guild-party-count">
                   {count}/{party.capacity}
                 </span>
+                {!locked && otherGuilds.length > 0 && (
+                  <select
+                    className="guild-party-move-select"
+                    value=""
+                    disabled={locked}
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onChange={(e) => {
+                      if (e.target.value) onDropParty(party.id, e.target.value);
+                    }}
+                    aria-label={`Mover ${party.name} a otra guild`}
+                    title="Mover a otra guild"
+                  >
+                    <option value="">Mover a…</option>
+                    {otherGuilds.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
                 {!locked && (
                   <button
                     className="chip-remove"

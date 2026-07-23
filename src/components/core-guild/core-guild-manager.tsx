@@ -615,6 +615,7 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
               parties={parties}
               members={activeMembers}
               locked={locked}
+              otherGuilds={guilds.filter((g) => g.id !== guild.id).map((g) => ({ id: g.id, name: g.name }))}
               onDropParty={assignPartyToGuild}
               onUnassignParty={(partyId) => assignPartyToGuild(partyId, null)}
               onUpdate={(patch) => updateGuild(guild.id, patch)}

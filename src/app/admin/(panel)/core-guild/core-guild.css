@@ -511,6 +511,22 @@
   margin-left: auto;
   color: var(--pb-text-muted);
 }
+.guild-party-move-select {
+  background: var(--pb-surface-1);
+  border: 1px solid var(--pb-border);
+  border-radius: var(--pb-radius-sm);
+  color: var(--pb-text-secondary);
+  font-size: 10px;
+  padding: 2px 4px;
+  max-width: 90px;
+  cursor: pointer;
+}
+.guild-party-move-select:hover,
+.guild-party-move-select:focus {
+  border-color: var(--pb-accent);
+  color: var(--foreground, #e9edf1);
+  outline: none;
+}
 
 .guild-empty {
   font-size: 11px;
