@@ -1,24 +1,34 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Event, EventSignup } from "@prisma/client";
 import { Campo } from "@/components/party/campo";
 import { useCampo } from "@/lib/party/use-campo";
 import { signupsToPlayers } from "@/lib/party/from-signups";
 import { getEventSignups } from "@/lib/actions/events";
+import type { EditingTemplate } from "@/components/party/party-builder-app";
 
 type EventWithSignups = Event & { signups: EventSignup[] };
 
 export function EmperiumOverrun({
   canManageParty,
   events,
+  editingTemplate,
 }: {
   canManageParty: boolean;
   events: EventWithSignups[];
+  editingTemplate: EditingTemplate | null;
 }) {
   const campo = useCampo(undefined, { minPlayers: 20 });
   const [selectedEventId, setSelectedEventId] = useState(events[0]?.id ?? "");
   const [msg, setMsg] = useState("");
+
+  // Precarga la composición guardada al entrar en modo edición — una sola
+  // vez al montar (ver mismo patrón en guild-league.tsx).
+  useEffect(() => {
+    if (editingTemplate) campo.loadSnapshot(editingTemplate.data);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const selectedEvent = events.find((e) => e.id === selectedEventId) ?? null;
 
@@ -76,7 +86,13 @@ export function EmperiumOverrun({
         label="Jugadores del gremio"
         campo={campo}
         showSlotsImmediately
-        saveTemplate={{ event: "EMPERIUM_OVERRUN", canManageParty, eventId: selectedEvent?.id }}
+        saveTemplate={{
+          event: "EMPERIUM_OVERRUN",
+          canManageParty,
+          eventId: selectedEvent?.id,
+          editingTemplateId: editingTemplate?.id,
+          editingTemplateName: editingTemplate?.name,
+        }}
       />
     </div>
   );

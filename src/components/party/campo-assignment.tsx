@@ -14,7 +14,7 @@ const CAMPO_LABEL: Record<CampoSide, string> = {
 };
 
 function CampoColumn({ side, campo }: { side: CampoSide; campo: UseCampoReturn }) {
-  const { players, parties, assignPlayer, assignPartyCampo, removePlayer } = campo;
+  const { players, parties, assignPlayer, assignPartyCampo, removePlayer, updatePlayerClass } = campo;
   const { selected, clearSelection } = usePlayerSelection();
   const [error, setError] = useState("");
 
@@ -76,6 +76,7 @@ function CampoColumn({ side, campo }: { side: CampoSide; campo: UseCampoReturn }
             onDrop={handlePlayerDrop}
             onClickAssign={() => handlePlayerClickAssign(party.id)}
             onRemovePlayer={removePlayer}
+            onUpdateClass={updatePlayerClass}
             compact
           />
         ))}

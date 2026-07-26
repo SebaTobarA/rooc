@@ -72,6 +72,8 @@ export interface UseCampoReturn {
   setCompositions: (c: SlotLabel[][]) => void;
   importPlayers: (raw: string) => ImportResult;
   addPlayers: (players: Player[]) => void;
+  loadSnapshot: (snapshot: { players: Player[]; parties: Party[] }) => void;
+  updatePlayerClass: (playerId: string, clase: string) => void;
   organizeParties: () => string | null; // null = ok, string = error/aviso
   suggestDistribution: () => string | null; // null = ok, string = aviso
   assignPlayer: (playerId: string, partyId: string | null) => void;
@@ -189,6 +191,24 @@ export function useCampo(initialSlots?: SlotLabel[], options: UseCampoOptions = 
       const toAdd = newPlayers.filter((p) => !existingNicks.has(p.nickname.toLowerCase()));
       return [...prev, ...toAdd];
     });
+  }, []);
+
+  // Reemplaza jugadores y parties tal cual venían en una plantilla guardada
+  // (ver "Editar" en saved-templates.tsx) — a diferencia de
+  // applySavedComposition, acá se preserva fidelidad exacta (mismos ids,
+  // nombres, capacidades y campo) para que "Guardar cambios" no genere un
+  // snapshot distinto si el usuario no tocó nada.
+  const loadSnapshot = useCallback((snapshot: { players: Player[]; parties: Party[] }) => {
+    setPlayers(snapshot.players);
+    setParties(snapshot.parties);
+  }, []);
+
+  // Corrige la clase de un jugador ya importado (ej. sin clase asignada en
+  // Discord) y recalcula su rol a partir de la clase nueva.
+  const updatePlayerClass = useCallback((playerId: string, clase: string) => {
+    setPlayers((prev) =>
+      prev.map((p) => (p.id === playerId ? { ...p, clase, rol: inferRole(clase) } : p))
+    );
   }, []);
 
   // Cicla entre composiciones. Lord Knights son DPS primario; si faltan Tanks
@@ -521,6 +541,8 @@ export function useCampo(initialSlots?: SlotLabel[], options: UseCampoOptions = 
     setCompositions,
     importPlayers,
     addPlayers,
+    loadSnapshot,
+    updatePlayerClass,
     organizeParties,
     suggestDistribution,
     assignPlayer,

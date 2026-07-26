@@ -4,6 +4,7 @@ import { getEffectivePermissions } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { PartyBuilderApp } from "@/components/party/party-builder-app";
 import { SavedTemplates } from "@/components/party/saved-templates";
+import { readSnapshot } from "@/lib/actions/party-templates";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +12,11 @@ export const metadata = {
   title: "Party Builder",
 };
 
-export default async function PartyPage() {
+export default async function PartyPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ edit?: string }>;
+}) {
   const session = await getSession();
   const permissions = await getEffectivePermissions(session);
 
@@ -27,7 +32,9 @@ export default async function PartyPage() {
     );
   }
 
-  const [guildLeagueEvents, emperiumEvents] = await Promise.all([
+  const { edit: editingTemplateId } = await searchParams;
+
+  const [guildLeagueEvents, emperiumEvents, templateToEdit] = await Promise.all([
     prisma.event.findMany({
       where: { category: "GUILD_LEAGUE", status: "PUBLISHED" },
       include: { signups: true },
@@ -38,14 +45,30 @@ export default async function PartyPage() {
       include: { signups: true },
       orderBy: { startsAt: "desc" },
     }),
+    editingTemplateId
+      ? prisma.partyTemplate.findUnique({ where: { id: editingTemplateId } })
+      : Promise.resolve(null),
   ]);
+
+  const snapshot = templateToEdit ? readSnapshot(templateToEdit.data) : null;
+  const editingTemplate =
+    templateToEdit && snapshot && permissions.canManageParty
+      ? {
+          id: templateToEdit.id,
+          event: templateToEdit.event as "GUILD_LEAGUE" | "EMPERIUM_OVERRUN",
+          name: templateToEdit.name,
+          data: snapshot,
+        }
+      : null;
 
   return (
     <div className="party-page">
       <PartyBuilderApp
+        key={editingTemplate?.id ?? "new"}
         canManageParty={permissions.canManageParty}
         guildLeagueEvents={guildLeagueEvents}
         emperiumEvents={emperiumEvents}
+        editingTemplate={editingTemplate}
         history={<SavedTemplates canManageParty={permissions.canManageParty} />}
       />
     </div>

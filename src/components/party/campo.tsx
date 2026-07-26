@@ -5,10 +5,11 @@ import { Wand2, FolderPlus, Sparkles, Save } from "lucide-react";
 import type { UseCampoReturn } from "@/lib/party/use-campo";
 import { StatsBar } from "@/components/party/stats-bar";
 import { ImportBox } from "@/components/party/import-box";
+import { DiscordRoleImport } from "@/components/party/discord-role-import";
 import { SlotPicker } from "@/components/party/slot-picker";
 import { PlayerChip } from "@/components/party/player-chip";
 import { PartyCard } from "@/components/party/party-card";
-import { createPartyTemplate } from "@/lib/actions/party-templates";
+import { createPartyTemplate, updatePartyTemplate } from "@/lib/actions/party-templates";
 import { readDragPayload } from "@/lib/party/drag-payload";
 import { usePlayerSelection } from "@/lib/party/selection-context";
 
@@ -17,7 +18,14 @@ interface CampoProps {
   campo: UseCampoReturn;
   showSlotsImmediately?: boolean;
   /** Si se pasa, habilita el botón "Guardar como plantilla" para este campo. */
-  saveTemplate?: { event: "GUILD_LEAGUE" | "EMPERIUM_OVERRUN"; canManageParty: boolean; eventId?: string };
+  saveTemplate?: {
+    event: "GUILD_LEAGUE" | "EMPERIUM_OVERRUN";
+    canManageParty: boolean;
+    eventId?: string;
+    /** Si viene de "Editar" en el historial, guarda sobre esta plantilla en vez de crear una nueva. */
+    editingTemplateId?: string;
+    editingTemplateName?: string;
+  };
 }
 
 export function Campo({ label, campo, showSlotsImmediately = false, saveTemplate }: CampoProps) {
@@ -33,6 +41,7 @@ export function Campo({ label, campo, showSlotsImmediately = false, saveTemplate
     assignPartyCampo,
     removePlayer,
     addParty,
+    updatePlayerClass,
     unassigned,
     completeCount,
     hasPlayers,
@@ -105,14 +114,22 @@ export function Campo({ label, campo, showSlotsImmediately = false, saveTemplate
 
   async function handleSaveTemplate() {
     if (!saveTemplate) return;
-    const name = window.prompt("Nombre de la plantilla:", label || "Plantilla de party");
+    const name = window.prompt(
+      "Nombre de la plantilla:",
+      saveTemplate.editingTemplateName ?? label ?? "Plantilla de party"
+    );
     if (!name) return;
 
     setSaving(true);
     setSaveMsg("");
     try {
-      await createPartyTemplate(saveTemplate.event, name, { players, parties }, saveTemplate.eventId);
-      setSaveMsg("Plantilla guardada.");
+      if (saveTemplate.editingTemplateId) {
+        await updatePartyTemplate(saveTemplate.editingTemplateId, name, { players, parties });
+        setSaveMsg("Cambios guardados.");
+      } else {
+        await createPartyTemplate(saveTemplate.event, name, { players, parties }, saveTemplate.eventId);
+        setSaveMsg("Plantilla guardada.");
+      }
     } catch (err) {
       setSaveMsg(err instanceof Error ? err.message : "No se pudo guardar la plantilla.");
     } finally {
@@ -137,6 +154,8 @@ export function Campo({ label, campo, showSlotsImmediately = false, saveTemplate
         <ImportBox onImport={importPlayers} />
       </details>
 
+      <DiscordRoleImport onImport={campo.addPlayers} />
+
       {showSlots && <SlotPicker compositions={compositions} onChange={setCompositions} />}
 
       {showSlots && (
@@ -154,7 +173,11 @@ export function Campo({ label, campo, showSlotsImmediately = false, saveTemplate
             {saveTemplate?.canManageParty && parties.length > 0 && (
               <button className="btn btn-secondary" onClick={handleSaveTemplate} disabled={saving}>
                 <Save size={14} />
-                {saving ? "Guardando…" : "Guardar como plantilla"}
+                {saving
+                  ? "Guardando…"
+                  : saveTemplate.editingTemplateId
+                    ? "Guardar cambios"
+                    : "Guardar como plantilla"}
               </button>
             )}
           </div>
@@ -180,7 +203,7 @@ export function Campo({ label, campo, showSlotsImmediately = false, saveTemplate
           aria-label="Jugadores sin asignar. Toca un jugador seleccionado para moverlo acá."
         >
           {unassigned.map((p) => (
-            <PlayerChip key={p.id} player={p} onRemove={removePlayer} />
+            <PlayerChip key={p.id} player={p} onRemove={removePlayer} onUpdateClass={updatePlayerClass} />
           ))}
           {unassigned.length === 0 && <p className="pool-empty">Sin jugadores pendientes</p>}
         </div>
@@ -201,6 +224,7 @@ export function Campo({ label, campo, showSlotsImmediately = false, saveTemplate
               onDrop={handleZoneDrop}
               onClickAssign={() => handleZoneClick(party.id)}
               onRemovePlayer={removePlayer}
+              onUpdateClass={updatePlayerClass}
             />
           ))}
           {stagedParties.length === 0 && (

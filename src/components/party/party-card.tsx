@@ -13,6 +13,8 @@ interface PartyCardProps {
   onDrop: (e: DragEvent, partyId: string) => void;
   onClickAssign: () => void;
   onRemovePlayer: (id: string) => void;
+  /** Forwarded al PlayerChip por defecto — ver player-chip.tsx. Ignorado si `renderMember` reemplaza el chip. */
+  onUpdateClass?: (id: string, clase: string) => void;
   /** Fila colapsada por defecto (nombre + contador + estado), pensada para
    * las columnas de Campo Principal/Secundario: ahí la composición ya se
    * armó antes, así que ver de un vistazo si cada party está completa
@@ -41,6 +43,7 @@ export function PartyCard({
   onDrop,
   onClickAssign,
   onRemovePlayer,
+  onUpdateClass,
   compact = false,
   collapsible = false,
   renderMember,
@@ -172,7 +175,7 @@ export function PartyCard({
               renderMember ? (
                 <Fragment key={p.id}>{renderMember(p)}</Fragment>
               ) : (
-                <PlayerChip key={p.id} player={p} onRemove={onRemovePlayer} />
+                <PlayerChip key={p.id} player={p} onRemove={onRemovePlayer} onUpdateClass={onUpdateClass} />
               )
             )}
             {members.length === 0 && <p className="party-empty">Arrastra jugadores aquí</p>}

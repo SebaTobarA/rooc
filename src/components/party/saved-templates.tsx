@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { Pencil } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { DeleteTemplateButton } from "@/components/party/delete-template-button";
 import { CommunicateTemplateButton } from "@/components/party/communicate-template-button";
@@ -62,6 +64,10 @@ export async function SavedTemplates({ canManageParty }: { canManageParty: boole
               </div>
               {canManageParty && (
                 <div className="saved-template-actions">
+                  <Link href={`/panel/party?edit=${template.id}`} className="btn btn-ghost btn-sm">
+                    <Pencil size={12} />
+                    Editar
+                  </Link>
                   <CommunicateTemplateButton
                     id={template.id}
                     alreadyCommunicated={Boolean(template.communicatedAt)}

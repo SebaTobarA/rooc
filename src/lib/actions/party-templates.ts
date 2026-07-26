@@ -18,7 +18,7 @@ export interface PartyTemplateSnapshot {
   parties: Party[];
 }
 
-function readSnapshot(data: unknown): PartyTemplateSnapshot | null {
+export function readSnapshot(data: unknown): PartyTemplateSnapshot | null {
   if (!data || typeof data !== "object") return null;
   const players = (data as { players?: unknown }).players;
   const parties = (data as { parties?: unknown }).parties;
@@ -51,6 +51,36 @@ export async function createPartyTemplate(
       createdById: user.id,
       eventId: eventId ?? null,
     },
+  });
+
+  revalidatePath("/panel/party");
+  return { id: template.id };
+}
+
+/**
+ * Actualiza el nombre y la composición de una plantilla ya guardada, en vez
+ * de crear una fila nueva en el historial — usado por "Guardar cambios"
+ * cuando el builder se abrió desde "Editar" en saved-templates.tsx. No toca
+ * communicatedAt/channelId/messageId: si la plantilla ya se había
+ * comunicado, communicatePartyTemplate sigue editando el mismo mensaje de
+ * Discord con la composición nueva en vez de publicar uno aparte.
+ */
+export async function updatePartyTemplate(
+  id: string,
+  name: string,
+  data: PartyTemplateSnapshot
+): Promise<{ id: string }> {
+  const session = await getSession();
+  if (!session?.discordId) throw new Error("No autenticado.");
+
+  const permissions = await getEffectivePermissions(session);
+  if (!permissions.canManageParty) {
+    throw new Error("Tu rol no tiene permiso para editar plantillas de party.");
+  }
+
+  const template = await prisma.partyTemplate.update({
+    where: { id },
+    data: { name: name.trim() || "Sin nombre", data: data as object },
   });
 
   revalidatePath("/panel/party");

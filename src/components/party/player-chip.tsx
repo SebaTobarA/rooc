@@ -16,9 +16,13 @@ const ROLE_CLASS: Record<Player["rol"], string> = {
 interface PlayerChipProps {
   player: Player;
   onRemove?: (id: string) => void;
+  /** Si se pasa, un jugador sin clase (ej. importado por rol de Discord sin
+   * clase asignada ahí) muestra un input inline para completarla en vez de
+   * un chip vacío — ver discord-role-import.tsx. */
+  onUpdateClass?: (id: string, clase: string) => void;
 }
 
-export function PlayerChip({ player, onRemove }: PlayerChipProps) {
+export function PlayerChip({ player, onRemove, onUpdateClass }: PlayerChipProps) {
   const { selected, selectPlayer } = usePlayerSelection();
   const isSelected = selected?.kind === "player" && selected.id === player.id;
 
@@ -53,10 +57,31 @@ export function PlayerChip({ player, onRemove }: PlayerChipProps) {
       onKeyDown={handleKeyDown}
       role="listitem"
       tabIndex={0}
-      aria-label={`${player.nickname}, ${player.clase}${isSelected ? " (seleccionado)" : ""}`}
+      aria-label={`${player.nickname}, ${player.clase || "sin clase"}${isSelected ? " (seleccionado)" : ""}`}
     >
       <span className="chip-nick">{player.nickname}</span>
-      <span className="chip-class">{player.clase}</span>
+      {!player.clase && onUpdateClass ? (
+        <input
+          key={player.id}
+          type="text"
+          defaultValue=""
+          placeholder="Sin clase ⚠"
+          className="chip-class-input"
+          draggable={false}
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onKeyDown={(e) => {
+            e.stopPropagation();
+            if (e.key === "Enter") e.currentTarget.blur();
+          }}
+          onBlur={(e) => {
+            const value = e.currentTarget.value.trim();
+            if (value) onUpdateClass(player.id, value);
+          }}
+        />
+      ) : (
+        <span className="chip-class">{player.clase || "Sin clase ⚠"}</span>
+      )}
       {onRemove && (
         <button
           className="chip-remove"

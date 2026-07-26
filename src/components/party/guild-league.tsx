@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Save, Send } from "lucide-react";
 import type { Event, EventSignup } from "@prisma/client";
 import type { CampoSide, Player } from "@/types/party";
@@ -9,8 +9,10 @@ import { CampoAssignment } from "@/components/party/campo-assignment";
 import { useCampo } from "@/lib/party/use-campo";
 import { signupsToPlayers } from "@/lib/party/from-signups";
 import { getEventSignups } from "@/lib/actions/events";
+import type { EditingTemplate } from "@/components/party/party-builder-app";
 import {
   createPartyTemplate,
+  updatePartyTemplate,
   findLatestTemplateForCategory,
   communicatePartyTemplate,
 } from "@/lib/actions/party-templates";
@@ -20,9 +22,11 @@ type EventWithSignups = Event & { signups: EventSignup[] };
 export function GuildLeague({
   canManageParty,
   events,
+  editingTemplate,
 }: {
   canManageParty: boolean;
   events: EventWithSignups[];
+  editingTemplate: EditingTemplate | null;
 }) {
   const campo = useCampo(undefined, { maxPlayers: 80, maxParties: 16 });
   const [selectedEventId, setSelectedEventId] = useState(events[0]?.id ?? "");
@@ -34,10 +38,21 @@ export function GuildLeague({
     parties: { id: string; campo: CampoSide | null }[];
   } | null>(null);
 
-  const [savedTemplateId, setSavedTemplateId] = useState<string | null>(null);
+  // Si viene de "Editar" en el historial, savedTemplateId arranca apuntando
+  // a esa plantilla para que "Comunicar partys" quede habilitado sin
+  // necesidad de volver a guardar primero.
+  const [savedTemplateId, setSavedTemplateId] = useState<string | null>(editingTemplate?.id ?? null);
   const [saveMsg, setSaveMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [saving, setSaving] = useState(false);
   const [communicating, setCommunicating] = useState(false);
+
+  // Precarga la composición guardada al entrar en modo edición — una sola
+  // vez al montar, ya que PartyBuilderApp remonta este componente (key en
+  // page.tsx) por cada template distinta que se abra.
+  useEffect(() => {
+    if (editingTemplate) campo.loadSnapshot(editingTemplate.data);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const selectedEvent = events.find((e) => e.id === selectedEventId) ?? null;
 
@@ -102,19 +117,27 @@ export function GuildLeague({
   }
 
   async function handleSaveComposition() {
-    const name = window.prompt("Nombre de la composición:", selectedEvent?.title ?? "Composición de partys");
+    const name = window.prompt(
+      "Nombre de la composición:",
+      editingTemplate?.name ?? selectedEvent?.title ?? "Composición de partys"
+    );
     if (!name) return;
     setSaving(true);
     setSaveMsg(null);
     try {
-      const template = await createPartyTemplate(
-        "GUILD_LEAGUE",
-        name,
-        { players: campo.players, parties: campo.parties },
-        selectedEvent?.id
-      );
-      setSavedTemplateId(template.id);
-      setSaveMsg({ text: "Composición guardada. Ya puedes comunicarla.", ok: true });
+      if (editingTemplate) {
+        await updatePartyTemplate(editingTemplate.id, name, { players: campo.players, parties: campo.parties });
+        setSaveMsg({ text: "Cambios guardados.", ok: true });
+      } else {
+        const template = await createPartyTemplate(
+          "GUILD_LEAGUE",
+          name,
+          { players: campo.players, parties: campo.parties },
+          selectedEvent?.id
+        );
+        setSavedTemplateId(template.id);
+        setSaveMsg({ text: "Composición guardada. Ya puedes comunicarla.", ok: true });
+      }
     } catch (err) {
       setSaveMsg({ text: err instanceof Error ? err.message : "No se pudo guardar.", ok: false });
     } finally {
@@ -193,7 +216,11 @@ export function GuildLeague({
         <div className="campo-actions">
           <button className="btn btn-primary" onClick={handleSaveComposition} disabled={saving}>
             <Save size={14} />
-            {saving ? "Guardando…" : "Guardar composición de partys"}
+            {saving
+              ? "Guardando…"
+              : editingTemplate
+                ? "Guardar cambios"
+                : "Guardar composición de partys"}
           </button>
           <button
             className="btn btn-secondary"
