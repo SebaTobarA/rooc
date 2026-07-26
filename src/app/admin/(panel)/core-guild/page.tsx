@@ -2,8 +2,11 @@ import "@/app/panel/party/party.css";
 import "./core-guild.css";
 import { prisma } from "@/lib/prisma";
 import { getCoreGuildRoster, CORE_GUILD_ROLE_ID } from "@/lib/core-guild/sync";
+import { reconcileMembers } from "@/lib/core-guild/reconcile";
+import { getGuildChannels } from "@/lib/discord-bot";
 import { BotErrorNotice } from "@/components/admin/bot-error-notice";
 import { CoreGuildManager } from "@/components/core-guild/core-guild-manager";
+import { CoreMembersSection } from "@/components/core-guild/core-members-section";
 import type { SavedCoreGuildBoard } from "@/lib/core-guild/use-core-guild-board";
 import type { CoreGuildBoardData } from "@/lib/core-guild/types";
 
@@ -15,10 +18,11 @@ export const metadata = {
 
 export default async function AdminCoreGuildPage() {
   let roster: Awaited<ReturnType<typeof getCoreGuildRoster>> = [];
+  let channels: Awaited<ReturnType<typeof getGuildChannels>> = [];
   let error: string | null = null;
 
   try {
-    roster = await getCoreGuildRoster();
+    [roster, channels] = await Promise.all([getCoreGuildRoster(), getGuildChannels()]);
   } catch (err) {
     error = err instanceof Error ? err.message : "Error desconocido";
   }
@@ -37,16 +41,21 @@ export default async function AdminCoreGuildPage() {
       }
     : null;
 
+  const initialMembers = reconcileMembers(roster, saved?.data.members ?? []);
+
   return (
     <div>
       <p className="text-sm text-muted">
         {roster.length} miembro(s) con el rol <code className="text-accent">[SD] Core</code> (ID{" "}
-        <code className="text-accent">{CORE_GUILD_ROLE_ID}</code>) en el server. Clasificalos, armá
-        las parties y repartilas entre guilds — nada se guarda hasta apretar &quot;Guardar&quot;.
+        <code className="text-accent">{CORE_GUILD_ROLE_ID}</code>) en el server.
       </p>
 
       <div className="mt-4">
-        <CoreGuildManager roster={roster} saved={saved} />
+        <CoreMembersSection initialMembers={initialMembers} />
+      </div>
+
+      <div className="mt-4">
+        <CoreGuildManager roster={roster} saved={saved} channels={channels} />
       </div>
     </div>
   );

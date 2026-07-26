@@ -70,9 +70,48 @@ export type DiscordButton = {
   custom_id: string;
 };
 
+export type DiscordSelectOption = {
+  label: string;
+  value: string;
+  description?: string;
+};
+
+/** Menú desplegable de una sola elección (component_type 3) — ocupa toda su fila, no se puede combinar con botones en la misma. */
+export type DiscordSelectMenu = {
+  type: 3;
+  custom_id: string;
+  placeholder?: string;
+  options: DiscordSelectOption[];
+};
+
 export type DiscordActionRow = {
   type: 1;
-  components: DiscordButton[];
+  components: (DiscordButton | DiscordSelectMenu)[];
+};
+
+/** Estilos de campo de texto de un modal (1=una línea, 2=párrafo). */
+export type DiscordTextInputStyle = 1 | 2;
+
+export type DiscordTextInput = {
+  type: 4;
+  custom_id: string;
+  label: string;
+  style: DiscordTextInputStyle;
+  required?: boolean;
+  placeholder?: string;
+  max_length?: number;
+};
+
+export type DiscordModalActionRow = {
+  type: 1;
+  components: DiscordTextInput[];
+};
+
+/** Formulario emergente (interaction response type 9) — la única forma de pedir texto libre en una interacción de Discord. */
+export type DiscordModal = {
+  custom_id: string;
+  title: string;
+  components: DiscordModalActionRow[];
 };
 
 /** Un solo miembro por ID. Devuelve null si no pertenece al server (404). */
@@ -106,6 +145,24 @@ export async function getGuildRoles(): Promise<DiscordGuildRole[]> {
 export const getGuildRolesCached = unstable_cache(getGuildRoles, ["guild-roles"], {
   revalidate: 300,
 });
+
+/**
+ * Crea un rol nuevo en el server (ej. para identificar a un equipo de
+ * amigos en Core Guild) — el rol queda por debajo de la jerarquía del bot,
+ * así que después se le puede asignar a miembros con addGuildMemberRole sin
+ * problema de permisos.
+ */
+export async function createGuildRole(name: string): Promise<DiscordGuildRole> {
+  const response = await discordBotFetch(`/guilds/${getGuildId()}/roles`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  if (!response.ok) {
+    throw new Error(`No se pudo crear el rol en Discord (${response.status}).`);
+  }
+  return response.json();
+}
 
 /**
  * Asigna/quita un rol a un miembro puntual — usado para mantener sincronizada

@@ -33,9 +33,10 @@ const eventSchema = z
       templateId: data.templateId,
       startsAt,
       endsAt,
-      // El cierre de inscripciones es el mismo fin del evento: el mensaje
-      // en Discord queda visible hasta que se borre, así que no hace
-      // falta un campo aparte para "cuándo deja de existir la encuesta".
+      // Por defecto el cierre de inscripciones es el mismo fin del evento
+      // — se puede correr después desde /panel/eventos/[id] (ver
+      // updateEventSignupsCloseAt), ej. para extender el plazo mientras el
+      // evento ya está en curso.
       signupsCloseAt: endsAt,
     };
   })
@@ -76,8 +77,10 @@ export async function createEvent(formData: FormData) {
   redirect(`/panel/eventos/${event.id}`);
 }
 
-export async function sendEvent(id: string) {
-  await renderAndPublishEmbed(id);
+export async function sendEvent(id: string, formData: FormData) {
+  const channelId = String(formData.get("channelId") ?? "");
+  if (!channelId) throw new Error("Elige a qué canal comunicar el evento.");
+  await renderAndPublishEmbed(id, channelId);
   revalidateEventPaths(id);
 }
 
@@ -86,11 +89,38 @@ export async function sendEvent(id: string) {
  * la publicación original en Discord a mano. Se olvida el channelId/messageId
  * guardados (apuntan a un mensaje que ya no existe) para que
  * renderAndPublishEmbed tome la rama de "publicar de cero" en vez de
- * intentar editar un mensaje borrado.
+ * intentar editar un mensaje borrado — pero se guarda antes el canal
+ * original para reenviarlo ahí mismo (Asistencia/SD2/SD3), no al canal por
+ * defecto.
  */
 export async function resendEvent(id: string) {
+  const existing = await prisma.event.findUniqueOrThrow({ where: { id }, select: { channelId: true } });
   await prisma.event.update({ where: { id }, data: { channelId: null, messageId: null } });
-  await renderAndPublishEmbed(id);
+  await renderAndPublishEmbed(id, existing.channelId ?? undefined);
+  revalidateEventPaths(id);
+}
+
+/**
+ * Cambia hasta cuándo se aceptan altas/cambios de inscripción — independiente
+ * de startsAt/endsAt, para poder extender o acortar el plazo sin tocar las
+ * fechas del evento en sí (ej. el evento ya arrancó pero se sigue
+ * aceptando gente, o hay que cerrar antes de lo previsto).
+ */
+export async function updateEventSignupsCloseAt(id: string, formData: FormData) {
+  const date = String(formData.get("signupsCloseAtDate") ?? "");
+  const time = String(formData.get("signupsCloseAtTime") ?? "");
+  if (!date || !time) throw new Error("Elige la fecha y hora de cierre.");
+
+  const signupsCloseAt = new Date(`${date}T${time}:00-03:00`);
+  const event = await prisma.event.update({ where: { id }, data: { signupsCloseAt } });
+
+  // El embed publicado muestra hasta cuándo se aceptan inscripciones, así
+  // que hay que reescribirlo — si no, en Discord sigue figurando el plazo
+  // viejo aunque el botón ya acepte (o rechace) gente con el nuevo.
+  if (event.channelId && event.messageId) {
+    await renderAndPublishEmbed(id);
+  }
+
   revalidateEventPaths(id);
 }
 

@@ -45,7 +45,7 @@ function formatEventRange(startsAt: Date, endsAt: Date): string {
   ].join("\n");
 }
 
-function truncateFieldValue(lines: string[]): string {
+export function truncateFieldValue(lines: string[]): string {
   if (lines.length === 0) return "-";
   let value = "";
   for (let i = 0; i < lines.length; i++) {
@@ -90,6 +90,11 @@ export function buildEventEmbed(
     description: [
       "**Event Info:**",
       formatEventRange(event.startsAt, event.endsAt),
+      // El cierre de inscripciones se puede correr después de publicado
+      // (ver updateEventSignupsCloseAt), así que se muestra siempre: es el
+      // dato que define hasta cuándo los botones de abajo siguen aceptando
+      // gente, y no tiene por qué coincidir con el fin del evento.
+      `🔒 Inscripciones hasta ${DATE_FORMATTER.format(event.signupsCloseAt)} ${TIME_FORMATTER.format(event.signupsCloseAt)}`,
       "",
       "**Description:**",
       event.description || "-",

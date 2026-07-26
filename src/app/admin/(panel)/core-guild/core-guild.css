@@ -39,6 +39,17 @@
   white-space: nowrap;
 }
 
+.core-guild-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.core-guild-survey-channel-select {
+  width: auto;
+  max-width: 220px;
+}
+
 .core-guild-section {
   margin-top: 28px;
   padding-top: 20px;
@@ -487,6 +498,25 @@
   font-weight: 600;
 }
 
+.guild-add-party-select {
+  width: 100%;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.guild-role-sync {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.guild-role-input {
+  flex: 1;
+  min-width: 120px;
+  font-size: 12px;
+}
+
 .guild-parties {
   display: flex;
   flex-direction: column;
@@ -548,6 +578,21 @@
   width: auto;
   flex: 1;
   min-width: 140px;
+}
+
+/* ---------- Crear rol de Discord por grupo (Organización de Grupos) ---------- */
+.core-party-role-row {
+  margin-top: 6px;
+  padding: 6px 2px 0;
+  border-top: 1px dashed var(--pb-border);
+}
+.friend-team-role-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pb-success);
 }
 
 /* ---------- Responsive: tabla de miembros en mobile ---------- */

@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Trash2, X } from "lucide-react";
+import { ShieldPlus, Trash2, X } from "lucide-react";
 import type { CoreGuild, CoreMember, CorePartySlot } from "@/lib/core-guild/types";
 import { readDragPayload } from "@/lib/party/drag-payload";
 import { usePlayerSelection } from "@/lib/party/selection-context";
+import { syncGuildDiscordRole } from "@/lib/actions/core-guild";
 
 interface GuildCardProps {
   guild: CoreGuild;
@@ -31,18 +32,39 @@ export function GuildCard({
   onRemove,
 }: GuildCardProps) {
   const [isDragOver, setIsDragOver] = useState(false);
+  const [syncState, setSyncState] = useState<{ status: "idle" | "loading" | "error"; error?: string }>({
+    status: "idle",
+  });
   const { selected, clearSelection } = usePlayerSelection();
   const isPartyArmed = selected?.kind === "party";
 
   const assignedParties = guild.partyIds
     .map((id) => parties.find((p) => p.id === id))
     .filter((p): p is CorePartySlot => Boolean(p));
+  const addablePartyIds = new Set(assignedParties.map((p) => p.id));
+  const addableParties = parties.filter((p) => !addablePartyIds.has(p.id));
 
-  const totalMembers = assignedParties.reduce(
-    (sum, party) => sum + members.filter((m) => m.partyId === party.id).length,
-    0
-  );
+  const guildMembers = members.filter((m) => m.partyId && assignedParties.some((p) => p.id === m.partyId));
+  const totalMembers = guildMembers.length;
   const overCap = totalMembers > guild.cap;
+
+  async function handleSyncRole() {
+    const roleId = guild.discordRoleId?.trim();
+    if (!roleId) return;
+    setSyncState({ status: "loading" });
+    const result = await syncGuildDiscordRole(
+      roleId,
+      guildMembers.map((m) => m.discordId)
+    );
+    if (result.failedIds?.length) {
+      setSyncState({
+        status: "error",
+        error: `No se pudo asignar a ${result.failedIds.length} miembro(s).`,
+      });
+      return;
+    }
+    setSyncState({ status: "idle" });
+  }
 
   function handleAssignSelectedParty() {
     if (locked || !selected || selected.kind !== "party") return;
@@ -118,6 +140,52 @@ export function GuildCard({
       <p className={`guild-occupancy${overCap ? " guild-occupancy--over" : ""}`}>
         {totalMembers}/{guild.cap} jugadores{overCap ? " — supera el cupo" : ""}
       </p>
+
+      <div className="guild-role-sync" onClick={(e) => e.stopPropagation()}>
+        {/* Sin `disabled={locked}`: sincronizar un rol es una acción real
+            contra Discord, no una edición del board — tiene que poder
+            hacerse aunque el board ya esté guardado, sin forzar al admin a
+            abrir "Editar" primero. */}
+        <input
+          className="core-input guild-role-input"
+          defaultValue={guild.discordRoleId ?? ""}
+          placeholder="ID de rol en Discord (ej. SD2)"
+          onBlur={(e) => onUpdate({ discordRoleId: e.target.value.trim() || undefined })}
+          aria-label={`ID de rol de Discord para ${guild.name}`}
+        />
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          disabled={!guild.discordRoleId?.trim() || totalMembers === 0 || syncState.status === "loading"}
+          onClick={handleSyncRole}
+          title="Asigna ese rol de Discord a todos los miembros que están en esta guild ahora mismo"
+        >
+          <ShieldPlus size={13} />
+          {syncState.status === "loading" ? "Sincronizando…" : "Sincronizar rol"}
+        </button>
+        {syncState.status === "error" && <p className="campo-error">{syncState.error}</p>}
+      </div>
+
+      {!locked && addableParties.length > 0 && (
+        <select
+          className="core-input guild-add-party-select"
+          value=""
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onChange={(e) => {
+            if (e.target.value) onDropParty(e.target.value, guild.id);
+          }}
+          aria-label={`Agregar grupo a ${guild.name}`}
+          title="Agregar un grupo a esta guild sin arrastrar"
+        >
+          <option value="">+ Agregar grupo…</option>
+          {addableParties.map((party) => (
+            <option key={party.id} value={party.id}>
+              {party.name}
+            </option>
+          ))}
+        </select>
+      )}
 
       <div className="guild-parties">
         {assignedParties.length === 0 ? (

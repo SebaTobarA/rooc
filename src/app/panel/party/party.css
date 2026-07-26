@@ -902,6 +902,51 @@
   cursor: pointer;
 }
 
+/* ---------- Raids de Emperium Overrun ---------- */
+.raid-create-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 10px 0 4px;
+}
+.raid-create-input {
+  width: auto;
+  flex: 1;
+  min-width: 180px;
+}
+
+.raid-columns {
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+
+.raid-column .campo-column-header {
+  gap: 8px;
+}
+.raid-name-input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  border-bottom: 1px dashed transparent;
+  color: var(--foreground, #e9edf1);
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0;
+}
+.raid-name-input:hover {
+  border-bottom-color: var(--pb-border-hover);
+}
+.raid-name-input:focus {
+  outline: none;
+  border-bottom-color: var(--pb-accent);
+}
+.raid-column .import-collapse {
+  margin: 6px 0;
+}
+
 /* ---------- Party completa arrastrable (asignación a campo) ---------- */
 .party-card {
   cursor: grab;

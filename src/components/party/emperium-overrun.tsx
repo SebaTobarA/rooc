@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { Event, EventSignup } from "@prisma/client";
 import { Campo } from "@/components/party/campo";
+import { RaidAssignment } from "@/components/party/raid-assignment";
 import { useCampo } from "@/lib/party/use-campo";
 import { signupsToPlayers } from "@/lib/party/from-signups";
 import { getEventSignups } from "@/lib/actions/events";
@@ -94,6 +95,8 @@ export function EmperiumOverrun({
           editingTemplateName: editingTemplate?.name,
         }}
       />
+
+      <RaidAssignment campo={campo} />
     </div>
   );
 }
