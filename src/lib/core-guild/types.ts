@@ -1,5 +1,3 @@
-import type { SlotLabel } from "@/types/party";
-
 export type WalletType = "F2P" | "MS" | "BALLENA";
 export type GroupMode = "SOLO" | "GROUP";
 // Guild in-game elegida por el miembro en la encuesta de Discord (ver
@@ -38,10 +36,15 @@ export interface CoreMember {
 export interface CorePartySlot {
   id: string;
   name: string;
+  // Ya no representa un cupo real (no hay composición por rol en Core
+  // Guild) — se recalcula en el render como members.length, solo queda
+  // acá para no tener que tocar PartyCard (compartido con Overrun/
+  // Emperium, que sí usa un cupo real).
   capacity: number;
-  // Party "lista" — el admin la marcó como terminada. "Organizar parties"
-  // no toca a sus miembros, y no se pueden arrastrar jugadores hacia
-  // adentro/afuera (sí se la puede seguir arrastrando entera a una guild).
+  // Party "lista" — el admin la marcó como terminada. "Agrupar por
+  // etiqueta" no toca a sus miembros, y no se pueden arrastrar jugadores
+  // hacia adentro/afuera (sí se la puede seguir arrastrando entera a una
+  // guild). También habilita "Crear rol" en Discord para el grupo.
   locked: boolean;
 }
 
@@ -63,11 +66,9 @@ export interface CoreGuild {
 export interface CoreGuildBoardData {
   members: CoreMember[];
   parties: CorePartySlot[];
-  compositions: SlotLabel[][];
   guilds: CoreGuild[];
-  // Etiqueta de equipo (en minúscula) -> ID del rol ya creado en Discord
-  // para ese equipo de amigos. Ausente/vacío en boards guardados antes de
-  // esta funcionalidad.
+  // ID de party (grupo) -> ID del rol ya creado en Discord para ese grupo.
+  // Ausente/vacío en boards guardados antes de esta funcionalidad.
   teamRoles: Record<string, string>;
   // Mensaje público de la encuesta de organización (ver survey-roster.ts)
   // — se edita in-place cada vez que alguien responde, en vez de publicar
@@ -75,14 +76,11 @@ export interface CoreGuildBoardData {
   surveyMessage: { channelId: string; messageId: string } | null;
 }
 
-const DEFAULT_CORE_GUILD_COMPOSITION: SlotLabel[] = ["Tanque", "Soporte", "Daño", "Daño", "Daño"];
-
 /** Board vacío — misma forma que usan use-core-guild-board.ts (cliente) y survey-response.ts/survey-roster.ts (servidor) cuando todavía no existe una fila en la base. */
 export function emptyCoreGuildBoardData(): CoreGuildBoardData {
   return {
     members: [],
     parties: [],
-    compositions: [[...DEFAULT_CORE_GUILD_COMPOSITION]],
     guilds: [],
     teamRoles: {},
     surveyMessage: null,

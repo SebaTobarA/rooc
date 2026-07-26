@@ -33,6 +33,10 @@ interface PartyCardProps {
    * Secundario). */
   expanded?: boolean;
   onToggleExpanded?: () => void;
+  /** Core Guild ya no arma composición por rol — oculta el aviso de
+   * "falta Tanque/Curación" y el ícono de completa/incompleta, que no
+   * aplican cuando el grupo es solo gente con la misma etiqueta. */
+  hideRoleWarnings?: boolean;
 }
 
 export function PartyCard({
@@ -47,6 +51,7 @@ export function PartyCard({
   renderName,
   expanded: expandedProp,
   onToggleExpanded,
+  hideRoleWarnings = false,
 }: PartyCardProps) {
   const showToggle = compact || collapsible;
   const [isDragOver, setIsDragOver] = useState(false);
@@ -58,14 +63,14 @@ export function PartyCard({
   const isPartySelected = selected?.kind === "party" && selected.partyId === party.id;
   const isPlayerArmed = selected?.kind === "player";
 
-  const hasNoTank = !members.some((m) => m.rol === "Tank");
-  const hasNoSupport = !members.some((m) => m.rol === "Support");
+  const hasNoTank = !hideRoleWarnings && !members.some((m) => m.rol === "Tank");
+  const hasNoSupport = !hideRoleWarnings && !members.some((m) => m.rol === "Support");
   const missingRoles = [
     ...(hasNoTank ? ["Tanque"] : []),
     ...(hasNoSupport ? ["Curación"] : []),
   ];
-  const isIncomplete = members.length > 0 && members.length < party.capacity;
-  const isComplete = members.length > 0 && members.length >= party.capacity;
+  const isIncomplete = !hideRoleWarnings && members.length > 0 && members.length < party.capacity;
+  const isComplete = hideRoleWarnings || (members.length > 0 && members.length >= party.capacity);
 
   function handleSelectParty() {
     selectParty({ kind: "party", partyId: party.id });
@@ -101,7 +106,7 @@ export function PartyCard({
       <div className="party-card-header">
         <GripVertical size={13} className="party-card-grip" aria-hidden="true" />
         {renderName ? renderName() : <span className="party-card-name">{party.name}</span>}
-        {showToggle && (
+        {showToggle && !hideRoleWarnings && (
           <span
             className={`party-card-status ${isComplete ? "party-card-status--ok" : "party-card-status--warn"}`}
             aria-hidden="true"
@@ -109,9 +114,7 @@ export function PartyCard({
             {isComplete ? <CheckCircle2 size={13} /> : <AlertTriangle size={13} />}
           </span>
         )}
-        <span className="party-card-count">
-          {members.length}/{party.capacity}
-        </span>
+        <span className="party-card-count">{hideRoleWarnings ? members.length : `${members.length}/${party.capacity}`}</span>
         {showToggle && (
           <button
             type="button"

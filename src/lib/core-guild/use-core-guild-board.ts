@@ -1,12 +1,12 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
-import type { SlotLabel } from "@/types/party";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { emptyCoreGuildBoardData, type CoreGuild, type CoreGuildBoardData, type CoreMember, type CorePartySlot } from "./types";
-import type { CoreGuildRosterEntry } from "./sync";
-import { organizeCoreParties } from "./organize";
-import { computeFriendTeams } from "./friend-teams";
+import { reconcileMembers } from "./reconcile";
+import { organizeCoreGroups } from "./organize";
 import { saveCoreGuildBoard, unlockCoreGuildBoard } from "@/lib/actions/core-guild";
+import { getCoreGuildMembersSnapshot } from "@/lib/actions/core-guild-members";
+import type { CoreGuildRosterEntry } from "./sync";
 
 export interface SavedCoreGuildBoard {
   data: CoreGuildBoardData;
@@ -15,52 +15,11 @@ export interface SavedCoreGuildBoard {
   updatedAt: string;
 }
 
-// Mezcla el roster fresco de Discord con lo último guardado: los miembros
-// que ya estaban guardados conservan sus campos editables (jobRole,
-// grupo/etiqueta, wallet, party), solo se refrescan nick/avatar; los que
-// aparecen nuevos en Discord se agregan con valores por defecto; los que ya
-// no tienen el rol Core quedan marcados `inCore: false` en vez de
-// desaparecer, para que el admin decida a mano si los saca.
-function reconcileMembers(roster: CoreGuildRosterEntry[], saved: CoreMember[]): CoreMember[] {
-  const savedById = new Map(saved.map((m) => [m.discordId, m]));
-  const rosterIds = new Set(roster.map((r) => r.discordId));
-
-  const merged: CoreMember[] = roster.map((entry) => {
-    const existing = savedById.get(entry.discordId);
-    if (existing) {
-      return {
-        ...existing,
-        username: entry.username,
-        globalName: entry.globalName,
-        nick: entry.nick,
-        avatarHash: entry.avatarHash,
-        inCore: true,
-        // `guildChoice` no existía en boards guardados antes de la encuesta.
-        guildChoice: existing.guildChoice ?? null,
-      };
-    }
-    return {
-      discordId: entry.discordId,
-      username: entry.username,
-      globalName: entry.globalName,
-      nick: entry.nick,
-      avatarHash: entry.avatarHash,
-      jobRole: entry.suggestedJobRole ?? "",
-      groupMode: "SOLO" as const,
-      groupTag: "",
-      walletType: "F2P" as const,
-      inCore: true,
-      partyId: null,
-      guildChoice: null,
-    };
-  });
-
-  saved.forEach((m) => {
-    if (!rosterIds.has(m.discordId)) merged.push({ ...m, inCore: false });
-  });
-
-  return merged;
-}
+// Cada cuánto se refresca members en segundo plano para reflejar ediciones
+// de la sección Miembros Core (independiente, autoguardada) o respuestas
+// nuevas de la encuesta — sin esto, "Organización de Grupos" solo vería
+// etiquetas frescas después de recargar la página entera.
+const MEMBER_POLL_MS = 6000;
 
 export function useCoreGuildBoard(roster: CoreGuildRosterEntry[], saved: SavedCoreGuildBoard | null) {
   const initial = useMemo<CoreGuildBoardData>(() => {
@@ -70,9 +29,8 @@ export function useCoreGuildBoard(roster: CoreGuildRosterEntry[], saved: SavedCo
       members: reconcileMembers(roster, base.members ?? []),
       // `locked` no existía en boards guardados antes de esta funcionalidad.
       parties: (base.parties ?? []).map((p) => ({ ...p, locked: p.locked ?? false })),
-      compositions: base.compositions?.length ? base.compositions : empty.compositions,
       guilds: base.guilds ?? [],
-      // `teamRoles` tampoco existía antes de la sección Amigos.
+      // `teamRoles` tampoco existía antes de esta funcionalidad.
       teamRoles: base.teamRoles ?? {},
       // ni `surveyMessage`.
       surveyMessage: base.surveyMessage ?? null,
@@ -84,7 +42,6 @@ export function useCoreGuildBoard(roster: CoreGuildRosterEntry[], saved: SavedCo
 
   const [members, setMembers] = useState<CoreMember[]>(initial.members);
   const [parties, setParties] = useState<CorePartySlot[]>(initial.parties);
-  const [compositions, setCompositions] = useState<SlotLabel[][]>(initial.compositions);
   const [guilds, setGuilds] = useState<CoreGuild[]>(initial.guilds);
   const [teamRoles, setTeamRoles] = useState<Record<string, string>>(initial.teamRoles);
   // Nunca se edita desde la UI — se conserva tal cual para no pisarlo al
@@ -96,38 +53,58 @@ export function useCoreGuildBoard(roster: CoreGuildRosterEntry[], saved: SavedCo
 
   const activeMembers = members.filter((m) => m.inCore);
   const unassigned = activeMembers.filter((m) => !m.partyId);
-  const friendTeams = useMemo(() => computeFriendTeams(activeMembers, parties), [activeMembers, parties]);
 
-  const setTeamRole = useCallback((teamKey: string, roleId: string) => {
-    setTeamRoles((prev) => ({ ...prev, [teamKey]: roleId }));
+  // Refresca los datos "de perfil" de cada miembro (etiqueta, guild
+  // elegida, clase, wallet, si sigue en Core) en segundo plano — la
+  // sección Miembros Core y la encuesta de Discord los editan de forma
+  // independiente y en vivo, así que este board los necesita frescos sin
+  // que el admin tenga que recargar la página. `partyId` es lo único que
+  // se conserva tal cual está localmente: es el borrador de este board
+  // (no se persiste hasta "Guardar"), y no debería pisarse solo.
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const fresh = await getCoreGuildMembersSnapshot();
+        const freshById = new Map(fresh.map((m) => [m.discordId, m]));
+        setMembers((prev) => {
+          const merged = prev.map((m) => {
+            const server = freshById.get(m.discordId);
+            if (!server) return m;
+            return { ...server, partyId: m.partyId };
+          });
+          const knownIds = new Set(prev.map((m) => m.discordId));
+          fresh.forEach((m) => {
+            if (!knownIds.has(m.discordId)) merged.push({ ...m, partyId: null });
+          });
+          return merged;
+        });
+      } catch {
+        // Si falla un tick, se reintenta solo en el siguiente — no hace
+        // falta mostrar error por un refresco en segundo plano.
+      }
+    }, MEMBER_POLL_MS);
+    return () => clearInterval(interval);
   }, []);
 
-  const updateMember = useCallback((discordId: string, patch: Partial<CoreMember>) => {
-    setMembers((prev) => prev.map((m) => (m.discordId === discordId ? { ...m, ...patch } : m)));
-  }, []);
-
-  const removeMember = useCallback((discordId: string) => {
-    setMembers((prev) => prev.filter((m) => m.discordId !== discordId));
+  const setTeamRole = useCallback((partyId: string, roleId: string) => {
+    setTeamRoles((prev) => ({ ...prev, [partyId]: roleId }));
   }, []);
 
   const assignToParty = useCallback((discordId: string, partyId: string | null) => {
     setMembers((prev) => prev.map((m) => (m.discordId === discordId ? { ...m, partyId } : m)));
   }, []);
 
-  const addParty = useCallback(
-    (name?: string) => {
-      setParties((prev) => [
-        ...prev,
-        {
-          id: `core_party_manual_${prev.length + 1}_${Date.now().toString(36)}`,
-          name: name?.trim() || `Party ${prev.length + 1}`,
-          capacity: compositions[0]?.length ?? 5,
-          locked: false,
-        },
-      ]);
-    },
-    [compositions]
-  );
+  const addParty = useCallback((name?: string) => {
+    setParties((prev) => [
+      ...prev,
+      {
+        id: `core_party_manual_${prev.length + 1}_${Date.now().toString(36)}`,
+        name: name?.trim() || `Grupo ${prev.length + 1}`,
+        capacity: 0,
+        locked: false,
+      },
+    ]);
+  }, []);
 
   const removeParty = useCallback((partyId: string) => {
     setParties((prev) => prev.filter((p) => p.id !== partyId));
@@ -156,9 +133,9 @@ export function useCoreGuildBoard(roster: CoreGuildRosterEntry[], saved: SavedCo
   }, [parties]);
 
   // Las parties marcadas "lista" (locked) no se tocan: ni a ellas ni a sus
-  // miembros. organizeCoreParties solo corre sobre el resto (sin asignar +
-  // miembros de parties todavía no bloqueadas), y el resultado se agrega a
-  // las bloqueadas en vez de reemplazarlas.
+  // miembros. organizeCoreGroups solo corre sobre el resto (sin asignar +
+  // miembros de parties todavía no bloqueadas), agrupando por etiqueta —
+  // sin composición por rol, ver organize.ts.
   const organize = useCallback(() => {
     const lockedParties = parties.filter((p) => p.locked);
     const lockedPartyIds = new Set(lockedParties.map((p) => p.id));
@@ -167,7 +144,7 @@ export function useCoreGuildBoard(roster: CoreGuildRosterEntry[], saved: SavedCo
     );
     const poolMembers = members.filter((m) => !lockedMemberIds.has(m.discordId));
 
-    const result = organizeCoreParties(poolMembers, compositions);
+    const result = organizeCoreGroups(poolMembers);
     const newParties = [...lockedParties, ...result.parties];
     const validIds = new Set(newParties.map((p) => p.id));
 
@@ -178,7 +155,7 @@ export function useCoreGuildBoard(roster: CoreGuildRosterEntry[], saved: SavedCo
       )
     );
     setGuilds((prev) => prev.map((g) => ({ ...g, partyIds: g.partyIds.filter((id) => validIds.has(id)) })));
-  }, [members, compositions, parties]);
+  }, [members, parties]);
 
   const addGuild = useCallback((name: string, level: number, cap: number) => {
     setGuilds((prev) => [
@@ -216,7 +193,7 @@ export function useCoreGuildBoard(roster: CoreGuildRosterEntry[], saved: SavedCo
     setSaving(true);
     setError("");
     try {
-      await saveCoreGuildBoard({ members, parties, compositions, guilds, teamRoles, surveyMessage });
+      await saveCoreGuildBoard({ members, parties, guilds, teamRoles, surveyMessage });
       setLocked(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo guardar.");
@@ -243,17 +220,12 @@ export function useCoreGuildBoard(roster: CoreGuildRosterEntry[], saved: SavedCo
     activeMembers,
     unassigned,
     parties,
-    compositions,
-    setCompositions,
     guilds,
     teamRoles,
     setTeamRole,
-    friendTeams,
     locked,
     saving,
     error,
-    updateMember,
-    removeMember,
     assignToParty,
     addParty,
     removeParty,

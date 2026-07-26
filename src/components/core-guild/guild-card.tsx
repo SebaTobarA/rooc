@@ -41,6 +41,8 @@ export function GuildCard({
   const assignedParties = guild.partyIds
     .map((id) => parties.find((p) => p.id === id))
     .filter((p): p is CorePartySlot => Boolean(p));
+  const addablePartyIds = new Set(assignedParties.map((p) => p.id));
+  const addableParties = parties.filter((p) => !addablePartyIds.has(p.id));
 
   const guildMembers = members.filter((m) => m.partyId && assignedParties.some((p) => p.id === m.partyId));
   const totalMembers = guildMembers.length;
@@ -163,6 +165,27 @@ export function GuildCard({
         </button>
         {syncState.status === "error" && <p className="campo-error">{syncState.error}</p>}
       </div>
+
+      {!locked && addableParties.length > 0 && (
+        <select
+          className="core-input guild-add-party-select"
+          value=""
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onChange={(e) => {
+            if (e.target.value) onDropParty(e.target.value, guild.id);
+          }}
+          aria-label={`Agregar grupo a ${guild.name}`}
+          title="Agregar un grupo a esta guild sin arrastrar"
+        >
+          <option value="">+ Agregar grupo…</option>
+          {addableParties.map((party) => (
+            <option key={party.id} value={party.id}>
+              {party.name}
+            </option>
+          ))}
+        </select>
+      )}
 
       <div className="guild-parties">
         {assignedParties.length === 0 ? (

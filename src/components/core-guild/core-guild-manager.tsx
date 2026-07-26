@@ -1,15 +1,12 @@
 "use client";
 
-import { useMemo, useState, type DragEvent, type FormEvent } from "react";
+import { useState, type DragEvent, type FormEvent } from "react";
 import {
   Wand2,
   FolderPlus,
   Save,
   Pencil,
   Plus,
-  Search,
-  ChevronLeft,
-  ChevronRight,
   Lock,
   Unlock,
   Eraser,
@@ -17,45 +14,21 @@ import {
   Minimize2,
   Maximize2,
   Megaphone,
+  ShieldPlus,
 } from "lucide-react";
 import type { Player, Party } from "@/types/party";
 import { inferRole } from "@/lib/party/infer-role";
-import { discordAvatarUrl } from "@/lib/discord-avatar";
-import { JOB_ROLE_NAMES } from "@/lib/discord-job-roles";
 import { readDragPayload } from "@/lib/party/drag-payload";
 import { PlayerSelectionProvider, usePlayerSelection } from "@/lib/party/selection-context";
 import { useCoreGuildBoard, type SavedCoreGuildBoard } from "@/lib/core-guild/use-core-guild-board";
 import type { CoreGuildRosterEntry } from "@/lib/core-guild/sync";
-import type { CorePartySlot, CoreMember, WalletType } from "@/lib/core-guild/types";
-import { GUILD_CHOICE_LABELS, GUILD_CHOICE_OPTIONS } from "@/lib/core-guild/guild-choice";
+import type { CorePartySlot, CoreMember } from "@/lib/core-guild/types";
 import { CORE_GUILD_SURVEY_CHANNEL_ID } from "@/lib/discord-guild-channels";
-import { publishCoreGuildSurvey } from "@/lib/actions/core-guild";
+import { createTeamDiscordRole, publishCoreGuildSurvey } from "@/lib/actions/core-guild";
 import type { DiscordGuildChannel } from "@/lib/discord-bot";
 import { PartyCard } from "@/components/party/party-card";
-import { SlotPicker } from "@/components/party/slot-picker";
-import { StatsBar } from "@/components/party/stats-bar";
 import { CoreMemberChip, type MoveTarget } from "@/components/core-guild/core-member-chip";
 import { GuildCard } from "@/components/core-guild/guild-card";
-import { FriendTeamsSection } from "@/components/core-guild/friend-teams-section";
-
-const WALLET_OPTIONS: { value: WalletType; label: string }[] = [
-  { value: "F2P", label: "F2P" },
-  { value: "MS", label: "MS" },
-  { value: "BALLENA", label: "Ballena" },
-];
-
-// Cuántos miembros se muestran por hoja en la tabla — únicas opciones
-// permitidas, empezando en 5.
-const PAGE_SIZE_OPTIONS = [5, 10, 15, 20, 25, 50] as const;
-
-// Insensible a mayúsculas/acentos, mismo truco que discord-job-roles.ts.
-function normalizeSearch(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(new RegExp("[\\u0300-\\u036f]", "g"), "")
-    .toLowerCase()
-    .trim();
-}
 
 function toPlayerView(member: CoreMember): Player {
   return {
@@ -69,10 +42,11 @@ function toPlayerView(member: CoreMember): Player {
 
 // Core Guild no tiene el concepto de Campo Principal/Secundario de Guild
 // League — se agrega `campo: null` solo para calzar con el tipo Party
-// compartido con el resto del party builder. Se conserva `locked` (propio
-// de Core Guild) además.
-function toPartyView(party: CorePartySlot): Party & { locked: boolean } {
-  return { ...party, campo: null };
+// compartido con el resto del party builder. La capacidad ya no es un cupo
+// real (no hay composición por rol acá): se recalcula como members.length
+// para que PartyCard siempre la muestre como "completa".
+function toPartyView(party: CorePartySlot, memberCount: number): Party & { locked: boolean } {
+  return { ...party, campo: null, capacity: Math.max(memberCount, 1) };
 }
 
 interface CoreGuildManagerProps {
@@ -89,6 +63,11 @@ export function CoreGuildManager(props: CoreGuildManagerProps) {
   );
 }
 
+interface RoleState {
+  status: "idle" | "loading" | "error";
+  error?: string;
+}
+
 function CoreGuildManagerInner({ roster, saved, channels }: CoreGuildManagerProps) {
   const board = useCoreGuildBoard(roster, saved);
   const {
@@ -96,17 +75,12 @@ function CoreGuildManagerInner({ roster, saved, channels }: CoreGuildManagerProp
     activeMembers,
     unassigned,
     parties,
-    compositions,
-    setCompositions,
     guilds,
     teamRoles,
     setTeamRole,
-    friendTeams,
     locked,
     saving,
     error,
-    updateMember,
-    removeMember,
     assignToParty,
     addParty,
     removeParty,
@@ -126,76 +100,21 @@ function CoreGuildManagerInner({ roster, saved, channels }: CoreGuildManagerProp
   const { selected, clearSelection } = usePlayerSelection();
   const [organizeMsg, setOrganizeMsg] = useState("");
   const [guildForm, setGuildForm] = useState(false);
+  const [roleState, setRoleState] = useState<Record<string, RoleState>>({});
   const [publishState, setPublishState] = useState<{ status: "idle" | "loading" | "done" | "error"; error?: string }>({
     status: "idle",
   });
   const [surveyChannelId, setSurveyChannelId] = useState(
     channels.some((c) => c.id === CORE_GUILD_SURVEY_CHANNEL_ID) ? CORE_GUILD_SURVEY_CHANNEL_ID : ""
   );
-  const [search, setSearch] = useState("");
-  const [pageSize, setPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(5);
-  const [page, setPage] = useState(1);
   // Colapsado/expandido es solo una preferencia de vista (no se guarda con
   // el board) — qué parties están achicadas ahora mismo.
   const [collapsedPartyIds, setCollapsedPartyIds] = useState<Set<string>>(new Set());
 
-  const existingTags = useMemo(
-    () => [...new Set(members.filter((m) => m.groupTag.trim()).map((m) => m.groupTag.trim()))],
-    [members]
-  );
-
-  const sortedMembers = useMemo(
-    () =>
-      [...members].sort((a, b) => {
-        if (a.inCore !== b.inCore) return a.inCore ? -1 : 1;
-        const nameA = a.nick ?? a.globalName ?? a.username;
-        const nameB = b.nick ?? b.globalName ?? b.username;
-        return nameA.localeCompare(nameB);
-      }),
-    [members]
-  );
-
-  const filteredMembers = useMemo(() => {
-    const query = normalizeSearch(search);
-    if (!query) return sortedMembers;
-    return sortedMembers.filter((m) => {
-      const displayName = m.nick ?? m.globalName ?? m.username;
-      return (
-        normalizeSearch(displayName).includes(query) ||
-        normalizeSearch(m.username).includes(query) ||
-        normalizeSearch(m.jobRole).includes(query)
-      );
-    });
-  }, [sortedMembers, search]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredMembers.length / pageSize));
-  const currentPage = Math.min(page, totalPages);
-  const pagedMembers = filteredMembers.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-
-  function handleSearchChange(value: string) {
-    setSearch(value);
-    setPage(1);
-  }
-
-  function handlePageSizeChange(value: (typeof PAGE_SIZE_OPTIONS)[number]) {
-    setPageSize(value);
-    setPage(1);
-  }
-
-  const allPlayers = activeMembers.map(toPlayerView);
-  const partyViews = parties.map(toPartyView);
-  // Destinos válidos para el selector "mover a" de cada chip — parties
-  // bloqueadas no entran, ni como origen (no se muestra el selector) ni
+  // Destinos válidos para el selector "mover a" de cada chip — grupos
+  // bloqueados no entran, ni como origen (no se muestra el selector) ni
   // como destino.
   const moveTargets: MoveTarget[] = parties.filter((p) => !p.locked).map((p) => ({ id: p.id, name: p.name }));
-  const completeCount = parties.filter((party) => {
-    const partyMembers = activeMembers.filter((m) => m.partyId === party.id);
-    return (
-      partyMembers.length > 0 &&
-      partyMembers.some((m) => inferRole(m.jobRole) === "Tank") &&
-      partyMembers.some((m) => inferRole(m.jobRole) === "Support")
-    );
-  }).length;
 
   function isPartyLocked(partyId: string | null) {
     return partyId !== null && parties.find((p) => p.id === partyId)?.locked === true;
@@ -219,7 +138,7 @@ function CoreGuildManagerInner({ roster, saved, channels }: CoreGuildManagerProp
   function handleOrganize() {
     setOrganizeMsg("");
     organize();
-    setOrganizeMsg("Parties organizadas — los grupos etiquetados quedaron priorizados juntos.");
+    setOrganizeMsg("Grupos armados a partir de las etiquetas de Miembros Core.");
     setTimeout(() => setOrganizeMsg(""), 5000);
   }
 
@@ -232,6 +151,26 @@ function CoreGuildManagerInner({ roster, saved, channels }: CoreGuildManagerProp
     }
     setPublishState({ status: "done" });
     setTimeout(() => setPublishState({ status: "idle" }), 5000);
+  }
+
+  async function handleCreateRole(party: CorePartySlot, partyMembers: CoreMember[]) {
+    setRoleState((prev) => ({ ...prev, [party.id]: { status: "loading" } }));
+    const result = await createTeamDiscordRole(
+      party.name,
+      partyMembers.map((m) => m.discordId)
+    );
+    if (result.error) {
+      setRoleState((prev) => ({ ...prev, [party.id]: { status: "error", error: result.error } }));
+      return;
+    }
+    setRoleState((prev) => ({ ...prev, [party.id]: { status: "idle" } }));
+    if (result.roleId) setTeamRole(party.id, result.roleId);
+    if (result.failedIds?.length) {
+      setRoleState((prev) => ({
+        ...prev,
+        [party.id]: { status: "error", error: `Rol creado, pero no se pudo asignar a ${result.failedIds!.length} persona(s).` },
+      }));
+    }
   }
 
   function togglePartyCollapsed(partyId: string) {
@@ -254,7 +193,7 @@ function CoreGuildManagerInner({ roster, saved, channels }: CoreGuildManagerProp
   function handleClearParties() {
     setOrganizeMsg("");
     clearParties();
-    setOrganizeMsg("Parties sin bloquear borradas — sus miembros volvieron a \"Sin asignar\".");
+    setOrganizeMsg('Grupos sin bloquear borrados — sus miembros volvieron a "Solos".');
     setTimeout(() => setOrganizeMsg(""), 5000);
   }
 
@@ -272,17 +211,6 @@ function CoreGuildManagerInner({ roster, saved, channels }: CoreGuildManagerProp
 
   return (
     <div className="party-page campo core-guild-manager">
-      <datalist id="core-guild-job-roles">
-        {JOB_ROLE_NAMES.map((name) => (
-          <option key={name} value={name} />
-        ))}
-      </datalist>
-      <datalist id="core-guild-tags">
-        {existingTags.map((tag) => (
-          <option key={tag} value={tag} />
-        ))}
-      </datalist>
-
       <div className="core-guild-header">
         <div>
           <p className="core-guild-status">
@@ -337,223 +265,21 @@ function CoreGuildManagerInner({ roster, saved, channels }: CoreGuildManagerProp
         )}
       </div>
 
-      {/* ---------- Sección 1: miembros ---------- */}
+      {/* ---------- Organización de Grupos ---------- */}
       <section className="core-guild-section">
-        <h2 className="campo-label">Miembros Core</h2>
-
-        <div className="core-member-toolbar">
-          <div className="core-search">
-            <Search size={14} className="core-search-icon" />
-            <input
-              type="text"
-              className="core-input core-search-input"
-              placeholder="Buscar por nombre, usuario o clase…"
-              value={search}
-              onChange={(e) => handleSearchChange(e.target.value)}
-            />
-          </div>
-          <label className="core-page-size">
-            Por hoja
-            <select
-              value={pageSize}
-              onChange={(e) => handlePageSizeChange(Number(e.target.value) as (typeof PAGE_SIZE_OPTIONS)[number])}
-            >
-              {PAGE_SIZE_OPTIONS.map((size) => (
-                <option key={size} value={size}>
-                  {size}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        <div className="core-member-table-wrap">
-          <table className="core-member-table">
-            <thead>
-              <tr>
-                <th>Miembro</th>
-                <th>Rol de juego</th>
-                <th>Guild</th>
-                <th>Solitario</th>
-                <th>En grupo</th>
-                <th>Etiqueta</th>
-                <th>Wallet</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {pagedMembers.map((member) => {
-                const avatar = discordAvatarUrl(member.discordId, member.avatarHash, 32);
-                const displayName = member.nick ?? member.globalName ?? member.username;
-                return (
-                  <tr key={member.discordId} className={member.inCore ? "" : "core-member-row--inactive"}>
-                    <td data-label="Miembro">
-                      <div className="core-member-identity">
-                        {avatar ? (
-                          <img src={avatar} alt="" className="core-member-avatar" />
-                        ) : (
-                          <span className="core-member-avatar core-member-avatar--fallback">
-                            {displayName.slice(0, 1).toUpperCase()}
-                          </span>
-                        )}
-                        <div>
-                          <div className="core-member-name">{displayName}</div>
-                          <div className="core-member-username">@{member.username}</div>
-                          {!member.inCore && <div className="core-member-badge">Ya no tiene el rol Core</div>}
-                        </div>
-                      </div>
-                    </td>
-                    <td data-label="Rol de juego">
-                      <input
-                        className="core-input"
-                        list="core-guild-job-roles"
-                        defaultValue={member.jobRole}
-                        disabled={locked}
-                        placeholder="Sin clase"
-                        onBlur={(e) => updateMember(member.discordId, { jobRole: e.target.value.trim() })}
-                      />
-                    </td>
-                    <td data-label="Guild">
-                      <select
-                        className="core-input"
-                        value={member.guildChoice ?? ""}
-                        disabled={locked}
-                        onChange={(e) =>
-                          updateMember(member.discordId, {
-                            guildChoice: e.target.value ? (e.target.value as CoreMember["guildChoice"]) : null,
-                          })
-                        }
-                        aria-label={`Guild elegida por ${displayName}`}
-                      >
-                        <option value="">Sin responder</option>
-                        {GUILD_CHOICE_OPTIONS.map((choice) => (
-                          <option key={choice} value={choice}>
-                            {GUILD_CHOICE_LABELS[choice]}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="core-radio-cell" data-label="Solitario">
-                      <input
-                        type="radio"
-                        name={`group-${member.discordId}`}
-                        checked={member.groupMode === "SOLO"}
-                        disabled={locked}
-                        onChange={() => updateMember(member.discordId, { groupMode: "SOLO", groupTag: "" })}
-                        aria-label="Solitario"
-                      />
-                    </td>
-                    <td className="core-radio-cell" data-label="En grupo">
-                      <input
-                        type="radio"
-                        name={`group-${member.discordId}`}
-                        checked={member.groupMode === "GROUP"}
-                        disabled={locked}
-                        onChange={() => updateMember(member.discordId, { groupMode: "GROUP" })}
-                        aria-label="En grupo"
-                      />
-                    </td>
-                    <td data-label="Etiqueta">
-                      <input
-                        key={`tag-${member.discordId}-${member.groupTag}`}
-                        className="core-input"
-                        list="core-guild-tags"
-                        defaultValue={member.groupTag}
-                        disabled={locked}
-                        placeholder="Sin etiqueta (solitario)"
-                        onBlur={(e) => {
-                          const value = e.target.value.trim();
-                          updateMember(member.discordId, {
-                            groupTag: value,
-                            groupMode: value ? "GROUP" : "SOLO",
-                          });
-                        }}
-                      />
-                    </td>
-                    <td data-label="Wallet">
-                      <div className="core-wallet-toggle">
-                        {WALLET_OPTIONS.map((option) => (
-                          <button
-                            key={option.value}
-                            type="button"
-                            disabled={locked}
-                            className={`core-wallet-btn${member.walletType === option.value ? " active" : ""}`}
-                            onClick={() => updateMember(member.discordId, { walletType: option.value })}
-                          >
-                            {option.label}
-                          </button>
-                        ))}
-                      </div>
-                    </td>
-                    <td data-label="">
-                      {!locked && !member.inCore && (
-                        <button
-                          className="btn btn-ghost btn-sm"
-                          onClick={() => removeMember(member.discordId)}
-                        >
-                          Quitar
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-              {filteredMembers.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="core-muted">
-                    {search.trim()
-                      ? "Ningún miembro coincide con la búsqueda."
-                      : "Nadie tiene el rol [SD] Core todavía."}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {filteredMembers.length > 0 && (
-          <div className="core-pagination">
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage <= 1}
-              aria-label="Hoja anterior"
-            >
-              <ChevronLeft size={14} />
-            </button>
-            <span className="core-pagination-info">
-              Hoja {currentPage} de {totalPages} · {filteredMembers.length} miembro(s)
-            </span>
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage >= totalPages}
-              aria-label="Hoja siguiente"
-            >
-              <ChevronRight size={14} />
-            </button>
-          </div>
-        )}
-      </section>
-
-      {/* ---------- Sección 2: organizador de parties ---------- */}
-      <section className="core-guild-section">
-        <h2 className="campo-label">Organizador de parties</h2>
-
-        <StatsBar players={allPlayers} parties={partyViews} unassignedCount={unassigned.length} completeCount={completeCount} />
-
-        <SlotPicker compositions={compositions} onChange={setCompositions} />
+        <h2 className="campo-label">Organización de Grupos</h2>
+        <p className="core-guild-status">
+          {members.length} miembro(s) · {activeMembers.length - unassigned.length} en grupos · {unassigned.length} solos
+        </p>
 
         <div className="campo-actions">
           <button className="btn btn-primary" onClick={handleOrganize} disabled={locked}>
             <Wand2 size={14} />
-            Organizar parties
+            Agrupar por etiqueta
           </button>
           <button className="btn btn-secondary" onClick={() => addParty()} disabled={locked}>
             <FolderPlus size={14} />
-            Nueva party
+            Agregar grupo
           </button>
           <button
             className="btn btn-secondary"
@@ -561,22 +287,22 @@ function CoreGuildManagerInner({ roster, saved, channels }: CoreGuildManagerProp
             disabled={locked || parties.every((p) => p.locked)}
           >
             <Eraser size={14} />
-            Limpiar parties
+            Limpiar grupos
           </button>
           <button className="btn btn-ghost" onClick={collapseAllParties} disabled={parties.length === 0}>
             <Minimize2 size={14} />
-            Colapsar todas
+            Colapsar todos
           </button>
           <button className="btn btn-ghost" onClick={expandAllParties} disabled={parties.length === 0}>
             <Maximize2 size={14} />
-            Expandir todas
+            Expandir todos
           </button>
         </div>
         {organizeMsg && <p className="suggest-msg">{organizeMsg}</p>}
 
         <div className="pool-section">
           <div className="pool-header">
-            <span className="pool-title">Sin asignar</span>
+            <span className="pool-title">Solos</span>
           </div>
           <div
             className={`player-pool ${selected?.kind === "player" ? "player-pool--armed" : ""}`}
@@ -584,7 +310,7 @@ function CoreGuildManagerInner({ roster, saved, channels }: CoreGuildManagerProp
             onDrop={(e) => handleZoneDrop(e, null)}
             onClick={() => handleZoneClick(null)}
             role="list"
-            aria-label="Miembros sin asignar. Toca un miembro seleccionado para moverlo acá."
+            aria-label="Miembros solos. Toca un miembro seleccionado para moverlo acá."
           >
             {unassigned.map((m) => (
               <CoreMemberChip
@@ -602,11 +328,15 @@ function CoreGuildManagerInner({ roster, saved, channels }: CoreGuildManagerProp
 
         {parties.length > 0 && (
           <div className="parties-grid">
-            {partyViews.map((party) => {
+            {parties.map((party) => {
+              const partyMembers = activeMembers.filter((m) => m.partyId === party.id);
+              const partyView = toPartyView(party, partyMembers.length);
               const guildId = guildIdForParty(party.id);
               const guildName = guildId ? guilds.find((g) => g.id === guildId)?.name : null;
               const partyLocked = party.locked;
               const editable = !locked && !partyLocked;
+              const roleStatus = roleState[party.id] ?? { status: "idle" as const };
+              const existingRoleId = teamRoles[party.id];
               return (
                 <div key={party.id} className={partyLocked ? "core-party-wrapper core-party-wrapper--locked" : "core-party-wrapper"}>
                   <div className="core-party-hint-row">
@@ -634,12 +364,13 @@ function CoreGuildManagerInner({ roster, saved, channels }: CoreGuildManagerProp
                     </div>
                   </div>
                   <PartyCard
-                    party={party}
-                    members={activeMembers.filter((m) => m.partyId === party.id).map(toPlayerView)}
+                    party={partyView}
+                    members={partyMembers.map(toPlayerView)}
                     onDrop={handleZoneDrop}
                     onClickAssign={() => handleZoneClick(party.id)}
                     onRemovePlayer={(id) => editable && assignToParty(id, null)}
                     collapsible
+                    hideRoleWarnings
                     expanded={!collapsedPartyIds.has(party.id)}
                     onToggleExpanded={() => togglePartyCollapsed(party.id)}
                     renderName={() => (
@@ -672,6 +403,29 @@ function CoreGuildManagerInner({ roster, saved, channels }: CoreGuildManagerProp
                       );
                     }}
                   />
+                  <div className="core-party-role-row">
+                    {existingRoleId ? (
+                      <span className="friend-team-role-badge">
+                        <ShieldPlus size={13} /> Rol ya creado
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        disabled={!partyLocked || partyMembers.length === 0 || roleStatus.status === "loading"}
+                        onClick={() => handleCreateRole(party, partyMembers)}
+                        title={
+                          partyLocked
+                            ? "Crear el rol en Discord y asignárselo a todo el grupo"
+                            : "Marcá el grupo como lista primero"
+                        }
+                      >
+                        <ShieldPlus size={13} />
+                        {roleStatus.status === "loading" ? "Creando rol…" : "Crear rol"}
+                      </button>
+                    )}
+                    {roleStatus.status === "error" && <p className="campo-error">{roleStatus.error}</p>}
+                  </div>
                 </div>
               );
             })}
@@ -679,20 +433,7 @@ function CoreGuildManagerInner({ roster, saved, channels }: CoreGuildManagerProp
         )}
       </section>
 
-      {/* ---------- Sección 3: amigos ---------- */}
-      <FriendTeamsSection
-        teams={friendTeams}
-        parties={parties}
-        guilds={guilds}
-        teamRoles={teamRoles}
-        locked={locked}
-        onRoleCreated={setTeamRole}
-        onAssignPartyToGuild={assignPartyToGuild}
-        guildIdForParty={guildIdForParty}
-        onCreateParty={addParty}
-      />
-
-      {/* ---------- Sección 4: guilds ---------- */}
+      {/* ---------- Guilds ---------- */}
       <section className="core-guild-section">
         <h2 className="campo-label">Guilds</h2>
 

@@ -1,14 +1,12 @@
 /**
- * Lee los grupos de amigos que ya están bloqueados (candado cerrado en
- * todas sus parties) en el board de Core Guild — para ofrecerlos como
+ * Lee los grupos que ya están bloqueados (candado cerrado) en
+ * /admin/core-guild — Organización de Grupos — para ofrecerlos como
  * opciones en el paso "¿vienes con un grupo de amigos?" de la encuesta de
  * Discord (ver survey-interactions.ts). Solo grupos ya bloqueados, no
- * cualquier etiqueta cargada: mismo criterio que la sección Amigos del
- * admin para saber cuándo un equipo está "terminado".
+ * cualquier etiqueta cargada: recién ahí el admin los considera "listos".
  */
 
 import { prisma } from "@/lib/prisma";
-import { computeFriendTeams } from "./friend-teams";
 import { emptyCoreGuildBoardData, type CoreGuildBoardData } from "./types";
 
 export interface ExistingGroup {
@@ -20,7 +18,11 @@ export async function listExistingGroupTags(): Promise<ExistingGroup[]> {
   const board = await prisma.coreGuildBoard.findFirst();
   const data = (board?.data as CoreGuildBoardData | undefined) ?? emptyCoreGuildBoardData();
 
-  return computeFriendTeams(data.members, data.parties)
-    .filter((team) => team.allLocked)
-    .map((team) => ({ tag: team.name, count: team.members.length }));
+  return data.parties
+    .filter((party) => party.locked)
+    .map((party) => ({
+      tag: party.name,
+      count: data.members.filter((m) => m.inCore && m.partyId === party.id).length,
+    }))
+    .filter((group) => group.count > 0);
 }

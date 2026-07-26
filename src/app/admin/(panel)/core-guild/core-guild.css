@@ -498,6 +498,12 @@
   font-weight: 600;
 }
 
+.guild-add-party-select {
+  width: 100%;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
 .guild-role-sync {
   display: flex;
   flex-wrap: wrap;
@@ -574,90 +580,11 @@
   min-width: 140px;
 }
 
-/* ---------- Amigos: equipos agrupados por etiqueta ---------- */
-.friend-team-new-party {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-  margin: 10px 0 16px;
-}
-.friend-team-new-party .core-input {
-  width: auto;
-  flex: 1;
-  min-width: 180px;
-}
-
-.friend-teams-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 12px;
-  margin-top: 10px;
-}
-
-.friend-team-card {
-  border: 1px solid var(--pb-border);
-  border-radius: var(--pb-radius);
-  background: var(--pb-surface-1);
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.friend-team-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-}
-.friend-team-name {
-  font-weight: 600;
-  font-size: 14px;
-}
-.friend-team-count {
-  font-size: 11px;
-  color: var(--pb-text-muted);
-  white-space: nowrap;
-}
-
-.friend-team-parties {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-.friend-team-party-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--pb-text-secondary);
-}
-.friend-team-party-name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.friend-team-party-count {
-  color: var(--pb-text-muted);
-  flex-shrink: 0;
-}
-
-.friend-team-warning {
-  font-size: 11px;
-  color: var(--pb-accent-hover);
-  margin: 0;
-}
-
-.friend-team-footer {
-  margin-top: auto;
-  padding-top: 4px;
-  border-top: 1px solid var(--pb-border);
+/* ---------- Crear rol de Discord por grupo (Organización de Grupos) ---------- */
+.core-party-role-row {
+  margin-top: 6px;
+  padding: 6px 2px 0;
+  border-top: 1px dashed var(--pb-border);
 }
 .friend-team-role-badge {
   display: inline-flex;
