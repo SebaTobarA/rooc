@@ -46,7 +46,7 @@ function toPlayerView(member: CoreMember): Player {
 // real (no hay composición por rol acá): se recalcula como members.length
 // para que PartyCard siempre la muestre como "completa".
 function toPartyView(party: CorePartySlot, memberCount: number): Party & { locked: boolean } {
-  return { ...party, campo: null, capacity: Math.max(memberCount, 1) };
+  return { ...party, campo: null, raidId: null, capacity: Math.max(memberCount, 1) };
 }
 
 interface CoreGuildManagerProps {

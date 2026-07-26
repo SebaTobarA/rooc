@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
-import type { Player, Party, SlotLabel, Role, ImportResult } from "@/types/party";
+import { useState, useCallback, useEffect, useRef } from "react";
+import type { Player, Party, Raid, SlotLabel, Role, ImportResult } from "@/types/party";
 import { parseEntries } from "@/lib/party/parse-entries";
 import {
   inferRole,
@@ -30,8 +30,10 @@ const ROLE_ORDER: Record<Role, number> = {
 
 // 16 parties totales en Guild League = 8 por campo. Emperium Overrun no
 // tiene campos, así que assignPartyCampo/applySavedComposition nunca se
-// llaman ahí.
+// llaman ahí — en cambio agrupa sus parties en raids (ver más abajo), con
+// el mismo tope de 8 parties por contenedor.
 const MAX_PARTIES_PER_CAMPO = 8;
+const MAX_PARTIES_PER_RAID = 8;
 
 const uidRef = { current: 0 };
 function nextId(prefix: string): string {
@@ -59,6 +61,138 @@ function pickUnique(pool: Player[], usedClasses: Set<string>): Player | undefine
   return undefined;
 }
 
+interface FillResult {
+  parties: Party[];
+  assignments: Record<string, string>;
+  roleOverrides: Record<string, Role>;
+  cappedOut: boolean;
+}
+
+// Núcleo del armado por composición (rol/clase, con Lord Knight de tanque
+// de emergencia, máx. 1 músico + 1 healer por party) — usado tanto por
+// organizeParties (todo el pool, reemplaza todas las parties) como por
+// organizeRaid (solo el pool sin asignar, agrega parties nuevas a un raid
+// puntual). No toca estado de React, solo calcula.
+function fillPartiesFromPool(
+  pool: Player[],
+  comps: SlotLabel[][],
+  maxNewParties: number | undefined,
+  namePrefix: string,
+  startIndex: number,
+  raidId: string | null
+): FillResult {
+  const lordKnights = pool.filter((p) => p.rol === "DPS" && isLordKnight(p.clase)).slice();
+  const musicianPool = pool.filter((p) => p.rol === "Support" && isMusicianClass(p.clase)).slice();
+  const healerPool = pool.filter((p) => p.rol === "Support" && isHealerClass(p.clase)).slice();
+  const creatorPool = pool.filter((p) => p.rol === "Support" && isCreatorClass(p.clase)).slice();
+  const byRole: Record<Role, Player[]> = {
+    Tank: pool.filter((p) => p.rol === "Tank").slice(),
+    DPS: pool.filter((p) => p.rol === "DPS" && !isLordKnight(p.clase)).slice(),
+    Support: [],
+    Flexible: pool.filter((p) => p.rol === "Flexible").slice(),
+  };
+
+  const newParties: Party[] = [];
+  const assignments: Record<string, string> = {};
+  const roleOverrides: Record<string, Role> = {};
+  let index = startIndex;
+  let cappedOut = false;
+
+  for (;;) {
+    if (maxNewParties !== undefined && newParties.length >= maxNewParties) {
+      cappedOut = true;
+      break;
+    }
+
+    const currentSlots = comps[newParties.length % comps.length];
+    const quota = computeQuota(currentSlots);
+    const partySize = currentSlots.length;
+
+    const remaining =
+      byRole.Tank.length +
+      byRole.DPS.length +
+      lordKnights.length +
+      musicianPool.length +
+      healerPool.length +
+      creatorPool.length +
+      byRole.Flexible.length;
+
+    if (remaining === 0) break;
+
+    // Detener cuando ya no hay jugadores para los roles esenciales (Tank / Soporte).
+    // Los DPS sobrantes quedan sin asignar para que "Sugerir distribución" los coloque.
+    const hasEssentialTank = quota.Tank === 0 || byRole.Tank.length + lordKnights.length > 0;
+    const supportLeft = musicianPool.length + healerPool.length + creatorPool.length;
+    const hasEssentialSupport = quota.Support === 0 || supportLeft > 0;
+
+    if (!hasEssentialTank || !hasEssentialSupport) break;
+
+    index++;
+    const party: Party = {
+      id: nextId("party"),
+      name: `${namePrefix} ${index}`,
+      capacity: partySize,
+      campo: null,
+      raidId,
+    };
+    const usedClasses = new Set<string>();
+
+    // Tank: Paladines primero, LKs de emergencia
+    for (let i = 0; i < quota.Tank; i++) {
+      const real = pickUnique(byRole.Tank, usedClasses);
+      if (real) {
+        assignments[real.id] = party.id;
+      } else {
+        const lk = pickUnique(lordKnights, usedClasses);
+        if (lk) {
+          assignments[lk.id] = party.id;
+          roleOverrides[lk.id] = "Tank";
+        }
+      }
+    }
+
+    // Soporte: max 1 músico + max 1 healer por party; Creator como comodín
+    let usedMusician = false;
+    let usedHealer = false;
+    for (let i = 0; i < quota.Support; i++) {
+      let p: Player | undefined;
+      if (!usedMusician && musicianPool.length > 0) {
+        p = pickUnique(musicianPool, usedClasses);
+        usedMusician = true;
+      } else if (!usedHealer && healerPool.length > 0) {
+        p = pickUnique(healerPool, usedClasses);
+        usedHealer = true;
+      } else {
+        p = pickUnique(creatorPool, usedClasses);
+      }
+      if (p) assignments[p.id] = party.id;
+    }
+
+    // DPS: regulares primero, LKs restantes
+    for (let i = 0; i < quota.DPS; i++) {
+      const p = pickUnique(byRole.DPS, usedClasses) ?? pickUnique(lordKnights, usedClasses);
+      if (p) assignments[p.id] = party.id;
+    }
+
+    // Flexible: Creators de comodín, luego el resto
+    for (let i = 0; i < quota.Flexible; i++) {
+      const p =
+        pickUnique(byRole.Flexible, usedClasses) ??
+        pickUnique(creatorPool, usedClasses) ??
+        pickUnique(byRole.DPS, usedClasses) ??
+        pickUnique(lordKnights, usedClasses) ??
+        pickUnique(musicianPool, usedClasses) ??
+        pickUnique(healerPool, usedClasses) ??
+        pickUnique(byRole.Tank, usedClasses);
+      if (p) assignments[p.id] = party.id;
+    }
+
+    newParties.push(party);
+  }
+
+  return { parties: newParties, assignments, roleOverrides, cappedOut };
+}
+
 export interface UseCampoOptions {
   maxPlayers?: number; // alerta si se supera en importación
   minPlayers?: number; // alerta si no se alcanza en organización
@@ -68,6 +202,7 @@ export interface UseCampoOptions {
 export interface UseCampoReturn {
   players: Player[];
   parties: Party[];
+  raids: Raid[];
   compositions: SlotLabel[][];
   setCompositions: (c: SlotLabel[][]) => void;
   importPlayers: (raw: string) => ImportResult;
@@ -80,6 +215,12 @@ export interface UseCampoReturn {
   removePlayer: (playerId: string) => void;
   addParty: () => string | null; // null = ok, string = error
   applySavedComposition: (groups: { campo: Party["campo"]; players: Player[] }[]) => string | null;
+  addRaid: (name?: string) => void;
+  removeRaid: (raidId: string) => void;
+  updateRaidName: (raidId: string, name: string) => void;
+  updateRaidCompositions: (raidId: string, compositions: SlotLabel[][]) => void;
+  assignPartyToRaid: (partyId: string, raidId: string | null) => string | null; // null = ok, string = error
+  organizeRaid: (raidId: string) => string | null; // null = ok, string = error/aviso
   unassigned: Player[];
   completeCount: number;
   hasPlayers: boolean;
@@ -90,16 +231,24 @@ export function useCampo(initialSlots?: SlotLabel[], options: UseCampoOptions = 
 
   const [players, setPlayers] = useState<Player[]>([]);
   const [parties, setParties] = useState<Party[]>([]);
+  const [raids, setRaids] = useState<Raid[]>([]);
   const [compositions, setCompositionsState] = useState<SlotLabel[][]>([
     initialSlots ?? [...DEFAULT_SLOTS],
   ]);
 
   const playersRef = useRef<Player[]>(players);
   const partiesRef = useRef<Party[]>(parties);
+  const raidsRef = useRef<Raid[]>(raids);
   const compositionsRef = useRef<SlotLabel[][]>(compositions);
-  playersRef.current = players;
-  partiesRef.current = parties;
-  compositionsRef.current = compositions;
+  // Los callbacks estables (useCallback sin estas deps) necesitan leer el
+  // valor más reciente sin recrearse — se sincroniza en un efecto en vez de
+  // durante el render, que React desaconseja mutar refs directamente ahí.
+  useEffect(() => {
+    playersRef.current = players;
+    partiesRef.current = parties;
+    raidsRef.current = raids;
+    compositionsRef.current = compositions;
+  });
 
   const unassigned = players.filter((p) => !p.partyId);
   const hasPlayers = players.length > 0;
@@ -201,126 +350,23 @@ export function useCampo(initialSlots?: SlotLabel[], options: UseCampoOptions = 
       return `Se necesitan al menos ${minPlayers} jugadores para organizar parties (actualmente hay ${all.length}).`;
     }
 
-    const comps = compositionsRef.current;
+    const result = fillPartiesFromPool(all, compositionsRef.current, maxParties, "Party", 0, null);
 
-    const lordKnights = all.filter((p) => p.rol === "DPS" && isLordKnight(p.clase)).slice();
-    const musicianPool = all.filter((p) => p.rol === "Support" && isMusicianClass(p.clase)).slice();
-    const healerPool = all.filter((p) => p.rol === "Support" && isHealerClass(p.clase)).slice();
-    const creatorPool = all.filter((p) => p.rol === "Support" && isCreatorClass(p.clase)).slice();
-    const byRole: Record<Role, Player[]> = {
-      Tank: all.filter((p) => p.rol === "Tank").slice(),
-      DPS: all.filter((p) => p.rol === "DPS" && !isLordKnight(p.clase)).slice(),
-      Support: [],
-      Flexible: all.filter((p) => p.rol === "Flexible").slice(),
-    };
-
-    const newParties: Party[] = [];
-    const assignments: Record<string, string> = {};
-    const roleOverrides: Record<string, Role> = {};
-    let index = 0;
-    let cappedOut = false;
-
-    for (;;) {
-      if (maxParties !== undefined && newParties.length >= maxParties) {
-        cappedOut = true;
-        break;
-      }
-
-      const currentSlots = comps[index % comps.length];
-      const quota = computeQuota(currentSlots);
-      const partySize = currentSlots.length;
-
-      const remaining =
-        byRole.Tank.length +
-        byRole.DPS.length +
-        lordKnights.length +
-        musicianPool.length +
-        healerPool.length +
-        creatorPool.length +
-        byRole.Flexible.length;
-
-      if (remaining === 0) break;
-
-      // Detener cuando ya no hay jugadores para los roles esenciales (Tank / Soporte).
-      // Los DPS sobrantes quedan sin asignar para que "Sugerir distribución" los coloque.
-      const hasEssentialTank = quota.Tank === 0 || byRole.Tank.length + lordKnights.length > 0;
-      const supportLeft = musicianPool.length + healerPool.length + creatorPool.length;
-      const hasEssentialSupport = quota.Support === 0 || supportLeft > 0;
-
-      if (!hasEssentialTank || !hasEssentialSupport) break;
-
-      index++;
-      const party: Party = { id: nextId("party"), name: `Party ${index}`, capacity: partySize, campo: null };
-      const usedClasses = new Set<string>();
-
-      // Tank: Paladines primero, LKs de emergencia
-      for (let i = 0; i < quota.Tank; i++) {
-        const real = pickUnique(byRole.Tank, usedClasses);
-        if (real) {
-          assignments[real.id] = party.id;
-        } else {
-          const lk = pickUnique(lordKnights, usedClasses);
-          if (lk) {
-            assignments[lk.id] = party.id;
-            roleOverrides[lk.id] = "Tank";
-          }
-        }
-      }
-
-      // Soporte: max 1 músico + max 1 healer por party; Creator como comodín
-      let usedMusician = false;
-      let usedHealer = false;
-      for (let i = 0; i < quota.Support; i++) {
-        let p: Player | undefined;
-        if (!usedMusician && musicianPool.length > 0) {
-          p = pickUnique(musicianPool, usedClasses);
-          usedMusician = true;
-        } else if (!usedHealer && healerPool.length > 0) {
-          p = pickUnique(healerPool, usedClasses);
-          usedHealer = true;
-        } else {
-          p = pickUnique(creatorPool, usedClasses);
-        }
-        if (p) assignments[p.id] = party.id;
-      }
-
-      // DPS: regulares primero, LKs restantes
-      for (let i = 0; i < quota.DPS; i++) {
-        const p = pickUnique(byRole.DPS, usedClasses) ?? pickUnique(lordKnights, usedClasses);
-        if (p) assignments[p.id] = party.id;
-      }
-
-      // Flexible: Creators de comodín, luego el resto
-      for (let i = 0; i < quota.Flexible; i++) {
-        const p =
-          pickUnique(byRole.Flexible, usedClasses) ??
-          pickUnique(creatorPool, usedClasses) ??
-          pickUnique(byRole.DPS, usedClasses) ??
-          pickUnique(lordKnights, usedClasses) ??
-          pickUnique(musicianPool, usedClasses) ??
-          pickUnique(healerPool, usedClasses) ??
-          pickUnique(byRole.Tank, usedClasses);
-        if (p) assignments[p.id] = party.id;
-      }
-
-      newParties.push(party);
-    }
-
-    if (newParties.length === 0) {
+    if (result.parties.length === 0) {
       return "No hay suficientes jugadores para armar al menos una party con esa composición.";
     }
 
-    setParties(newParties);
+    setParties(result.parties);
     setPlayers((prev) =>
       prev.map((p) => ({
         ...p,
-        partyId: assignments[p.id] ?? null,
-        ...(roleOverrides[p.id] ? { rol: roleOverrides[p.id] } : {}),
+        partyId: result.assignments[p.id] ?? null,
+        ...(result.roleOverrides[p.id] ? { rol: result.roleOverrides[p.id] } : {}),
       }))
     );
 
-    if (cappedOut) {
-      const leftover = all.length - Object.keys(assignments).length;
+    if (result.cappedOut) {
+      const leftover = all.length - Object.keys(result.assignments).length;
       if (leftover > 0) {
         return `Se alcanzó el límite de ${maxParties} parties — ${leftover} jugador(es) quedaron sin asignar.`;
       }
@@ -370,6 +416,7 @@ export function useCampo(initialSlots?: SlotLabel[], options: UseCampoOptions = 
         name: `Party ${existingCount + gi + 1} (sugerida)`,
         capacity: targetSize,
         campo: null,
+        raidId: null,
       };
       newParties.push(party);
       group.forEach((p) => {
@@ -456,7 +503,7 @@ export function useCampo(initialSlots?: SlotLabel[], options: UseCampoOptions = 
     }
     setParties((prev) => [
       ...prev,
-      { id: nextId("party"), name: `Party ${prev.length + 1}`, capacity: 12, campo: null },
+      { id: nextId("party"), name: `Party ${prev.length + 1}`, capacity: 12, campo: null, raidId: null },
     ]);
     return null;
   }, [maxParties]);
@@ -499,6 +546,7 @@ export function useCampo(initialSlots?: SlotLabel[], options: UseCampoOptions = 
           name: `Party ${existingCount + gi + 1}`,
           capacity: group.players.length,
           campo,
+          raidId: null,
         };
         newParties.push(party);
         group.players.forEach((p) => {
@@ -514,9 +562,86 @@ export function useCampo(initialSlots?: SlotLabel[], options: UseCampoOptions = 
     [maxParties]
   );
 
+  const addRaid = useCallback((name?: string) => {
+    setRaids((prev) => [
+      ...prev,
+      { id: nextId("raid"), name: name?.trim() || `Raid ${prev.length + 1}`, compositions: [[...DEFAULT_SLOTS]] },
+    ]);
+  }, []);
+
+  const removeRaid = useCallback((raidId: string) => {
+    setRaids((prev) => prev.filter((r) => r.id !== raidId));
+    setParties((prev) => prev.map((p) => (p.raidId === raidId ? { ...p, raidId: null } : p)));
+  }, []);
+
+  const updateRaidName = useCallback((raidId: string, name: string) => {
+    setRaids((prev) => prev.map((r) => (r.id === raidId ? { ...r, name } : r)));
+  }, []);
+
+  const updateRaidCompositions = useCallback((raidId: string, comps: SlotLabel[][]) => {
+    setRaids((prev) =>
+      prev.map((r) => (r.id === raidId ? { ...r, compositions: comps.length > 0 ? comps : [[...DEFAULT_SLOTS]] } : r))
+    );
+  }, []);
+
+  // Asigna (o quita, con raidId null) una party completa a un raid — mismo
+  // criterio de tope que assignPartyCampo, pero contra la lista dinámica de
+  // raids en vez de los dos campos fijos.
+  const assignPartyToRaid = useCallback((partyId: string, raidId: string | null): string | null => {
+    if (raidId !== null) {
+      const countInRaid = partiesRef.current.filter((p) => p.raidId === raidId && p.id !== partyId).length;
+      if (countInRaid >= MAX_PARTIES_PER_RAID) {
+        const raid = raidsRef.current.find((r) => r.id === raidId);
+        return `${raid?.name ?? "Ese raid"} ya tiene ${MAX_PARTIES_PER_RAID} parties — ese es el máximo.`;
+      }
+    }
+    setParties((prev) => prev.map((p) => (p.id === partyId ? { ...p, raidId } : p)));
+    return null;
+  }, []);
+
+  // Arma parties nuevas directo dentro de un raid, usando SU composición
+  // propia — a diferencia de organizeParties (que reemplaza TODAS las
+  // parties usando la composición global), esto solo toma del pool sin
+  // asignar y agrega, sin tocar nada que ya esté organizado en otro lado.
+  const organizeRaid = useCallback((raidId: string): string | null => {
+    const raid = raidsRef.current.find((r) => r.id === raidId);
+    if (!raid) return "Ese raid ya no existe.";
+
+    const currentCount = partiesRef.current.filter((p) => p.raidId === raidId).length;
+    const capacity = MAX_PARTIES_PER_RAID - currentCount;
+    if (capacity <= 0) {
+      return `${raid.name} ya tiene ${MAX_PARTIES_PER_RAID} parties — ese es el máximo.`;
+    }
+
+    const pool = playersRef.current.filter((p) => !p.partyId);
+    if (pool.length === 0) {
+      return "No hay jugadores sin asignar para organizar este raid.";
+    }
+
+    const result = fillPartiesFromPool(pool, raid.compositions, capacity, `${raid.name} - Party`, currentCount, raidId);
+    if (result.parties.length === 0) {
+      return "No hay suficientes jugadores sin asignar para armar al menos una party con esa composición.";
+    }
+
+    setParties((prev) => [...prev, ...result.parties]);
+    setPlayers((prev) =>
+      prev.map((p) =>
+        result.assignments[p.id]
+          ? { ...p, partyId: result.assignments[p.id], ...(result.roleOverrides[p.id] ? { rol: result.roleOverrides[p.id] } : {}) }
+          : p
+      )
+    );
+
+    if (result.cappedOut) {
+      return `${raid.name} llegó al máximo de ${MAX_PARTIES_PER_RAID} parties — algunos jugadores sin asignar quedaron pendientes.`;
+    }
+    return null;
+  }, []);
+
   return {
     players,
     parties,
+    raids,
     compositions,
     setCompositions,
     importPlayers,
@@ -529,6 +654,12 @@ export function useCampo(initialSlots?: SlotLabel[], options: UseCampoOptions = 
     removePlayer,
     addParty,
     applySavedComposition,
+    addRaid,
+    removeRaid,
+    updateRaidName,
+    updateRaidCompositions,
+    assignPartyToRaid,
+    organizeRaid,
     unassigned,
     completeCount,
     hasPlayers,
