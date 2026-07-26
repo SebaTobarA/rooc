@@ -21,6 +21,9 @@ import {
   buildFriendGroupQuestionComponents,
   buildGuildSelectComponents,
   buildNewGroupModal,
+  buildSurveyConfirmationEmbed,
+  buildSurveyErrorEmbed,
+  buildSurveyStepEmbed,
 } from "@/lib/discord-core-guild-survey-embed";
 import { GUILD_CHOICE_LABELS, GUILD_CHOICE_OPTIONS } from "./guild-choice";
 import { listExistingGroupTags } from "./survey-groups";
@@ -49,9 +52,9 @@ function parseGuildChoice(value: string | undefined): GuildChoice | null {
   return value && (GUILD_CHOICE_OPTIONS as string[]).includes(value) ? (value as GuildChoice) : null;
 }
 
-async function safeEdit(token: string, content: string) {
+async function safeEdit(token: string, message: string) {
   try {
-    await editInteractionOriginal(token, { content, components: [] });
+    await editInteractionOriginal(token, { embeds: [buildSurveyErrorEmbed(message)], components: [] });
   } catch {
     // Si ni siquiera esto funciona no queda mucho más por hacer.
   }
@@ -86,27 +89,30 @@ export async function handleCoreGuildSurveyComponent(interaction: SurveyComponen
 
   if (step === "guild") {
     if (parts[2] === "n") {
-      return Response.json({ type: 4, data: { flags: 64, content: NOT_IN_GUILD_MESSAGE } });
+      return Response.json({ type: 4, data: { flags: 64, embeds: [buildSurveyStepEmbed(NOT_IN_GUILD_MESSAGE)] } });
     }
     return Response.json({
       type: 4,
-      data: { flags: 64, content: "¿Cuál guild?", components: buildGuildSelectComponents() },
+      data: { flags: 64, embeds: [buildSurveyStepEmbed("¿Cuál guild?")], components: buildGuildSelectComponents() },
     });
   }
 
   if (step === "guildsel") {
     const guild = parseGuildChoice(interaction.data.values?.[0]);
-    if (!guild) return Response.json({ type: 7, data: { content: RESTART_MESSAGE, components: [] } });
+    if (!guild) return Response.json({ type: 7, data: { embeds: [buildSurveyErrorEmbed(RESTART_MESSAGE)], components: [] } });
     return Response.json({
       type: 7,
-      data: { content: "¿Vienes con un grupo de amigos?", components: buildFriendGroupQuestionComponents(guild) },
+      data: {
+        embeds: [buildSurveyStepEmbed("¿Vienes con un grupo de amigos?")],
+        components: buildFriendGroupQuestionComponents(guild),
+      },
     });
   }
 
   if (step === "fr") {
     const answer = parts[2];
     const guild = parseGuildChoice(parts[3]);
-    if (!guild) return Response.json({ type: 7, data: { content: RESTART_MESSAGE, components: [] } });
+    if (!guild) return Response.json({ type: 7, data: { embeds: [buildSurveyErrorEmbed(RESTART_MESSAGE)], components: [] } });
 
     if (answer === "new") {
       return Response.json({ type: 9, data: buildNewGroupModal(guild) });
@@ -117,7 +123,7 @@ export async function handleCoreGuildSurveyComponent(interaction: SurveyComponen
         try {
           await finalizeSurveyResponse(interaction.member, guild, { kind: "SOLO" });
           await editInteractionOriginal(token, {
-            content: `Listo ✅ Quedaste anotado en ${GUILD_CHOICE_LABELS[guild]} como jugador solitario.`,
+            embeds: [buildSurveyConfirmationEmbed(GUILD_CHOICE_LABELS[guild], "Solitario")],
             components: [],
           });
         } catch (err) {
@@ -133,13 +139,15 @@ export async function handleCoreGuildSurveyComponent(interaction: SurveyComponen
         const groups = await listExistingGroupTags();
         if (groups.length === 0) {
           await editInteractionOriginal(token, {
-            content: 'Todavía no hay grupos creados — volvé a elegir "Mi grupo no está" para crear el primero.',
+            embeds: [
+              buildSurveyStepEmbed('Todavía no hay grupos creados — volvé a elegir "Mi grupo no está" para crear el primero.'),
+            ],
             components: [],
           });
           return;
         }
         await editInteractionOriginal(token, {
-          content: "¿Cuál es tu grupo?",
+          embeds: [buildSurveyStepEmbed("¿Cuál es tu grupo?")],
           components: buildExistingGroupSelectComponents(guild, groups),
         });
       } catch (err) {
@@ -152,13 +160,13 @@ export async function handleCoreGuildSurveyComponent(interaction: SurveyComponen
   if (step === "groupsel") {
     const guild = parseGuildChoice(parts[2]);
     const tag = interaction.data.values?.[0];
-    if (!guild || !tag) return Response.json({ type: 7, data: { content: RESTART_MESSAGE, components: [] } });
+    if (!guild || !tag) return Response.json({ type: 7, data: { embeds: [buildSurveyErrorEmbed(RESTART_MESSAGE)], components: [] } });
 
     after(async () => {
       try {
         await finalizeSurveyResponse(interaction.member, guild, { kind: "EXISTING", tag });
         await editInteractionOriginal(token, {
-          content: `Listo ✅ Quedaste anotado en ${GUILD_CHOICE_LABELS[guild]} con el grupo "${tag}".`,
+          embeds: [buildSurveyConfirmationEmbed(GUILD_CHOICE_LABELS[guild], tag)],
           components: [],
         });
       } catch (err) {
@@ -168,7 +176,7 @@ export async function handleCoreGuildSurveyComponent(interaction: SurveyComponen
     return Response.json({ type: 6 });
   }
 
-  return Response.json({ type: 4, data: { flags: 64, content: "Acción no reconocida." } });
+  return Response.json({ type: 4, data: { flags: 64, embeds: [buildSurveyErrorEmbed("Acción no reconocida.")] } });
 }
 
 export async function handleCoreGuildSurveyModalSubmit(interaction: SurveyModalInteraction): Promise<Response> {
@@ -178,14 +186,14 @@ export async function handleCoreGuildSurveyModalSubmit(interaction: SurveyModalI
   const token = interaction.token;
 
   if (!guild || !tag) {
-    return Response.json({ type: 4, data: { flags: 64, content: RESTART_MESSAGE } });
+    return Response.json({ type: 4, data: { flags: 64, embeds: [buildSurveyErrorEmbed(RESTART_MESSAGE)] } });
   }
 
   after(async () => {
     try {
       await finalizeSurveyResponse(interaction.member, guild, { kind: "NEW", tag });
       await editInteractionOriginal(token, {
-        content: `Listo ✅ Creaste el grupo "${tag}" y quedaste anotado en ${GUILD_CHOICE_LABELS[guild]}.`,
+        embeds: [buildSurveyConfirmationEmbed(GUILD_CHOICE_LABELS[guild], `${tag} (nuevo)`)],
         components: [],
       });
     } catch (err) {

@@ -33,12 +33,36 @@ function row(...components: DiscordActionRow["components"]): DiscordActionRow {
 export const NOT_IN_GUILD_MESSAGE =
   'Por favor en Guild busca "Spc" en el buscador de Guild y apuntate a SD3 de Petirrojo o a SD4 de Escuditto mientras se hacen las plazas.';
 
+const SURVEY_COLOR = 0x6fe0f5;
+const SUCCESS_COLOR = 0x57f287;
+const ERROR_COLOR = 0xed4245;
+
 export function buildSurveyStartEmbed(): DiscordEmbed {
   return {
     title: "📋 Organización de grupos — Core Guild",
     description:
       "Antes de armar los equipos necesitamos saber en qué guild estás y con quién venís.\n\n¿Estás en una de las Guild?",
-    color: 0x6fe0f5,
+    color: SURVEY_COLOR,
+  };
+}
+
+/** Embed genérico para los pasos intermedios (pregunta simple, sin campos). */
+export function buildSurveyStepEmbed(description: string): DiscordEmbed {
+  return { description, color: SURVEY_COLOR };
+}
+
+export function buildSurveyErrorEmbed(description: string): DiscordEmbed {
+  return { description, color: ERROR_COLOR };
+}
+
+export function buildSurveyConfirmationEmbed(guildLabel: string, groupLabel: string): DiscordEmbed {
+  return {
+    title: "✅ Registro completado",
+    color: SUCCESS_COLOR,
+    fields: [
+      { name: "Guild", value: guildLabel, inline: true },
+      { name: "Grupo", value: groupLabel, inline: true },
+    ],
   };
 }
 
