@@ -140,10 +140,13 @@ export function GuildCard({
       </p>
 
       <div className="guild-role-sync" onClick={(e) => e.stopPropagation()}>
+        {/* Sin `disabled={locked}`: sincronizar un rol es una acción real
+            contra Discord, no una edición del board — tiene que poder
+            hacerse aunque el board ya esté guardado, sin forzar al admin a
+            abrir "Editar" primero. */}
         <input
           className="core-input guild-role-input"
           defaultValue={guild.discordRoleId ?? ""}
-          disabled={locked}
           placeholder="ID de rol en Discord (ej. SD2)"
           onBlur={(e) => onUpdate({ discordRoleId: e.target.value.trim() || undefined })}
           aria-label={`ID de rol de Discord para ${guild.name}`}
@@ -151,7 +154,7 @@ export function GuildCard({
         <button
           type="button"
           className="btn btn-secondary btn-sm"
-          disabled={locked || !guild.discordRoleId?.trim() || totalMembers === 0 || syncState.status === "loading"}
+          disabled={!guild.discordRoleId?.trim() || totalMembers === 0 || syncState.status === "loading"}
           onClick={handleSyncRole}
           title="Asigna ese rol de Discord a todos los miembros que están en esta guild ahora mismo"
         >
