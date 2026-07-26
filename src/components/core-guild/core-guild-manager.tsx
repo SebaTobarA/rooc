@@ -31,6 +31,7 @@ import { SlotPicker } from "@/components/party/slot-picker";
 import { StatsBar } from "@/components/party/stats-bar";
 import { CoreMemberChip, type MoveTarget } from "@/components/core-guild/core-member-chip";
 import { GuildCard } from "@/components/core-guild/guild-card";
+import { FriendTeamsSection } from "@/components/core-guild/friend-teams-section";
 
 const WALLET_OPTIONS: { value: WalletType; label: string }[] = [
   { value: "F2P", label: "F2P" },
@@ -92,6 +93,9 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
     compositions,
     setCompositions,
     guilds,
+    teamRoles,
+    setTeamRole,
+    friendTeams,
     locked,
     saving,
     error,
@@ -475,7 +479,7 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
             <Wand2 size={14} />
             Organizar parties
           </button>
-          <button className="btn btn-secondary" onClick={addParty} disabled={locked}>
+          <button className="btn btn-secondary" onClick={() => addParty()} disabled={locked}>
             <FolderPlus size={14} />
             Nueva party
           </button>
@@ -603,7 +607,20 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
         )}
       </section>
 
-      {/* ---------- Sección 3: guilds ---------- */}
+      {/* ---------- Sección 3: amigos ---------- */}
+      <FriendTeamsSection
+        teams={friendTeams}
+        parties={parties}
+        guilds={guilds}
+        teamRoles={teamRoles}
+        locked={locked}
+        onRoleCreated={setTeamRole}
+        onAssignPartyToGuild={assignPartyToGuild}
+        guildIdForParty={guildIdForParty}
+        onCreateParty={addParty}
+      />
+
+      {/* ---------- Sección 4: guilds ---------- */}
       <section className="core-guild-section">
         <h2 className="campo-label">Guilds</h2>
 

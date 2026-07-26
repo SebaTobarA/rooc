@@ -53,4 +53,8 @@ export interface CoreGuildBoardData {
   parties: CorePartySlot[];
   compositions: SlotLabel[][];
   guilds: CoreGuild[];
+  // Etiqueta de equipo (en minúscula) -> ID del rol ya creado en Discord
+  // para ese equipo de amigos. Ausente/vacío en boards guardados antes de
+  // esta funcionalidad.
+  teamRoles: Record<string, string>;
 }

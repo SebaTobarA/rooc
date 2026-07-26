@@ -108,6 +108,24 @@ export const getGuildRolesCached = unstable_cache(getGuildRoles, ["guild-roles"]
 });
 
 /**
+ * Crea un rol nuevo en el server (ej. para identificar a un equipo de
+ * amigos en Core Guild) — el rol queda por debajo de la jerarquía del bot,
+ * así que después se le puede asignar a miembros con addGuildMemberRole sin
+ * problema de permisos.
+ */
+export async function createGuildRole(name: string): Promise<DiscordGuildRole> {
+  const response = await discordBotFetch(`/guilds/${getGuildId()}/roles`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  if (!response.ok) {
+    throw new Error(`No se pudo crear el rol en Discord (${response.status}).`);
+  }
+  return response.json();
+}
+
+/**
  * Asigna/quita un rol a un miembro puntual — usado para mantener sincronizada
  * la clase elegida en /panel/perfil con el rol real en Discord. Requiere que
  * el rol del bot esté por encima del rol de clase en la jerarquía del server

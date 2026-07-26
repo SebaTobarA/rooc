@@ -5,6 +5,7 @@ import type { SlotLabel } from "@/types/party";
 import type { CoreGuild, CoreGuildBoardData, CoreMember, CorePartySlot } from "./types";
 import type { CoreGuildRosterEntry } from "./sync";
 import { organizeCoreParties } from "./organize";
+import { computeFriendTeams } from "./friend-teams";
 import { saveCoreGuildBoard, unlockCoreGuildBoard } from "@/lib/actions/core-guild";
 
 const DEFAULT_COMPOSITION: SlotLabel[] = ["Tanque", "Soporte", "Daño", "Daño", "Daño"];
@@ -17,7 +18,7 @@ export interface SavedCoreGuildBoard {
 }
 
 function emptyBoard(): CoreGuildBoardData {
-  return { members: [], parties: [], compositions: [[...DEFAULT_COMPOSITION]], guilds: [] };
+  return { members: [], parties: [], compositions: [[...DEFAULT_COMPOSITION]], guilds: [], teamRoles: {} };
 }
 
 // Mezcla el roster fresco de Discord con lo último guardado: los miembros
@@ -73,6 +74,8 @@ export function useCoreGuildBoard(roster: CoreGuildRosterEntry[], saved: SavedCo
       parties: (base.parties ?? []).map((p) => ({ ...p, locked: p.locked ?? false })),
       compositions: base.compositions?.length ? base.compositions : [[...DEFAULT_COMPOSITION]],
       guilds: base.guilds ?? [],
+      // `teamRoles` tampoco existía antes de la sección Amigos.
+      teamRoles: base.teamRoles ?? {},
     };
     // Solo se recalcula al montar — reconciliar de nuevo en cada render
     // pisaría ediciones en curso del admin.
@@ -83,12 +86,18 @@ export function useCoreGuildBoard(roster: CoreGuildRosterEntry[], saved: SavedCo
   const [parties, setParties] = useState<CorePartySlot[]>(initial.parties);
   const [compositions, setCompositions] = useState<SlotLabel[][]>(initial.compositions);
   const [guilds, setGuilds] = useState<CoreGuild[]>(initial.guilds);
+  const [teamRoles, setTeamRoles] = useState<Record<string, string>>(initial.teamRoles);
   const [locked, setLocked] = useState(saved?.locked ?? false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   const activeMembers = members.filter((m) => m.inCore);
   const unassigned = activeMembers.filter((m) => !m.partyId);
+  const friendTeams = useMemo(() => computeFriendTeams(activeMembers, parties), [activeMembers, parties]);
+
+  const setTeamRole = useCallback((teamKey: string, roleId: string) => {
+    setTeamRoles((prev) => ({ ...prev, [teamKey]: roleId }));
+  }, []);
 
   const updateMember = useCallback((discordId: string, patch: Partial<CoreMember>) => {
     setMembers((prev) => prev.map((m) => (m.discordId === discordId ? { ...m, ...patch } : m)));
@@ -102,17 +111,20 @@ export function useCoreGuildBoard(roster: CoreGuildRosterEntry[], saved: SavedCo
     setMembers((prev) => prev.map((m) => (m.discordId === discordId ? { ...m, partyId } : m)));
   }, []);
 
-  const addParty = useCallback(() => {
-    setParties((prev) => [
-      ...prev,
-      {
-        id: `core_party_manual_${prev.length + 1}_${Date.now().toString(36)}`,
-        name: `Party ${prev.length + 1}`,
-        capacity: compositions[0]?.length ?? 5,
-        locked: false,
-      },
-    ]);
-  }, [compositions]);
+  const addParty = useCallback(
+    (name?: string) => {
+      setParties((prev) => [
+        ...prev,
+        {
+          id: `core_party_manual_${prev.length + 1}_${Date.now().toString(36)}`,
+          name: name?.trim() || `Party ${prev.length + 1}`,
+          capacity: compositions[0]?.length ?? 5,
+          locked: false,
+        },
+      ]);
+    },
+    [compositions]
+  );
 
   const removeParty = useCallback((partyId: string) => {
     setParties((prev) => prev.filter((p) => p.id !== partyId));
@@ -201,7 +213,7 @@ export function useCoreGuildBoard(roster: CoreGuildRosterEntry[], saved: SavedCo
     setSaving(true);
     setError("");
     try {
-      await saveCoreGuildBoard({ members, parties, compositions, guilds });
+      await saveCoreGuildBoard({ members, parties, compositions, guilds, teamRoles });
       setLocked(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo guardar.");
@@ -231,6 +243,9 @@ export function useCoreGuildBoard(roster: CoreGuildRosterEntry[], saved: SavedCo
     compositions,
     setCompositions,
     guilds,
+    teamRoles,
+    setTeamRole,
+    friendTeams,
     locked,
     saving,
     error,
