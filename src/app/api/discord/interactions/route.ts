@@ -124,7 +124,14 @@ async function handleComponent(interaction: Required<DiscordInteraction>) {
   if (requiredRoleId && !interaction.member.roles.includes(requiredRoleId)) {
     return Response.json({
       type: 4,
-      data: { flags: 64, content: "No tienes el rol de guild necesario para anotarte en este canal." },
+      data: {
+        flags: 64,
+        // Se nombra el rol con <@&id> (Discord lo renderiza con su nombre
+        // real) en vez de un "te falta el rol" genérico — si no, esto se
+        // confunde con que las inscripciones estén cerradas.
+        content: `Para anotarte en este canal necesitas el rol <@&${requiredRoleId}>. Pídeselo a un oficial y vuelve a intentarlo.`,
+        allowed_mentions: { parse: [] },
+      },
     });
   }
 

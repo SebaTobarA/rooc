@@ -112,7 +112,15 @@ export async function updateEventSignupsCloseAt(id: string, formData: FormData) 
   if (!date || !time) throw new Error("Elige la fecha y hora de cierre.");
 
   const signupsCloseAt = new Date(`${date}T${time}:00-03:00`);
-  await prisma.event.update({ where: { id }, data: { signupsCloseAt } });
+  const event = await prisma.event.update({ where: { id }, data: { signupsCloseAt } });
+
+  // El embed publicado muestra hasta cuándo se aceptan inscripciones, así
+  // que hay que reescribirlo — si no, en Discord sigue figurando el plazo
+  // viejo aunque el botón ya acepte (o rechace) gente con el nuevo.
+  if (event.channelId && event.messageId) {
+    await renderAndPublishEmbed(id);
+  }
+
   revalidateEventPaths(id);
 }
 
