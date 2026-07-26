@@ -16,6 +16,7 @@ import {
   X,
   Minimize2,
   Maximize2,
+  Megaphone,
 } from "lucide-react";
 import type { Player, Party } from "@/types/party";
 import { inferRole } from "@/lib/party/infer-role";
@@ -26,6 +27,8 @@ import { PlayerSelectionProvider, usePlayerSelection } from "@/lib/party/selecti
 import { useCoreGuildBoard, type SavedCoreGuildBoard } from "@/lib/core-guild/use-core-guild-board";
 import type { CoreGuildRosterEntry } from "@/lib/core-guild/sync";
 import type { CorePartySlot, CoreMember, WalletType } from "@/lib/core-guild/types";
+import { GUILD_CHOICE_LABELS, GUILD_CHOICE_OPTIONS } from "@/lib/core-guild/guild-choice";
+import { publishCoreGuildSurvey } from "@/lib/actions/core-guild";
 import { PartyCard } from "@/components/party/party-card";
 import { SlotPicker } from "@/components/party/slot-picker";
 import { StatsBar } from "@/components/party/stats-bar";
@@ -120,6 +123,9 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
   const { selected, clearSelection } = usePlayerSelection();
   const [organizeMsg, setOrganizeMsg] = useState("");
   const [guildForm, setGuildForm] = useState(false);
+  const [publishState, setPublishState] = useState<{ status: "idle" | "loading" | "done" | "error"; error?: string }>({
+    status: "idle",
+  });
   const [search, setSearch] = useState("");
   const [pageSize, setPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(5);
   const [page, setPage] = useState(1);
@@ -211,6 +217,17 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
     setTimeout(() => setOrganizeMsg(""), 5000);
   }
 
+  async function handlePublishSurvey() {
+    setPublishState({ status: "loading" });
+    try {
+      await publishCoreGuildSurvey();
+      setPublishState({ status: "done" });
+      setTimeout(() => setPublishState({ status: "idle" }), 5000);
+    } catch (err) {
+      setPublishState({ status: "error", error: err instanceof Error ? err.message : "No se pudo publicar." });
+    }
+  }
+
   function togglePartyCollapsed(partyId: string) {
     setCollapsedPartyIds((prev) => {
       const next = new Set(prev);
@@ -273,6 +290,19 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
           </p>
           {error && <p className="campo-error">{error}</p>}
         </div>
+        <div className="core-guild-header-actions">
+          <button
+            className="btn btn-secondary"
+            onClick={handlePublishSurvey}
+            disabled={publishState.status === "loading"}
+            title="Publica en Discord la encuesta de organización (guild + grupo de amigos)"
+          >
+            <Megaphone size={14} />
+            {publishState.status === "loading" ? "Publicando…" : "Publicar encuesta"}
+          </button>
+          {publishState.status === "done" && <span className="core-guild-status-meta">Publicada ✅</span>}
+          {publishState.status === "error" && <p className="campo-error">{publishState.error}</p>}
+        </div>
         {locked ? (
           <button className="btn btn-secondary" onClick={unlock} disabled={saving}>
             <Pencil size={14} />
@@ -322,6 +352,7 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
               <tr>
                 <th>Miembro</th>
                 <th>Rol de juego</th>
+                <th>Guild</th>
                 <th>Solitario</th>
                 <th>En grupo</th>
                 <th>Etiqueta</th>
@@ -360,6 +391,26 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
                         placeholder="Sin clase"
                         onBlur={(e) => updateMember(member.discordId, { jobRole: e.target.value.trim() })}
                       />
+                    </td>
+                    <td data-label="Guild">
+                      <select
+                        className="core-input"
+                        value={member.guildChoice ?? ""}
+                        disabled={locked}
+                        onChange={(e) =>
+                          updateMember(member.discordId, {
+                            guildChoice: e.target.value ? (e.target.value as CoreMember["guildChoice"]) : null,
+                          })
+                        }
+                        aria-label={`Guild elegida por ${displayName}`}
+                      >
+                        <option value="">Sin responder</option>
+                        {GUILD_CHOICE_OPTIONS.map((choice) => (
+                          <option key={choice} value={choice}>
+                            {GUILD_CHOICE_LABELS[choice]}
+                          </option>
+                        ))}
+                      </select>
                     </td>
                     <td className="core-radio-cell" data-label="Solitario">
                       <input
@@ -428,7 +479,7 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
               })}
               {filteredMembers.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="core-muted">
+                  <td colSpan={8} className="core-muted">
                     {search.trim()
                       ? "Ningún miembro coincide con la búsqueda."
                       : "Nadie tiene el rol [SD] Core todavía."}

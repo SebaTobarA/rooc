@@ -39,6 +39,13 @@
   white-space: nowrap;
 }
 
+.core-guild-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .core-guild-section {
   margin-top: 28px;
   padding-top: 20px;

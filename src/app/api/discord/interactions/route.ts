@@ -22,6 +22,7 @@ import { swapMemberJobClass } from "@/lib/discord-role-swap";
 import { renderAndPublishEmbed, upsertEventSignup } from "@/lib/events";
 import { buildClassPickerComponents, buildConfirmComponents, parseCustomId } from "@/lib/discord-event-embed";
 import { requiredRoleForChannel } from "@/lib/discord-guild-channels";
+import { handleCoreGuildSurveyComponent, handleCoreGuildSurveyModalSubmit } from "@/lib/core-guild/survey-interactions";
 
 export const runtime = "nodejs";
 export const maxDuration = 15;
@@ -30,11 +31,16 @@ type DiscordInteraction = {
   type: number;
   token: string;
   member?: {
-    user: { id: string; username: string; global_name: string | null };
+    user: { id: string; username: string; global_name: string | null; avatar: string | null };
     nick: string | null;
     roles: string[];
   };
-  data?: { custom_id: string };
+  data?: {
+    custom_id: string;
+    values?: string[];
+    // Solo presente en interacciones type 5 (MODAL_SUBMIT).
+    components?: { components: { custom_id: string; value: string }[] }[];
+  };
 };
 
 function actorDisplayName(member: NonNullable<DiscordInteraction["member"]>): string {
@@ -70,7 +76,25 @@ export async function POST(request: Request) {
   }
 
   if (interaction.type === 3 && interaction.data && interaction.member) {
+    // La encuesta de organización de Core Guild usa un esquema de
+    // custom_id ("cgs:...") totalmente separado del de eventos — se
+    // resuelve aparte para no mezclar los dos parseCustomId.
+    if (interaction.data.custom_id.startsWith("cgs:")) {
+      return handleCoreGuildSurveyComponent({
+        token: interaction.token,
+        member: interaction.member,
+        data: { custom_id: interaction.data.custom_id, values: interaction.data.values },
+      });
+    }
     return handleComponent(interaction as Required<DiscordInteraction>);
+  }
+
+  if (interaction.type === 5 && interaction.data?.custom_id.startsWith("cgs:") && interaction.member && interaction.data.components) {
+    return handleCoreGuildSurveyModalSubmit({
+      token: interaction.token,
+      member: interaction.member,
+      data: { custom_id: interaction.data.custom_id, components: interaction.data.components },
+    });
   }
 
   return new Response("unsupported interaction type", { status: 400 });

@@ -2,6 +2,10 @@ import type { SlotLabel } from "@/types/party";
 
 export type WalletType = "F2P" | "MS" | "BALLENA";
 export type GroupMode = "SOLO" | "GROUP";
+// Guild in-game elegida por el miembro en la encuesta de Discord (ver
+// src/lib/core-guild/guild-choice.ts) — independiente de las CoreGuild de
+// más abajo, que son los contenedores de parties del organizador.
+export type GuildChoice = "SD1" | "SD2" | "SD3" | "SD4";
 
 // Un miembro del rol [SD] Core dentro del board — datos de Discord
 // denormalizados (igual que LeadershipMember/GuildApplication) más los
@@ -25,6 +29,10 @@ export interface CoreMember {
   // admin decida a mano si la saca.
   inCore: boolean;
   partyId: string | null;
+  // Respondida desde la encuesta de Discord (o cargada a mano por el
+  // admin) — en qué SpecialDelivery 1-4 dice estar el miembro. null si
+  // todavía no respondió.
+  guildChoice: GuildChoice | null;
 }
 
 export interface CorePartySlot {

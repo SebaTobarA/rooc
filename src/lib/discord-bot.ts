@@ -70,9 +70,48 @@ export type DiscordButton = {
   custom_id: string;
 };
 
+export type DiscordSelectOption = {
+  label: string;
+  value: string;
+  description?: string;
+};
+
+/** Menú desplegable de una sola elección (component_type 3) — ocupa toda su fila, no se puede combinar con botones en la misma. */
+export type DiscordSelectMenu = {
+  type: 3;
+  custom_id: string;
+  placeholder?: string;
+  options: DiscordSelectOption[];
+};
+
 export type DiscordActionRow = {
   type: 1;
-  components: DiscordButton[];
+  components: (DiscordButton | DiscordSelectMenu)[];
+};
+
+/** Estilos de campo de texto de un modal (1=una línea, 2=párrafo). */
+export type DiscordTextInputStyle = 1 | 2;
+
+export type DiscordTextInput = {
+  type: 4;
+  custom_id: string;
+  label: string;
+  style: DiscordTextInputStyle;
+  required?: boolean;
+  placeholder?: string;
+  max_length?: number;
+};
+
+export type DiscordModalActionRow = {
+  type: 1;
+  components: DiscordTextInput[];
+};
+
+/** Formulario emergente (interaction response type 9) — la única forma de pedir texto libre en una interacción de Discord. */
+export type DiscordModal = {
+  custom_id: string;
+  title: string;
+  components: DiscordModalActionRow[];
 };
 
 /** Un solo miembro por ID. Devuelve null si no pertenece al server (404). */

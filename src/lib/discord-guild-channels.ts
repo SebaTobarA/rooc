@@ -24,3 +24,6 @@ export const EVENT_CHANNEL_OPTIONS: EventChannelOption[] = [
 export function requiredRoleForChannel(channelId: string): string | null {
   return EVENT_CHANNEL_OPTIONS.find((option) => option.id === channelId)?.requiredRoleId ?? null;
 }
+
+/** Canal donde se publica la encuesta de organización de grupos de amigos (ver survey-interactions.ts). */
+export const CORE_GUILD_SURVEY_CHANNEL_ID = "1520965675903090732";

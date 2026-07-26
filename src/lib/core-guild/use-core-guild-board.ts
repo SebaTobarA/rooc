@@ -41,6 +41,8 @@ function reconcileMembers(roster: CoreGuildRosterEntry[], saved: CoreMember[]): 
         nick: entry.nick,
         avatarHash: entry.avatarHash,
         inCore: true,
+        // `guildChoice` no existía en boards guardados antes de la encuesta.
+        guildChoice: existing.guildChoice ?? null,
       };
     }
     return {
@@ -55,6 +57,7 @@ function reconcileMembers(roster: CoreGuildRosterEntry[], saved: CoreMember[]): 
       walletType: "F2P" as const,
       inCore: true,
       partyId: null,
+      guildChoice: null,
     };
   });
 
