@@ -17,7 +17,9 @@ import type {
   DiscordSelectMenu,
 } from "@/lib/discord-bot";
 import { GUILD_CHOICE_LABELS, GUILD_CHOICE_OPTIONS } from "@/lib/core-guild/guild-choice";
-import type { GuildChoice } from "@/lib/core-guild/types";
+import { truncateFieldValue } from "@/lib/discord-event-embed";
+import type { CoreMember, GuildChoice } from "@/lib/core-guild/types";
+import type { CoreGuildRosterEntry } from "@/lib/core-guild/sync";
 import type { ExistingGroup } from "@/lib/core-guild/survey-groups";
 
 const MAX_SELECT_OPTIONS = 25;
@@ -37,12 +39,62 @@ const SURVEY_COLOR = 0x6fe0f5;
 const SUCCESS_COLOR = 0x57f287;
 const ERROR_COLOR = 0xed4245;
 
-export function buildSurveyStartEmbed(): DiscordEmbed {
+function memberDisplayName(m: Pick<CoreMember, "nick" | "globalName" | "username">): string {
+  return m.nick ?? m.globalName ?? m.username;
+}
+
+/** Línea "**Tag (n)**: nombre1, nombre2..." por cada grupo dentro de una guild, más una línea "Solo (n)" al final si corresponde. */
+function buildGuildFieldValue(members: CoreMember[], guild: GuildChoice): string {
+  const inGuild = members.filter((m) => m.guildChoice === guild);
+  if (inGuild.length === 0) return "-";
+
+  const groups = new Map<string, CoreMember[]>();
+  const solo: CoreMember[] = [];
+  for (const member of inGuild) {
+    const tag = member.groupMode === "GROUP" ? member.groupTag.trim() : "";
+    if (tag) {
+      const bucket = groups.get(tag) ?? [];
+      bucket.push(member);
+      groups.set(tag, bucket);
+    } else {
+      solo.push(member);
+    }
+  }
+
+  const lines = [...groups.entries()]
+    .sort((a, b) => b[1].length - a[1].length)
+    .map(([tag, bucket]) => `**${tag} (${bucket.length})**: ${bucket.map(memberDisplayName).join(", ")}`);
+  if (solo.length > 0) lines.push(`**Solo (${solo.length})**: ${solo.map(memberDisplayName).join(", ")}`);
+
+  return truncateFieldValue(lines);
+}
+
+/**
+ * Embed público de la encuesta — se publica una sola vez y se edita cada
+ * vez que alguien responde (ver survey-roster.ts), para que todos vean en
+ * vivo quién ya se anotó en cada guild/grupo y a quién le falta responder.
+ */
+export function buildSurveyRosterEmbed(members: CoreMember[], coreRoster: CoreGuildRosterEntry[]): DiscordEmbed {
+  const respondedIds = new Set(members.filter((m) => m.guildChoice).map((m) => m.discordId));
+  const missing = coreRoster.filter((r) => !respondedIds.has(r.discordId));
+
+  const fields = GUILD_CHOICE_OPTIONS.map((guild) => ({
+    name: `${GUILD_CHOICE_LABELS[guild]} (${members.filter((m) => m.guildChoice === guild).length})`,
+    value: buildGuildFieldValue(members, guild),
+  }));
+
+  fields.push({
+    name: `Faltan por responder (${missing.length})`,
+    value: truncateFieldValue(missing.map((r) => r.nick ?? r.globalName ?? r.username)),
+  });
+
   return {
     title: "📋 Organización de grupos — Core Guild",
     description:
       "Antes de armar los equipos necesitamos saber en qué guild estás y con quién venís.\n\n¿Estás en una de las Guild?",
     color: SURVEY_COLOR,
+    fields,
+    footer: { text: `${respondedIds.size} respondieron · ${missing.length} faltan` },
   };
 }
 

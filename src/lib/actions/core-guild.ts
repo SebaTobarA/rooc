@@ -3,8 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { addGuildMemberRole, createGuildRole, postChannelMessage } from "@/lib/discord-bot";
-import { buildAreYouInGuildComponents, buildSurveyStartEmbed } from "@/lib/discord-core-guild-survey-embed";
+import { addGuildMemberRole, createGuildRole } from "@/lib/discord-bot";
+import { renderAndPublishSurveyRoster } from "@/lib/core-guild/survey-roster";
 import type { CoreGuildBoardData } from "@/lib/core-guild/types";
 
 // Sin chequeo de permiso explícito: /admin/core-guild ya está detrás del
@@ -103,18 +103,17 @@ export async function syncGuildDiscordRole(
 }
 
 /**
- * Publica el mensaje inicial de la encuesta de organización (¿estás en una
- * guild? sí/no) en el canal que elija el admin — es un mensaje estático, a
- * diferencia del roster de eventos no se vuelve a editar: cada miembro que
- * lo clickea arranca su propia conversación efímera con el bot.
+ * Publica el mensaje público de la encuesta de organización (¿estás en una
+ * guild? sí/no) en el canal que elija el admin. A diferencia del resto de
+ * Core Guild, esto sí escribe directo en Prisma (guarda dónde quedó
+ * publicado): survey-interactions.ts vuelve a llamar a la misma función
+ * cada vez que alguien responde, para que todos vean en vivo quién ya se
+ * anotó y a quién le falta.
  */
 export async function publishCoreGuildSurvey(channelId: string): Promise<{ error?: string }> {
   if (!channelId) return { error: "Elegí a qué canal publicar la encuesta." };
   try {
-    await postChannelMessage(channelId, {
-      embeds: [buildSurveyStartEmbed()],
-      components: buildAreYouInGuildComponents(),
-    });
+    await renderAndPublishSurveyRoster(channelId);
     return {};
   } catch (err) {
     return { error: err instanceof Error ? err.message : "No se pudo publicar la encuesta en Discord." };

@@ -45,7 +45,7 @@ function formatEventRange(startsAt: Date, endsAt: Date): string {
   ].join("\n");
 }
 
-function truncateFieldValue(lines: string[]): string {
+export function truncateFieldValue(lines: string[]): string {
   if (lines.length === 0) return "-";
   let value = "";
   for (let i = 0; i < lines.length; i++) {

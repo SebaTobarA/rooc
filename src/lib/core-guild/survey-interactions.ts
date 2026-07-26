@@ -5,10 +5,12 @@
  * con "cgs:" (Core Guild Survey), separado del flujo de eventos para no
  * mezclar los dos esquemas de custom_id.
  *
- * El mensaje original de la encuesta es público y fijo (nunca se edita);
- * cada persona que lo clickea arranca su propia conversación efímera
- * (flags 64) que va mutando con type 6/7 (UPDATE_MESSAGE), igual que el
- * flujo de "Participar" de eventos.
+ * El mensaje original de la encuesta es público, pero cada persona que lo
+ * clickea arranca su propia conversación efímera (flags 64) que va
+ * mutando con type 6/7 (UPDATE_MESSAGE), igual que el flujo de
+ * "Participar" de eventos — el mensaje público en sí se re-edita aparte
+ * (ver renderAndPublishSurveyRoster) cada vez que una respuesta se
+ * confirma, para que se vea en vivo quién ya respondió.
  */
 
 import { after } from "next/server";
@@ -28,6 +30,7 @@ import {
 import { GUILD_CHOICE_LABELS, GUILD_CHOICE_OPTIONS } from "./guild-choice";
 import { listExistingGroupTags } from "./survey-groups";
 import { applyCoreGuildSurveyResponse, ensureGuildChoiceRole, type SurveyGroupChoice } from "./survey-response";
+import { renderAndPublishSurveyRoster } from "./survey-roster";
 import type { GuildChoice } from "./types";
 
 export interface SurveyInteractionMember {
@@ -78,6 +81,8 @@ async function finalizeSurveyResponse(
     group,
   });
   await ensureGuildChoiceRole(member.user.id, guild, member.roles);
+  // Refresca el mensaje público en vivo — se edita in-place, ver survey-roster.ts.
+  await renderAndPublishSurveyRoster();
 }
 
 const RESTART_MESSAGE = "Ocurrió un error, empezá de nuevo desde el mensaje original de la encuesta.";

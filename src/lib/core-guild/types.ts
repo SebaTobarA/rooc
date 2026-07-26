@@ -69,4 +69,22 @@ export interface CoreGuildBoardData {
   // para ese equipo de amigos. Ausente/vacío en boards guardados antes de
   // esta funcionalidad.
   teamRoles: Record<string, string>;
+  // Mensaje público de la encuesta de organización (ver survey-roster.ts)
+  // — se edita in-place cada vez que alguien responde, en vez de publicar
+  // uno nuevo. null hasta la primera publicación.
+  surveyMessage: { channelId: string; messageId: string } | null;
+}
+
+const DEFAULT_CORE_GUILD_COMPOSITION: SlotLabel[] = ["Tanque", "Soporte", "Daño", "Daño", "Daño"];
+
+/** Board vacío — misma forma que usan use-core-guild-board.ts (cliente) y survey-response.ts/survey-roster.ts (servidor) cuando todavía no existe una fila en la base. */
+export function emptyCoreGuildBoardData(): CoreGuildBoardData {
+  return {
+    members: [],
+    parties: [],
+    compositions: [[...DEFAULT_CORE_GUILD_COMPOSITION]],
+    guilds: [],
+    teamRoles: {},
+    surveyMessage: null,
+  };
 }

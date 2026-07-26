@@ -14,13 +14,7 @@
 import { prisma } from "@/lib/prisma";
 import { addGuildMemberRole } from "@/lib/discord-bot";
 import { GUILD_CHOICE_ROLE_ID } from "./guild-choice";
-import type { CoreGuildBoardData, CoreMember, GuildChoice } from "./types";
-
-const DEFAULT_COMPOSITION = ["Tanque", "Soporte", "Daño", "Daño", "Daño"] as const;
-
-function emptyBoardData(): CoreGuildBoardData {
-  return { members: [], parties: [], compositions: [[...DEFAULT_COMPOSITION]], guilds: [], teamRoles: {} };
-}
+import { emptyCoreGuildBoardData, type CoreGuildBoardData, type CoreMember, type GuildChoice } from "./types";
 
 export type SurveyGroupChoice = { kind: "SOLO" } | { kind: "EXISTING" | "NEW"; tag: string };
 
@@ -38,7 +32,7 @@ export interface SurveyResponseInput {
 /** Persiste la respuesta en el board — crea la fila del miembro si es la primera vez que aparece. */
 export async function applyCoreGuildSurveyResponse(input: SurveyResponseInput): Promise<void> {
   const existingBoard = await prisma.coreGuildBoard.findFirst();
-  const data: CoreGuildBoardData = (existingBoard?.data as CoreGuildBoardData | undefined) ?? emptyBoardData();
+  const data: CoreGuildBoardData = (existingBoard?.data as CoreGuildBoardData | undefined) ?? emptyCoreGuildBoardData();
 
   const groupMode = input.group.kind === "SOLO" ? "SOLO" : "GROUP";
   const groupTag = input.group.kind === "SOLO" ? "" : input.group.tag;

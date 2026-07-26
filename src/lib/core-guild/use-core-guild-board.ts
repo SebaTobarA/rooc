@@ -2,23 +2,17 @@
 
 import { useCallback, useMemo, useState } from "react";
 import type { SlotLabel } from "@/types/party";
-import type { CoreGuild, CoreGuildBoardData, CoreMember, CorePartySlot } from "./types";
+import { emptyCoreGuildBoardData, type CoreGuild, type CoreGuildBoardData, type CoreMember, type CorePartySlot } from "./types";
 import type { CoreGuildRosterEntry } from "./sync";
 import { organizeCoreParties } from "./organize";
 import { computeFriendTeams } from "./friend-teams";
 import { saveCoreGuildBoard, unlockCoreGuildBoard } from "@/lib/actions/core-guild";
-
-const DEFAULT_COMPOSITION: SlotLabel[] = ["Tanque", "Soporte", "Daño", "Daño", "Daño"];
 
 export interface SavedCoreGuildBoard {
   data: CoreGuildBoardData;
   locked: boolean;
   updatedByUsername: string | null;
   updatedAt: string;
-}
-
-function emptyBoard(): CoreGuildBoardData {
-  return { members: [], parties: [], compositions: [[...DEFAULT_COMPOSITION]], guilds: [], teamRoles: {} };
 }
 
 // Mezcla el roster fresco de Discord con lo último guardado: los miembros
@@ -70,15 +64,18 @@ function reconcileMembers(roster: CoreGuildRosterEntry[], saved: CoreMember[]): 
 
 export function useCoreGuildBoard(roster: CoreGuildRosterEntry[], saved: SavedCoreGuildBoard | null) {
   const initial = useMemo<CoreGuildBoardData>(() => {
-    const base = saved?.data ?? emptyBoard();
+    const empty = emptyCoreGuildBoardData();
+    const base = saved?.data ?? empty;
     return {
       members: reconcileMembers(roster, base.members ?? []),
       // `locked` no existía en boards guardados antes de esta funcionalidad.
       parties: (base.parties ?? []).map((p) => ({ ...p, locked: p.locked ?? false })),
-      compositions: base.compositions?.length ? base.compositions : [[...DEFAULT_COMPOSITION]],
+      compositions: base.compositions?.length ? base.compositions : empty.compositions,
       guilds: base.guilds ?? [],
       // `teamRoles` tampoco existía antes de la sección Amigos.
       teamRoles: base.teamRoles ?? {},
+      // ni `surveyMessage`.
+      surveyMessage: base.surveyMessage ?? null,
     };
     // Solo se recalcula al montar — reconciliar de nuevo en cada render
     // pisaría ediciones en curso del admin.
@@ -90,6 +87,9 @@ export function useCoreGuildBoard(roster: CoreGuildRosterEntry[], saved: SavedCo
   const [compositions, setCompositions] = useState<SlotLabel[][]>(initial.compositions);
   const [guilds, setGuilds] = useState<CoreGuild[]>(initial.guilds);
   const [teamRoles, setTeamRoles] = useState<Record<string, string>>(initial.teamRoles);
+  // Nunca se edita desde la UI — se conserva tal cual para no pisarlo al
+  // guardar (lo escribe únicamente el servidor, ver survey-roster.ts).
+  const [surveyMessage] = useState(initial.surveyMessage);
   const [locked, setLocked] = useState(saved?.locked ?? false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -216,7 +216,7 @@ export function useCoreGuildBoard(roster: CoreGuildRosterEntry[], saved: SavedCo
     setSaving(true);
     setError("");
     try {
-      await saveCoreGuildBoard({ members, parties, compositions, guilds, teamRoles });
+      await saveCoreGuildBoard({ members, parties, compositions, guilds, teamRoles, surveyMessage });
       setLocked(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo guardar.");
