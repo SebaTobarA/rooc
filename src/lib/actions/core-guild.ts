@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { addGuildMemberRole, createGuildRole, postChannelMessage } from "@/lib/discord-bot";
-import { CORE_GUILD_SURVEY_CHANNEL_ID } from "@/lib/discord-guild-channels";
 import { buildAreYouInGuildComponents, buildSurveyStartEmbed } from "@/lib/discord-core-guild-survey-embed";
 import type { CoreGuildBoardData } from "@/lib/core-guild/types";
 
@@ -105,13 +104,14 @@ export async function syncGuildDiscordRole(
 
 /**
  * Publica el mensaje inicial de la encuesta de organización (¿estás en una
- * guild? sí/no) en el canal fijo de Core Guild — es un mensaje estático, a
+ * guild? sí/no) en el canal que elija el admin — es un mensaje estático, a
  * diferencia del roster de eventos no se vuelve a editar: cada miembro que
  * lo clickea arranca su propia conversación efímera con el bot.
  */
-export async function publishCoreGuildSurvey(): Promise<{ error?: string }> {
+export async function publishCoreGuildSurvey(channelId: string): Promise<{ error?: string }> {
+  if (!channelId) return { error: "Elegí a qué canal publicar la encuesta." };
   try {
-    await postChannelMessage(CORE_GUILD_SURVEY_CHANNEL_ID, {
+    await postChannelMessage(channelId, {
       embeds: [buildSurveyStartEmbed()],
       components: buildAreYouInGuildComponents(),
     });

@@ -45,6 +45,10 @@
   gap: 8px;
   flex-wrap: wrap;
 }
+.core-guild-survey-channel-select {
+  width: auto;
+  max-width: 220px;
+}
 
 .core-guild-section {
   margin-top: 28px;

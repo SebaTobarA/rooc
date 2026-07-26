@@ -28,7 +28,9 @@ import { useCoreGuildBoard, type SavedCoreGuildBoard } from "@/lib/core-guild/us
 import type { CoreGuildRosterEntry } from "@/lib/core-guild/sync";
 import type { CorePartySlot, CoreMember, WalletType } from "@/lib/core-guild/types";
 import { GUILD_CHOICE_LABELS, GUILD_CHOICE_OPTIONS } from "@/lib/core-guild/guild-choice";
+import { CORE_GUILD_SURVEY_CHANNEL_ID } from "@/lib/discord-guild-channels";
 import { publishCoreGuildSurvey } from "@/lib/actions/core-guild";
+import type { DiscordGuildChannel } from "@/lib/discord-bot";
 import { PartyCard } from "@/components/party/party-card";
 import { SlotPicker } from "@/components/party/slot-picker";
 import { StatsBar } from "@/components/party/stats-bar";
@@ -76,6 +78,7 @@ function toPartyView(party: CorePartySlot): Party & { locked: boolean } {
 interface CoreGuildManagerProps {
   roster: CoreGuildRosterEntry[];
   saved: SavedCoreGuildBoard | null;
+  channels: DiscordGuildChannel[];
 }
 
 export function CoreGuildManager(props: CoreGuildManagerProps) {
@@ -86,7 +89,7 @@ export function CoreGuildManager(props: CoreGuildManagerProps) {
   );
 }
 
-function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
+function CoreGuildManagerInner({ roster, saved, channels }: CoreGuildManagerProps) {
   const board = useCoreGuildBoard(roster, saved);
   const {
     members,
@@ -126,6 +129,9 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
   const [publishState, setPublishState] = useState<{ status: "idle" | "loading" | "done" | "error"; error?: string }>({
     status: "idle",
   });
+  const [surveyChannelId, setSurveyChannelId] = useState(
+    channels.some((c) => c.id === CORE_GUILD_SURVEY_CHANNEL_ID) ? CORE_GUILD_SURVEY_CHANNEL_ID : ""
+  );
   const [search, setSearch] = useState("");
   const [pageSize, setPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(5);
   const [page, setPage] = useState(1);
@@ -219,7 +225,7 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
 
   async function handlePublishSurvey() {
     setPublishState({ status: "loading" });
-    const result = await publishCoreGuildSurvey();
+    const result = await publishCoreGuildSurvey(surveyChannelId);
     if (result.error) {
       setPublishState({ status: "error", error: result.error });
       return;
@@ -291,10 +297,25 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
           {error && <p className="campo-error">{error}</p>}
         </div>
         <div className="core-guild-header-actions">
+          <select
+            className="core-input core-guild-survey-channel-select"
+            value={surveyChannelId}
+            onChange={(e) => setSurveyChannelId(e.target.value)}
+            aria-label="Canal donde publicar la encuesta"
+          >
+            <option value="" disabled>
+              ¿En qué canal?
+            </option>
+            {channels.map((channel) => (
+              <option key={channel.id} value={channel.id}>
+                #{channel.name}
+              </option>
+            ))}
+          </select>
           <button
             className="btn btn-secondary"
             onClick={handlePublishSurvey}
-            disabled={publishState.status === "loading"}
+            disabled={publishState.status === "loading" || !surveyChannelId}
             title="Publica en Discord la encuesta de organización (guild + grupo de amigos)"
           >
             <Megaphone size={14} />

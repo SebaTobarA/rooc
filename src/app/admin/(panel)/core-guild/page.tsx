@@ -2,6 +2,7 @@ import "@/app/panel/party/party.css";
 import "./core-guild.css";
 import { prisma } from "@/lib/prisma";
 import { getCoreGuildRoster, CORE_GUILD_ROLE_ID } from "@/lib/core-guild/sync";
+import { getGuildChannels } from "@/lib/discord-bot";
 import { BotErrorNotice } from "@/components/admin/bot-error-notice";
 import { CoreGuildManager } from "@/components/core-guild/core-guild-manager";
 import type { SavedCoreGuildBoard } from "@/lib/core-guild/use-core-guild-board";
@@ -15,10 +16,11 @@ export const metadata = {
 
 export default async function AdminCoreGuildPage() {
   let roster: Awaited<ReturnType<typeof getCoreGuildRoster>> = [];
+  let channels: Awaited<ReturnType<typeof getGuildChannels>> = [];
   let error: string | null = null;
 
   try {
-    roster = await getCoreGuildRoster();
+    [roster, channels] = await Promise.all([getCoreGuildRoster(), getGuildChannels()]);
   } catch (err) {
     error = err instanceof Error ? err.message : "Error desconocido";
   }
@@ -46,7 +48,7 @@ export default async function AdminCoreGuildPage() {
       </p>
 
       <div className="mt-4">
-        <CoreGuildManager roster={roster} saved={saved} />
+        <CoreGuildManager roster={roster} saved={saved} channels={channels} />
       </div>
     </div>
   );
