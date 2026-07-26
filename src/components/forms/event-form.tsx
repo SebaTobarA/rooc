@@ -4,12 +4,14 @@ import { Field, SubmitButton, inputClass } from "@/components/forms/form-fields"
 
 // Los inputs date/time nativos necesitan "YYYY-MM-DD" y "HH:mm" en hora
 // local por separado (a diferencia de toISOString(), que da UTC), así que
-// se arman a mano con los getters locales del Date.
-function toLocalDateValue(date: Date): string {
+// se arman a mano con los getters locales del Date. Se exportan porque
+// src/app/panel/eventos/[id]/page.tsx los reusa para el form de cierre de
+// inscripciones.
+export function toLocalDateValue(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
-function toLocalTimeValue(date: Date): string {
+export function toLocalTimeValue(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }

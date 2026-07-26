@@ -33,9 +33,10 @@ const eventSchema = z
       templateId: data.templateId,
       startsAt,
       endsAt,
-      // El cierre de inscripciones es el mismo fin del evento: el mensaje
-      // en Discord queda visible hasta que se borre, así que no hace
-      // falta un campo aparte para "cuándo deja de existir la encuesta".
+      // Por defecto el cierre de inscripciones es el mismo fin del evento
+      // — se puede correr después desde /panel/eventos/[id] (ver
+      // updateEventSignupsCloseAt), ej. para extender el plazo mientras el
+      // evento ya está en curso.
       signupsCloseAt: endsAt,
     };
   })
@@ -96,6 +97,22 @@ export async function resendEvent(id: string) {
   const existing = await prisma.event.findUniqueOrThrow({ where: { id }, select: { channelId: true } });
   await prisma.event.update({ where: { id }, data: { channelId: null, messageId: null } });
   await renderAndPublishEmbed(id, existing.channelId ?? undefined);
+  revalidateEventPaths(id);
+}
+
+/**
+ * Cambia hasta cuándo se aceptan altas/cambios de inscripción — independiente
+ * de startsAt/endsAt, para poder extender o acortar el plazo sin tocar las
+ * fechas del evento en sí (ej. el evento ya arrancó pero se sigue
+ * aceptando gente, o hay que cerrar antes de lo previsto).
+ */
+export async function updateEventSignupsCloseAt(id: string, formData: FormData) {
+  const date = String(formData.get("signupsCloseAtDate") ?? "");
+  const time = String(formData.get("signupsCloseAtTime") ?? "");
+  if (!date || !time) throw new Error("Elige la fecha y hora de cierre.");
+
+  const signupsCloseAt = new Date(`${date}T${time}:00-03:00`);
+  await prisma.event.update({ where: { id }, data: { signupsCloseAt } });
   revalidateEventPaths(id);
 }
 

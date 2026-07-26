@@ -5,8 +5,9 @@ import { getEffectivePermissions } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { EVENT_CATEGORY_LABEL, EVENT_STATUS_LABEL } from "@/lib/labels";
 import { JOB_ROLE_NAMES } from "@/lib/discord-job-roles";
-import { sendEvent, deleteEvent, resendEvent } from "@/lib/actions/events";
+import { sendEvent, deleteEvent, resendEvent, updateEventSignupsCloseAt } from "@/lib/actions/events";
 import { EVENT_CHANNEL_OPTIONS } from "@/lib/discord-guild-channels";
+import { toLocalDateValue, toLocalTimeValue } from "@/components/forms/event-form";
 import { BackLink } from "@/components/back-link";
 
 export const metadata = { title: "Detalle de evento" };
@@ -89,10 +90,46 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
             <dt className="text-xs uppercase tracking-wide text-muted">Fin</dt>
             <dd className="text-foreground">{DATE_FORMATTER.format(event.endsAt)}</dd>
           </div>
+          <div>
+            <dt className="text-xs uppercase tracking-wide text-muted">Cierre de inscripciones</dt>
+            <dd className="text-foreground">{DATE_FORMATTER.format(event.signupsCloseAt)}</dd>
+          </div>
         </dl>
         {event.description && (
           <p className="mt-4 whitespace-pre-wrap text-sm text-muted">{event.description}</p>
         )}
+
+        <form
+          action={updateEventSignupsCloseAt.bind(null, event.id)}
+          className="mt-4 flex flex-wrap items-end gap-2 border-t border-border pt-4"
+        >
+          <label className="text-xs text-muted">
+            Nueva fecha de cierre
+            <input
+              type="date"
+              name="signupsCloseAtDate"
+              defaultValue={toLocalDateValue(event.signupsCloseAt)}
+              required
+              className="mt-1 block rounded-[10px] border border-border bg-surface px-3 py-2 text-sm text-foreground"
+            />
+          </label>
+          <label className="text-xs text-muted">
+            Hora
+            <input
+              type="time"
+              name="signupsCloseAtTime"
+              defaultValue={toLocalTimeValue(event.signupsCloseAt)}
+              required
+              className="mt-1 block rounded-[10px] border border-border bg-surface px-3 py-2 text-sm text-foreground"
+            />
+          </label>
+          <button
+            type="submit"
+            className="rounded-[10px] border border-border px-4 py-2 text-sm font-semibold uppercase tracking-wide text-foreground transition-colors hover:bg-surface-hover"
+          >
+            Actualizar cierre
+          </button>
+        </form>
 
         <div className="mt-5 flex flex-wrap gap-3">
           {event.status === "DRAFT" ? (
