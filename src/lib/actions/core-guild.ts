@@ -109,9 +109,14 @@ export async function syncGuildDiscordRole(
  * diferencia del roster de eventos no se vuelve a editar: cada miembro que
  * lo clickea arranca su propia conversación efímera con el bot.
  */
-export async function publishCoreGuildSurvey(): Promise<void> {
-  await postChannelMessage(CORE_GUILD_SURVEY_CHANNEL_ID, {
-    embeds: [buildSurveyStartEmbed()],
-    components: buildAreYouInGuildComponents(),
-  });
+export async function publishCoreGuildSurvey(): Promise<{ error?: string }> {
+  try {
+    await postChannelMessage(CORE_GUILD_SURVEY_CHANNEL_ID, {
+      embeds: [buildSurveyStartEmbed()],
+      components: buildAreYouInGuildComponents(),
+    });
+    return {};
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "No se pudo publicar la encuesta en Discord." };
+  }
 }

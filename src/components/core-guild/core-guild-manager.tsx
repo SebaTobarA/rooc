@@ -219,13 +219,13 @@ function CoreGuildManagerInner({ roster, saved }: CoreGuildManagerProps) {
 
   async function handlePublishSurvey() {
     setPublishState({ status: "loading" });
-    try {
-      await publishCoreGuildSurvey();
-      setPublishState({ status: "done" });
-      setTimeout(() => setPublishState({ status: "idle" }), 5000);
-    } catch (err) {
-      setPublishState({ status: "error", error: err instanceof Error ? err.message : "No se pudo publicar." });
+    const result = await publishCoreGuildSurvey();
+    if (result.error) {
+      setPublishState({ status: "error", error: result.error });
+      return;
     }
+    setPublishState({ status: "done" });
+    setTimeout(() => setPublishState({ status: "idle" }), 5000);
   }
 
   function togglePartyCollapsed(partyId: string) {
