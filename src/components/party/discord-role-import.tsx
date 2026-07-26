@@ -11,7 +11,8 @@ import {
 } from "@/lib/party/discord-import";
 
 interface DiscordRoleImportProps {
-  onImport: (players: Player[]) => void;
+  /** Devuelve cuántos de los jugadores pasados se agregaron de verdad (los ya presentes en el pool se ignoran). */
+  onImport: (players: Player[]) => number;
 }
 
 export function DiscordRoleImport({ onImport }: DiscordRoleImportProps) {
@@ -53,13 +54,15 @@ export function DiscordRoleImport({ onImport }: DiscordRoleImportProps) {
           rol: inferRole(m.suggestedClass ?? ""),
           partyId: null,
         }));
-        onImport(players);
+        const addedCount = onImport(players);
+        const alreadyIn = players.length - addedCount;
         const withoutClass = players.filter((p) => !p.clase).length;
-        setMessage(
-          withoutClass > 0
-            ? `${players.length} importado(s) del rol "${role.name}" — ${withoutClass} sin clase asignada en Discord, edítalos en el chip.`
-            : `${players.length} importado(s) del rol "${role.name}".`
-        );
+        const parts = [
+          addedCount > 0 ? `${addedCount} nuevo(s) del rol "${role.name}"` : `Nadie nuevo del rol "${role.name}"`,
+        ];
+        if (alreadyIn > 0) parts.push(`${alreadyIn} ya estaban en el pool`);
+        if (withoutClass > 0) parts.push(`${withoutClass} sin clase asignada en Discord — edítalos en el chip`);
+        setMessage(`${parts.join(" — ")}.`);
       } catch (err) {
         setError(err instanceof Error ? err.message : "No se pudo importar ese rol.");
       } finally {
@@ -77,7 +80,7 @@ export function DiscordRoleImport({ onImport }: DiscordRoleImportProps) {
           style={{ background: "none", border: "none", padding: 0, display: "block", font: "inherit" }}
           onClick={handleOpen}
         >
-          Importar por rol de Discord
+          Importar por rol de Discord (incluye a quienes no respondieron la encuesta)
         </button>
         {message && <p className="import-message success">{message}</p>}
         {error && <p className="import-message error">{error}</p>}
@@ -88,8 +91,9 @@ export function DiscordRoleImport({ onImport }: DiscordRoleImportProps) {
   return (
     <div className="import-box">
       <p className="import-hint" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <Users size={12} /> Elegí un rol del server — se importan todos sus miembros con la clase que ya
-        tengan asignada en Discord.
+        <Users size={12} /> Elegí un rol del server — se importan los miembros que todavía no estén en el
+        pool (incluye a quienes no respondieron la encuesta de asistencia), con la clase que ya tengan
+        asignada en Discord.
       </p>
       <input
         autoFocus

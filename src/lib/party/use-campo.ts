@@ -206,7 +206,8 @@ export interface UseCampoReturn {
   compositions: SlotLabel[][];
   setCompositions: (c: SlotLabel[][]) => void;
   importPlayers: (raw: string) => ImportResult;
-  addPlayers: (players: Player[]) => void;
+  /** Devuelve cuántos jugadores nuevos se agregaron de verdad (excluye duplicados por id/nickname). */
+  addPlayers: (players: Player[]) => number;
   loadSnapshot: (snapshot: { players: Player[]; parties: Party[] }) => void;
   updatePlayerClass: (playerId: string, clase: string) => void;
   organizeParties: () => string | null; // null = ok, string = error/aviso
@@ -331,15 +332,28 @@ export function useCampo(initialSlots?: SlotLabel[], options: UseCampoOptions = 
   );
 
   // Alta directa (sin pasar por parseEntries) — usada para cargar jugadores
-  // ya resueltos desde otra fuente, ej. inscripciones a un evento de
-  // Discord (ver src/lib/party/from-signups.ts). Mismo dedupe por nickname
-  // que importPlayers, sin el límite de maxPlayers ni el parseo de texto.
-  const addPlayers = useCallback((newPlayers: Player[]) => {
-    setPlayers((prev) => {
-      const existingNicks = new Set(prev.map((p) => p.nickname.toLowerCase()));
-      const toAdd = newPlayers.filter((p) => !existingNicks.has(p.nickname.toLowerCase()));
-      return [...prev, ...toAdd];
-    });
+  // ya resueltos desde otra fuente, ej. inscripciones a un evento de Discord
+  // (ver src/lib/party/from-signups.ts) o el import por rol de Discord (ver
+  // discord-role-import.tsx). Dedupea por id (discordId real en ambas
+  // fuentes) además de por nickname — así, importar un rol completo después
+  // de cargar los inscritos de un evento solo suma a quienes todavía no
+  // están en el pool (p.ej. quienes no respondieron la encuesta de
+  // asistencia) en vez de duplicarlos si su nickname cambió. Devuelve
+  // cuántos se agregaron de verdad, para que el llamador pueda avisar bien
+  // (ver discord-role-import.tsx).
+  const addPlayers = useCallback((newPlayers: Player[]): number => {
+    const existing = playersRef.current;
+    const existingIds = new Set(existing.map((p) => p.id));
+    const existingNicks = new Set(existing.map((p) => p.nickname.toLowerCase()));
+    const toAdd: Player[] = [];
+    for (const p of newPlayers) {
+      if (existingIds.has(p.id) || existingNicks.has(p.nickname.toLowerCase())) continue;
+      toAdd.push(p);
+      existingIds.add(p.id);
+      existingNicks.add(p.nickname.toLowerCase());
+    }
+    if (toAdd.length > 0) setPlayers((prev) => [...prev, ...toAdd]);
+    return toAdd.length;
   }, []);
 
   // Reemplaza jugadores y parties tal cual venían en una plantilla guardada
