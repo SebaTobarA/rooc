@@ -349,7 +349,11 @@ export function useCampo(initialSlots?: SlotLabel[], options: UseCampoOptions = 
   // snapshot distinto si el usuario no tocó nada.
   const loadSnapshot = useCallback((snapshot: { players: Player[]; parties: Party[] }) => {
     setPlayers(snapshot.players);
-    setParties(snapshot.parties);
+    // raidId no existía en plantillas guardadas antes de que se agregaran
+    // los raids de Emperium Overrun — sin este fallback, esas parties
+    // quedarían con raidId undefined en vez de null y no matchearían los
+    // chequeos `=== null` que las tratan como "sin asignar a un raid".
+    setParties(snapshot.parties.map((p) => ({ ...p, raidId: p.raidId ?? null })));
   }, []);
 
   // Corrige la clase de un jugador ya importado (ej. sin clase asignada en
