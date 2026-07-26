@@ -46,6 +46,10 @@ export interface CoreGuild {
   cap: number;
   // Orden de las parties asignadas a esta guild.
   partyIds: string[];
+  // ID de un rol ya existente en Discord (ej. el rol "SD2") que identifica a
+  // los miembros de esta guild — lo tipea el admin a mano, no lo crea Boo
+  // (a diferencia de teamRoles, que sí crea roles nuevos por equipo).
+  discordRoleId?: string;
 }
 
 export interface CoreGuildBoardData {

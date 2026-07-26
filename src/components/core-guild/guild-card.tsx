@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Trash2, X } from "lucide-react";
+import { ShieldPlus, Trash2, X } from "lucide-react";
 import type { CoreGuild, CoreMember, CorePartySlot } from "@/lib/core-guild/types";
 import { readDragPayload } from "@/lib/party/drag-payload";
 import { usePlayerSelection } from "@/lib/party/selection-context";
+import { syncGuildDiscordRole } from "@/lib/actions/core-guild";
 
 interface GuildCardProps {
   guild: CoreGuild;
@@ -31,6 +32,9 @@ export function GuildCard({
   onRemove,
 }: GuildCardProps) {
   const [isDragOver, setIsDragOver] = useState(false);
+  const [syncState, setSyncState] = useState<{ status: "idle" | "loading" | "error"; error?: string }>({
+    status: "idle",
+  });
   const { selected, clearSelection } = usePlayerSelection();
   const isPartyArmed = selected?.kind === "party";
 
@@ -38,11 +42,27 @@ export function GuildCard({
     .map((id) => parties.find((p) => p.id === id))
     .filter((p): p is CorePartySlot => Boolean(p));
 
-  const totalMembers = assignedParties.reduce(
-    (sum, party) => sum + members.filter((m) => m.partyId === party.id).length,
-    0
-  );
+  const guildMembers = members.filter((m) => m.partyId && assignedParties.some((p) => p.id === m.partyId));
+  const totalMembers = guildMembers.length;
   const overCap = totalMembers > guild.cap;
+
+  async function handleSyncRole() {
+    const roleId = guild.discordRoleId?.trim();
+    if (!roleId) return;
+    setSyncState({ status: "loading" });
+    const result = await syncGuildDiscordRole(
+      roleId,
+      guildMembers.map((m) => m.discordId)
+    );
+    if (result.failedIds?.length) {
+      setSyncState({
+        status: "error",
+        error: `No se pudo asignar a ${result.failedIds.length} miembro(s).`,
+      });
+      return;
+    }
+    setSyncState({ status: "idle" });
+  }
 
   function handleAssignSelectedParty() {
     if (locked || !selected || selected.kind !== "party") return;
@@ -118,6 +138,28 @@ export function GuildCard({
       <p className={`guild-occupancy${overCap ? " guild-occupancy--over" : ""}`}>
         {totalMembers}/{guild.cap} jugadores{overCap ? " — supera el cupo" : ""}
       </p>
+
+      <div className="guild-role-sync" onClick={(e) => e.stopPropagation()}>
+        <input
+          className="core-input guild-role-input"
+          defaultValue={guild.discordRoleId ?? ""}
+          disabled={locked}
+          placeholder="ID de rol en Discord (ej. SD2)"
+          onBlur={(e) => onUpdate({ discordRoleId: e.target.value.trim() || undefined })}
+          aria-label={`ID de rol de Discord para ${guild.name}`}
+        />
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          disabled={locked || !guild.discordRoleId?.trim() || totalMembers === 0 || syncState.status === "loading"}
+          onClick={handleSyncRole}
+          title="Asigna ese rol de Discord a todos los miembros que están en esta guild ahora mismo"
+        >
+          <ShieldPlus size={13} />
+          {syncState.status === "loading" ? "Sincronizando…" : "Sincronizar rol"}
+        </button>
+        {syncState.status === "error" && <p className="campo-error">{syncState.error}</p>}
+      </div>
 
       <div className="guild-parties">
         {assignedParties.length === 0 ? (

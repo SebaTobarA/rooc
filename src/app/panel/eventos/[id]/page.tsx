@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { EVENT_CATEGORY_LABEL, EVENT_STATUS_LABEL } from "@/lib/labels";
 import { JOB_ROLE_NAMES } from "@/lib/discord-job-roles";
 import { sendEvent, deleteEvent, resendEvent } from "@/lib/actions/events";
+import { EVENT_CHANNEL_OPTIONS } from "@/lib/discord-guild-channels";
 import { BackLink } from "@/components/back-link";
 
 export const metadata = { title: "Detalle de evento" };
@@ -96,7 +97,23 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
         <div className="mt-5 flex flex-wrap gap-3">
           {event.status === "DRAFT" ? (
             <>
-              <form action={sendEvent.bind(null, event.id)}>
+              <form action={sendEvent.bind(null, event.id)} className="flex flex-wrap items-center gap-2">
+                <select
+                  name="channelId"
+                  required
+                  defaultValue=""
+                  className="rounded-[10px] border border-border bg-surface px-3 py-2 text-sm text-foreground"
+                  aria-label="Canal de Discord donde comunicar el evento"
+                >
+                  <option value="" disabled>
+                    ¿A qué canal comunicarlo?
+                  </option>
+                  {EVENT_CHANNEL_OPTIONS.map((channel) => (
+                    <option key={channel.id} value={channel.id}>
+                      {channel.label}
+                    </option>
+                  ))}
+                </select>
                 <button type="submit" className="btn-brand px-4 py-2 text-sm">
                   Enviar a Discord
                 </button>

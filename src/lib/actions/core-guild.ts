@@ -50,6 +50,19 @@ export async function unlockCoreGuildBoard(): Promise<void> {
   revalidatePath("/admin/core-guild");
 }
 
+/** Le asigna un rol ya existente a cada discordId, tolerando fallos puntuales (ej. alguien ya se fue del server). */
+async function assignRoleToMembers(roleId: string, discordIds: string[]): Promise<string[]> {
+  const failedIds: string[] = [];
+  for (const discordId of discordIds) {
+    try {
+      await addGuildMemberRole(discordId, roleId);
+    } catch {
+      failedIds.push(discordId);
+    }
+  }
+  return failedIds;
+}
+
 /**
  * Crea el rol de un equipo de amigos en Discord (nombrado igual que la
  * etiqueta) y se lo asigna a todos sus miembros. Se llama desde la sección
@@ -70,14 +83,20 @@ export async function createTeamDiscordRole(
     return { error: err instanceof Error ? err.message : "No se pudo crear el rol en Discord." };
   }
 
-  const failedIds: string[] = [];
-  for (const discordId of discordIds) {
-    try {
-      await addGuildMemberRole(discordId, roleId);
-    } catch {
-      failedIds.push(discordId);
-    }
-  }
-
+  const failedIds = await assignRoleToMembers(roleId, discordIds);
   return { roleId, failedIds: failedIds.length > 0 ? failedIds : undefined };
+}
+
+/**
+ * Asigna un rol ya existente en Discord (ej. "SD2", "SD3 Chill de Cojones")
+ * a todos los miembros actualmente ubicados en una guild de Core Guild — el
+ * ID del rol lo tipea el admin a mano en la guild card, esto no crea nada
+ * nuevo en Discord, solo aplica el rol que ya existe.
+ */
+export async function syncGuildDiscordRole(
+  roleId: string,
+  discordIds: string[]
+): Promise<{ failedIds?: string[] }> {
+  const failedIds = await assignRoleToMembers(roleId, discordIds);
+  return { failedIds: failedIds.length > 0 ? failedIds : undefined };
 }

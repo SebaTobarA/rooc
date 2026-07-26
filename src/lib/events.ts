@@ -31,8 +31,13 @@ export async function getDefaultEventChannelId(): Promise<string> {
  * (siguientes veces) en el canal de eventos. Se llama tanto al enviar un
  * evento desde el panel como cada vez que alguien interactúa con los
  * botones del roster en Discord.
+ *
+ * `targetChannelId` solo se usa en la primera publicación (quien envía el
+ * evento elige a cuál de los canales de Asistencia/SD2/SD3 comunicarlo, ver
+ * src/lib/discord-guild-channels.ts) — si no se pasa, cae al canal por
+ * defecto configurado en /panel/eventos.
  */
-export async function renderAndPublishEmbed(eventId: string): Promise<void> {
+export async function renderAndPublishEmbed(eventId: string, targetChannelId?: string): Promise<void> {
   const event = await prisma.event.findUniqueOrThrow({
     where: { id: eventId },
     include: { template: true },
@@ -46,7 +51,7 @@ export async function renderAndPublishEmbed(eventId: string): Promise<void> {
     return;
   }
 
-  const channelId = await getDefaultEventChannelId();
+  const channelId = targetChannelId ?? (await getDefaultEventChannelId());
   const message = await postChannelMessage(channelId, { embeds: [embed], components });
   await prisma.event.update({
     where: { id: eventId },

@@ -487,6 +487,19 @@
   font-weight: 600;
 }
 
+.guild-role-sync {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.guild-role-input {
+  flex: 1;
+  min-width: 120px;
+  font-size: 12px;
+}
+
 .guild-parties {
   display: flex;
   flex-direction: column;

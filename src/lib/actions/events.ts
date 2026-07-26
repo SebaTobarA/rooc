@@ -76,8 +76,10 @@ export async function createEvent(formData: FormData) {
   redirect(`/panel/eventos/${event.id}`);
 }
 
-export async function sendEvent(id: string) {
-  await renderAndPublishEmbed(id);
+export async function sendEvent(id: string, formData: FormData) {
+  const channelId = String(formData.get("channelId") ?? "");
+  if (!channelId) throw new Error("Elige a qué canal comunicar el evento.");
+  await renderAndPublishEmbed(id, channelId);
   revalidateEventPaths(id);
 }
 
@@ -86,11 +88,14 @@ export async function sendEvent(id: string) {
  * la publicación original en Discord a mano. Se olvida el channelId/messageId
  * guardados (apuntan a un mensaje que ya no existe) para que
  * renderAndPublishEmbed tome la rama de "publicar de cero" en vez de
- * intentar editar un mensaje borrado.
+ * intentar editar un mensaje borrado — pero se guarda antes el canal
+ * original para reenviarlo ahí mismo (Asistencia/SD2/SD3), no al canal por
+ * defecto.
  */
 export async function resendEvent(id: string) {
+  const existing = await prisma.event.findUniqueOrThrow({ where: { id }, select: { channelId: true } });
   await prisma.event.update({ where: { id }, data: { channelId: null, messageId: null } });
-  await renderAndPublishEmbed(id);
+  await renderAndPublishEmbed(id, existing.channelId ?? undefined);
   revalidateEventPaths(id);
 }
 

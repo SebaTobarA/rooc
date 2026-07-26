@@ -21,6 +21,7 @@ import { jobGuildRoleIds, listJobGuildRoles, resolveJobFromRoles } from "@/lib/d
 import { swapMemberJobClass } from "@/lib/discord-role-swap";
 import { renderAndPublishEmbed, upsertEventSignup } from "@/lib/events";
 import { buildClassPickerComponents, buildConfirmComponents, parseCustomId } from "@/lib/discord-event-embed";
+import { requiredRoleForChannel } from "@/lib/discord-guild-channels";
 
 export const runtime = "nodejs";
 export const maxDuration = 15;
@@ -40,8 +41,8 @@ function actorDisplayName(member: NonNullable<DiscordInteraction["member"]>): st
   return member.nick ?? member.user.global_name ?? member.user.username;
 }
 
-async function findEventGuard(eventId: string): Promise<{ signupsCloseAt: Date } | null> {
-  return prisma.event.findUnique({ where: { id: eventId }, select: { signupsCloseAt: true } });
+async function findEventGuard(eventId: string): Promise<{ signupsCloseAt: Date; channelId: string | null } | null> {
+  return prisma.event.findUnique({ where: { id: eventId }, select: { signupsCloseAt: true, channelId: true } });
 }
 
 async function safeEdit(token: string, content: string) {
@@ -92,6 +93,14 @@ async function handleComponent(interaction: Required<DiscordInteraction>) {
     return Response.json({
       type: 4,
       data: { flags: 64, content: "Las inscripciones para este evento ya cerraron." },
+    });
+  }
+
+  const requiredRoleId = guard.channelId ? requiredRoleForChannel(guard.channelId) : null;
+  if (requiredRoleId && !interaction.member.roles.includes(requiredRoleId)) {
+    return Response.json({
+      type: 4,
+      data: { flags: 64, content: "No tienes el rol de guild necesario para anotarte en este canal." },
     });
   }
 
