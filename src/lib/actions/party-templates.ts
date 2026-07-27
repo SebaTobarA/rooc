@@ -7,24 +7,15 @@ import { prisma } from "@/lib/prisma";
 import { postChannelMessage, editChannelMessage } from "@/lib/discord-bot";
 import { buildPartyRosterEmbed, eventCategoryLabel } from "@/lib/discord-party-embed";
 import type { Player, Party } from "@/types/party";
+import { readSnapshot, type PartyTemplateSnapshot } from "@/lib/party/template-snapshot";
 
 // Canal de asistencia (mismo donde se publican los eventos) y rol "[SD]
 // Core" a mencionar — fijos a pedido, no configurables desde el panel.
 const PARTY_COMMS_CHANNEL_ID = "1519127820847026256";
 const PARTY_COMMS_ROLE_ID = "1520562599903891526";
 
-export interface PartyTemplateSnapshot {
-  players: Player[];
-  parties: Party[];
-}
-
-export function readSnapshot(data: unknown): PartyTemplateSnapshot | null {
-  if (!data || typeof data !== "object") return null;
-  const players = (data as { players?: unknown }).players;
-  const parties = (data as { parties?: unknown }).parties;
-  if (!Array.isArray(players) || !Array.isArray(parties)) return null;
-  return { players: players as Player[], parties: parties as Party[] };
-}
+// PartyTemplateSnapshot / readSnapshot viven en @/lib/party/template-snapshot
+// porque este archivo es "use server" y solo puede exportar funciones async.
 
 export async function createPartyTemplate(
   event: "GUILD_LEAGUE" | "EMPERIUM_OVERRUN",

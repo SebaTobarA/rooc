@@ -131,7 +131,10 @@ function RaidColumn({ raidId, campo }: { raidId: string; campo: UseCampoReturn }
           />
         ))}
         {partiesInRaid.length === 0 && (
-          <p className="pool-empty">Arrastra o toca una party para asignarla acá</p>
+          <p className="pool-empty">
+            Un raid necesita al menos 1 party — armala con &quot;Organizar este raid&quot;, o arrastrá (o
+            tocá) una desde &quot;Sin asignar&quot;.
+          </p>
         )}
       </div>
     </div>
@@ -139,11 +142,15 @@ function RaidColumn({ raidId, campo }: { raidId: string; campo: UseCampoReturn }
 }
 
 /**
- * Armador de raids de Emperium Overrun — a diferencia de Guild League (dos
- * campos fijos), acá los raids se crean a demanda (mínimo 1, sin máximo) y
- * cada uno tiene su propia composición de party. Las parties arrancan en
- * el grid "sin asignar" de <Campo> y se arrastran (o tocan) hacia el raid
- * que corresponda, con el mismo tope de 8 parties por raid.
+ * Armador de raids, disponible en los dos tipos de evento (Guild League y
+ * Emperium Overrun). Los raids se crean a demanda y cada uno tiene su
+ * propia composición de party: agrupa entre 1 y 8 parties. Las parties
+ * arrancan en el grid "sin asignar" de <Campo> y se arrastran (o tocan)
+ * hacia el raid que corresponda.
+ *
+ * En Guild League convive con la asignación a Campo Principal/Secundario
+ * (ver campo-assignment.tsx): el raid es una agrupación propia del armado,
+ * el campo es dónde juega esa party.
  */
 export function RaidAssignment({ campo }: { campo: UseCampoReturn }) {
   const { raids, addRaid } = campo;
@@ -160,7 +167,8 @@ export function RaidAssignment({ campo }: { campo: UseCampoReturn }) {
       <h2 className="campo-label">Raids</h2>
       <p className="campo-hint">
         Creá un raid, definí qué tipo de parties necesita y armalas ahí directo, o arrastrá (o tocá) una
-        party desde &quot;Sin asignar&quot; para moverla a un raid — máximo 8 parties por raid.
+        party desde &quot;Sin asignar&quot; para moverla a un raid — cada raid lleva entre 1 y{" "}
+        {MAX_PARTIES_PER_RAID} parties.
       </p>
 
       <div className="raid-create-form">

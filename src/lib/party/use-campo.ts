@@ -208,7 +208,7 @@ export interface UseCampoReturn {
   importPlayers: (raw: string) => ImportResult;
   /** Devuelve cuántos jugadores nuevos se agregaron de verdad (excluye duplicados por id/nickname). */
   addPlayers: (players: Player[]) => number;
-  loadSnapshot: (snapshot: { players: Player[]; parties: Party[] }) => void;
+  loadSnapshot: (snapshot: { players: Player[]; parties: Party[]; raids?: Raid[] }) => void;
   updatePlayerClass: (playerId: string, clase: string) => void;
   organizeParties: () => string | null; // null = ok, string = error/aviso
   suggestDistribution: () => string | null; // null = ok, string = aviso
@@ -361,14 +361,28 @@ export function useCampo(initialSlots?: SlotLabel[], options: UseCampoOptions = 
   // applySavedComposition, acá se preserva fidelidad exacta (mismos ids,
   // nombres, capacidades y campo) para que "Guardar cambios" no genere un
   // snapshot distinto si el usuario no tocó nada.
-  const loadSnapshot = useCallback((snapshot: { players: Player[]; parties: Party[] }) => {
-    setPlayers(snapshot.players);
-    // raidId no existía en plantillas guardadas antes de que se agregaran
-    // los raids de Emperium Overrun — sin este fallback, esas parties
-    // quedarían con raidId undefined en vez de null y no matchearían los
-    // chequeos `=== null` que las tratan como "sin asignar a un raid".
-    setParties(snapshot.parties.map((p) => ({ ...p, raidId: p.raidId ?? null })));
-  }, []);
+  const loadSnapshot = useCallback(
+    (snapshot: { players: Player[]; parties: Party[]; raids?: Raid[] }) => {
+      const raids = snapshot.raids ?? [];
+      setPlayers(snapshot.players);
+      setRaids(raids);
+      // raidId no existía en plantillas guardadas antes de que se agregaran
+      // los raids — sin este fallback esas parties quedarían con raidId
+      // undefined en vez de null y no matchearían los chequeos `=== null`
+      // que las tratan como "sin asignar a un raid". Un raidId que apunte a
+      // un raid ya inexistente (plantilla a medio migrar) también se limpia,
+      // porque si no la party desaparecería de la vista: no la dibujaría
+      // ningún raid ni tampoco la grilla de "sin asignar".
+      const knownRaidIds = new Set(raids.map((r) => r.id));
+      setParties(
+        snapshot.parties.map((p) => ({
+          ...p,
+          raidId: p.raidId && knownRaidIds.has(p.raidId) ? p.raidId : null,
+        }))
+      );
+    },
+    []
+  );
 
   // Corrige la clase de un jugador ya importado (ej. sin clase asignada en
   // Discord) y recalcula su rol a partir de la clase nueva.

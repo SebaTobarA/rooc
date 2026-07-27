@@ -36,10 +36,25 @@ export async function listGuildRolesForImport(): Promise<DiscordRoleOption[]> {
 export interface ImportableDiscordMember {
   discordId: string;
   nickname: string;
+  username: string;
+  avatarHash: string | null;
   // Clase sugerida a partir del rol de Discord del miembro, o null si no
   // tiene ninguno asignado — en ese caso el chip queda "Sin clase" y
   // editable a mano en el pool (ver player-chip.tsx).
   suggestedClass: string | null;
+}
+
+function toImportable(
+  member: Awaited<ReturnType<typeof getGuildMembers>>[number],
+  roles: Awaited<ReturnType<typeof getGuildRoles>>
+): ImportableDiscordMember {
+  return {
+    discordId: member.user.id,
+    nickname: member.nick ?? member.user.global_name ?? member.user.username,
+    username: member.user.username,
+    avatarHash: member.user.avatar,
+    suggestedClass: resolveJobFromRoles(member.roles, roles),
+  };
 }
 
 export async function getMembersByDiscordRole(roleId: string): Promise<ImportableDiscordMember[]> {
@@ -47,11 +62,22 @@ export async function getMembersByDiscordRole(roleId: string): Promise<Importabl
 
   const [members, roles] = await Promise.all([getGuildMembers(), getGuildRoles()]);
 
+  return members.filter((member) => member.roles.includes(roleId)).map((m) => toImportable(m, roles));
+}
+
+/**
+ * Todos los miembros del server, sin filtrar por rol ni por inscripción a
+ * un evento — para poder sumar a mano a cualquiera al pool del Party
+ * Builder aunque no haya respondido la encuesta de asistencia (ver
+ * discord-member-picker.tsx). Ordenados por nombre visible para que el
+ * buscador sea predecible.
+ */
+export async function listAllGuildMembers(): Promise<ImportableDiscordMember[]> {
+  await requirePartyManager();
+
+  const [members, roles] = await Promise.all([getGuildMembers(), getGuildRoles()]);
+
   return members
-    .filter((member) => member.roles.includes(roleId))
-    .map((member) => ({
-      discordId: member.user.id,
-      nickname: member.nick ?? member.user.global_name ?? member.user.username,
-      suggestedClass: resolveJobFromRoles(member.roles, roles),
-    }));
+    .map((m) => toImportable(m, roles))
+    .sort((a, b) => a.nickname.localeCompare(b.nickname, "es"));
 }

@@ -6,6 +6,7 @@ import type { Event, EventSignup } from "@prisma/client";
 import type { CampoSide, Player } from "@/types/party";
 import { Campo } from "@/components/party/campo";
 import { CampoAssignment } from "@/components/party/campo-assignment";
+import { RaidAssignment } from "@/components/party/raid-assignment";
 import { useCampo } from "@/lib/party/use-campo";
 import { signupsToPlayers } from "@/lib/party/from-signups";
 import { getEventSignups } from "@/lib/actions/events";
@@ -126,13 +127,13 @@ export function GuildLeague({
     setSaveMsg(null);
     try {
       if (editingTemplate) {
-        await updatePartyTemplate(editingTemplate.id, name, { players: campo.players, parties: campo.parties });
+        await updatePartyTemplate(editingTemplate.id, name, { players: campo.players, parties: campo.parties, raids: campo.raids });
         setSaveMsg({ text: "Cambios guardados.", ok: true });
       } else {
         const template = await createPartyTemplate(
           "GUILD_LEAGUE",
           name,
-          { players: campo.players, parties: campo.parties },
+          { players: campo.players, parties: campo.parties, raids: campo.raids },
           selectedEvent?.id
         );
         setSavedTemplateId(template.id);
@@ -215,6 +216,8 @@ export function GuildLeague({
       )}
 
       <Campo label="Jugadores del gremio" campo={campo} showSlotsImmediately />
+
+      <RaidAssignment campo={campo} />
 
       <CampoAssignment campo={campo} />
 

@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import { ArrowLeft } from "lucide-react";
 import type { Event, EventSignup } from "@prisma/client";
 import type { EventType } from "@/types/party";
-import type { PartyTemplateSnapshot } from "@/lib/actions/party-templates";
+import type { PartyTemplateSnapshot } from "@/lib/party/template-snapshot";
 import { EventSelector } from "@/components/party/event-selector";
 import { GuildLeague } from "@/components/party/guild-league";
 import { EmperiumOverrun } from "@/components/party/emperium-overrun";

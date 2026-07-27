@@ -6,6 +6,7 @@ import type { UseCampoReturn } from "@/lib/party/use-campo";
 import { StatsBar } from "@/components/party/stats-bar";
 import { ImportBox } from "@/components/party/import-box";
 import { DiscordRoleImport } from "@/components/party/discord-role-import";
+import { DiscordMemberPicker } from "@/components/party/discord-member-picker";
 import { SlotPicker } from "@/components/party/slot-picker";
 import { PlayerChip } from "@/components/party/player-chip";
 import { PartyCard } from "@/components/party/party-card";
@@ -32,6 +33,7 @@ export function Campo({ label, campo, showSlotsImmediately = false, saveTemplate
   const {
     players,
     parties,
+    raids,
     compositions,
     setCompositions,
     importPlayers,
@@ -55,9 +57,10 @@ export function Campo({ label, campo, showSlotsImmediately = false, saveTemplate
   const { selected, clearSelection } = usePlayerSelection();
 
   const showSlots = showSlotsImmediately || hasPlayers;
-  // Parties todavía no asignadas a un campo (o, en Emperium, todas — ahí
-  // `campo` nunca se setea porque no existe esa etapa).
-  const stagedParties = parties.filter((p) => !p.campo);
+  // Parties todavía sin destino: ni asignadas a un campo (Guild League) ni
+  // metidas en un raid. Sin excluir las de raid, una party asignada se
+  // dibujaba dos veces — acá y dentro de su columna de raid.
+  const stagedParties = parties.filter((p) => !p.campo && !p.raidId);
 
   function handleZoneDrop(e: DragEvent, partyId: string | null) {
     e.preventDefault();
@@ -124,10 +127,15 @@ export function Campo({ label, campo, showSlotsImmediately = false, saveTemplate
     setSaveMsg("");
     try {
       if (saveTemplate.editingTemplateId) {
-        await updatePartyTemplate(saveTemplate.editingTemplateId, name, { players, parties });
+        await updatePartyTemplate(saveTemplate.editingTemplateId, name, { players, parties, raids });
         setSaveMsg("Cambios guardados.");
       } else {
-        await createPartyTemplate(saveTemplate.event, name, { players, parties }, saveTemplate.eventId);
+        await createPartyTemplate(
+          saveTemplate.event,
+          name,
+          { players, parties, raids },
+          saveTemplate.eventId
+        );
         setSaveMsg("Plantilla guardada.");
       }
     } catch (err) {
@@ -153,6 +161,11 @@ export function Campo({ label, campo, showSlotsImmediately = false, saveTemplate
         <summary className="import-collapse-summary">Importar manualmente (nick, clase)</summary>
         <ImportBox onImport={importPlayers} />
       </details>
+
+      <DiscordMemberPicker
+        onAdd={campo.addPlayers}
+        alreadyInPool={new Set(players.map((p) => p.id))}
+      />
 
       <DiscordRoleImport onImport={campo.addPlayers} />
 
@@ -228,7 +241,7 @@ export function Campo({ label, campo, showSlotsImmediately = false, saveTemplate
             />
           ))}
           {stagedParties.length === 0 && (
-            <p className="pool-empty">Todas las parties fueron asignadas a un campo</p>
+            <p className="pool-empty">Todas las parties ya fueron asignadas a un campo o a un raid</p>
           )}
         </div>
       )}

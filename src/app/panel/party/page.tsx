@@ -4,7 +4,7 @@ import { getEffectivePermissions } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { PartyBuilderApp } from "@/components/party/party-builder-app";
 import { SavedTemplates } from "@/components/party/saved-templates";
-import { readSnapshot } from "@/lib/actions/party-templates";
+import { readSnapshot } from "@/lib/party/template-snapshot";
 
 export const dynamic = "force-dynamic";
 
