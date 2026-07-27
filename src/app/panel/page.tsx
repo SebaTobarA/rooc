@@ -171,7 +171,7 @@ export default async function HomePage() {
           <div className="flex items-center gap-2">
             <BellRing className="h-5 w-5 text-accent" strokeWidth={2.2} />
             <h2 className="font-semibold text-foreground">
-              Tenés {pendingEvents.length} evento{pendingEvents.length === 1 ? "" : "s"} sin responder
+              Tienes {pendingEvents.length} evento{pendingEvents.length === 1 ? "" : "s"} sin responder
             </h2>
           </div>
           <p className="mt-1 text-sm text-muted">

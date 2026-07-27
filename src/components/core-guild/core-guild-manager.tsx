@@ -310,7 +310,7 @@ function CoreGuildManagerInner({ roster, saved, channels }: CoreGuildManagerProp
             onDrop={(e) => handleZoneDrop(e, null)}
             onClick={() => handleZoneClick(null)}
             role="list"
-            aria-label="Miembros solos. Toca un miembro seleccionado para moverlo acá."
+            aria-label="Miembros solos. Toca un miembro seleccionado para moverlo aquí."
           >
             {unassigned.map((m) => (
               <CoreMemberChip
@@ -417,7 +417,7 @@ function CoreGuildManagerInner({ roster, saved, channels }: CoreGuildManagerProp
                         title={
                           partyLocked
                             ? "Crear el rol en Discord y asignárselo a todo el grupo"
-                            : "Marcá el grupo como lista primero"
+                            : "Marca el grupo como lista primero"
                         }
                       >
                         <ShieldPlus size={13} />

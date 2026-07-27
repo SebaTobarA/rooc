@@ -31,7 +31,7 @@ async function discordBotFetch(path: string, init?: RequestInit): Promise<Respon
     cache: "no-store",
   });
   if (response.status === 429) {
-    throw new Error("Discord rate-limited la petición del bot. Probá de nuevo en unos segundos.");
+    throw new Error("Discord rate-limited la petición del bot. Prueba de nuevo en unos segundos.");
   }
   return response;
 }

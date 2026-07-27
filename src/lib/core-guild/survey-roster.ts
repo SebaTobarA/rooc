@@ -28,7 +28,7 @@ export async function renderAndPublishSurveyRoster(targetChannelId?: string): Pr
   }
 
   if (!targetChannelId) {
-    throw new Error("Todavía no se publicó la encuesta — elegí un canal para publicarla primero.");
+    throw new Error("Todavía no se publicó la encuesta — elige un canal para publicarla primero.");
   }
 
   const message = await postChannelMessage(targetChannelId, { embeds: [embed], components });

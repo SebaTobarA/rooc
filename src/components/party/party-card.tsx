@@ -172,7 +172,7 @@ export function PartyCard({
               onClickAssign();
             }}
             role="list"
-            aria-label={`Miembros de ${party.name}. Toca un jugador seleccionado para agregarlo acá.`}
+            aria-label={`Miembros de ${party.name}. Toca un jugador seleccionado para agregarlo aquí.`}
           >
             {members.map((p) =>
               renderMember ? (

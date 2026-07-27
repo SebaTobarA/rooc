@@ -15,7 +15,7 @@ export default async function AdminBuildPvpPage() {
     <div>
       <p className="text-sm text-muted">
         Árbol de clases del simulador de <span className="text-foreground">/panel/build-pvp</span>.
-        Cada clase base tiene su 2da clase y su 2da transcendente — hacé clic en cualquiera para
+        Cada clase base tiene su 2da clase y su 2da transcendente — haz clic en cualquiera para
         cargarle sus habilidades. Los puntos por tier (40) y el total (120) son fijos.
       </p>
 

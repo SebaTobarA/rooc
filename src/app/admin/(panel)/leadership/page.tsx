@@ -35,7 +35,7 @@ export default async function AdminLeadershipPage() {
     <div>
       <p className="text-sm text-muted">
         Los cargos y sus miembros se muestran en la sección &quot;Liderazgo&quot; de la web
-        principal, en el mismo orden en que aparecen acá. El primer cargo de la lista lleva el
+        principal, en el mismo orden en que aparecen aquí. El primer cargo de la lista lleva el
         acento dorado (Guild Leader).
       </p>
 

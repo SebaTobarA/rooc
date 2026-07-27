@@ -117,7 +117,7 @@ function RaidColumn({ raidId, campo }: { raidId: string; campo: UseCampoReturn }
         onDrop={handleColumnDrop}
         onClick={handleColumnClick}
         role="list"
-        aria-label={`${raid.name}. Toca una party seleccionada para asignarla acá.`}
+        aria-label={`${raid.name}. Toca una party seleccionada para asignarla aquí.`}
       >
         {partiesInRaid.map((party) => (
           <PartyCard
@@ -132,8 +132,8 @@ function RaidColumn({ raidId, campo }: { raidId: string; campo: UseCampoReturn }
         ))}
         {partiesInRaid.length === 0 && (
           <p className="pool-empty">
-            Un raid necesita al menos 1 party — armala con &quot;Organizar este raid&quot;, o arrastrá (o
-            tocá) una desde &quot;Sin asignar&quot;.
+            Un raid necesita al menos 1 party — ármala con &quot;Organizar este raid&quot;, o arrastra (o
+            toca) una desde &quot;Sin asignar&quot;.
           </p>
         )}
       </div>
@@ -166,7 +166,7 @@ export function RaidAssignment({ campo }: { campo: UseCampoReturn }) {
     <div className="campo-assignment">
       <h2 className="campo-label">Raids</h2>
       <p className="campo-hint">
-        Creá un raid, definí qué tipo de parties necesita y armalas ahí directo, o arrastrá (o tocá) una
+        Crea un raid, define qué tipo de parties necesita y ármalas ahí directo, o arrastra (o toca) una
         party desde &quot;Sin asignar&quot; para moverla a un raid — cada raid lleva entre 1 y{" "}
         {MAX_PARTIES_PER_RAID} parties.
       </p>

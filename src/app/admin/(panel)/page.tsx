@@ -25,7 +25,7 @@ export default async function AdminDashboardPage() {
     <div>
       <p className="text-sm text-muted">
         {placeholderItems > 0
-          ? `Hay ${placeholderItems} ítem(s) todavía marcados como dato de ejemplo (placeholder). Al crear/editar desde acá se desmarcan automáticamente.`
+          ? `Hay ${placeholderItems} ítem(s) todavía marcados como dato de ejemplo (placeholder). Al crear/editar desde aquí se desmarcan automáticamente.`
           : "Todos los ítems fueron editados o creados manualmente."}
       </p>
 

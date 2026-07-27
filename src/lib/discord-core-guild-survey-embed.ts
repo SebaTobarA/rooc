@@ -33,7 +33,7 @@ function row(...components: DiscordActionRow["components"]): DiscordActionRow {
 }
 
 export const NOT_IN_GUILD_MESSAGE =
-  'Por favor en Guild busca "Spc" en el buscador de Guild y apuntate a SD3 de Petirrojo o a SD4 de Escuditto mientras se hacen las plazas.';
+  'Por favor en Guild busca "Spc" en el buscador de Guild y apúntate a SD3 de Petirrojo o a SD4 de Escuditto mientras se hacen las plazas.';
 
 const SURVEY_COLOR = 0x6fe0f5;
 const SUCCESS_COLOR = 0x57f287;
@@ -91,7 +91,7 @@ export function buildSurveyRosterEmbed(members: CoreMember[], coreRoster: CoreGu
   return {
     title: "📋 Organización de grupos — Core Guild",
     description:
-      "Antes de armar los equipos necesitamos saber en qué guild estás y con quién venís.\n\n¿Estás en una de las Guild?",
+      "Antes de armar los equipos necesitamos saber en qué guild estás y con quién vienes.\n\n¿Estás en una de las Guild?",
     color: SURVEY_COLOR,
     fields,
     footer: { text: `${respondedIds.size} respondieron · ${missing.length} faltan` },
@@ -126,7 +126,7 @@ export function buildGuildSelectComponents(): DiscordActionRow[] {
   const select: DiscordSelectMenu = {
     type: 3,
     custom_id: "cgs:guildsel",
-    placeholder: "Elegí tu guild…",
+    placeholder: "Elige tu guild…",
     options: GUILD_CHOICE_OPTIONS.map((choice) => ({ label: GUILD_CHOICE_LABELS[choice], value: choice })),
   };
   return [row(select)];
@@ -146,7 +146,7 @@ export function buildExistingGroupSelectComponents(guild: GuildChoice, groups: E
   const select: DiscordSelectMenu = {
     type: 3,
     custom_id: `cgs:groupsel:${guild}`,
-    placeholder: "Elegí tu grupo…",
+    placeholder: "Elige tu grupo…",
     options: groups
       .slice(0, MAX_SELECT_OPTIONS)
       .map((g) => ({ label: `${g.tag} (${g.count})`, value: g.tag, description: `${g.count} persona(s)` })),

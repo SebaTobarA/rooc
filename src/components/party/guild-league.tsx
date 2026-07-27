@@ -195,7 +195,7 @@ export function GuildLeague({
       )}
       {events.length > 0 && (
         <p className="campo-hint" style={{ textAlign: "left", padding: "0 0 12px" }}>
-          ¿Alguien no respondió la encuesta de asistencia? Cargá los inscritos y después usá &quot;Importar
+          ¿Alguien no respondió la encuesta de asistencia? Carga los inscritos y después usa &quot;Importar
           por rol de Discord&quot; más abajo para sumar al resto del rol.
         </p>
       )}

@@ -93,7 +93,7 @@ export function GuildCard({
       }}
       onClick={handleAssignSelectedParty}
       role="list"
-      aria-label={`Guild ${guild.name}. Toca una party seleccionada para asignarla acá.`}
+      aria-label={`Guild ${guild.name}. Toca una party seleccionada para asignarla aquí.`}
     >
       <div className="guild-card-header" onClick={(e) => e.stopPropagation()}>
         <input
@@ -189,7 +189,7 @@ export function GuildCard({
 
       <div className="guild-parties">
         {assignedParties.length === 0 ? (
-          <p className="guild-empty">Arrastrá una party acá</p>
+          <p className="guild-empty">Arrastra una party aquí</p>
         ) : (
           assignedParties.map((party) => {
             const count = members.filter((m) => m.partyId === party.id).length;

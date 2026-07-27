@@ -27,7 +27,7 @@ export function EventTemplateForm({
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       <form action={action} className="grid gap-4">
-        <Field label="Nombre del template" hint="Interno, para identificarlo acá — no se muestra en Discord.">
+        <Field label="Nombre del template" hint="Interno, para identificarlo aquí — no se muestra en Discord.">
           <input
             name="title"
             value={title}

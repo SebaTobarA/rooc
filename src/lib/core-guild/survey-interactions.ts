@@ -85,7 +85,7 @@ async function finalizeSurveyResponse(
   await renderAndPublishSurveyRoster();
 }
 
-const RESTART_MESSAGE = "Ocurrió un error, empezá de nuevo desde el mensaje original de la encuesta.";
+const RESTART_MESSAGE = "Ocurrió un error, empieza de nuevo desde el mensaje original de la encuesta.";
 
 export async function handleCoreGuildSurveyComponent(interaction: SurveyComponentInteraction): Promise<Response> {
   const parts = interaction.data.custom_id.split(":");
@@ -145,7 +145,7 @@ export async function handleCoreGuildSurveyComponent(interaction: SurveyComponen
         if (groups.length === 0) {
           await editInteractionOriginal(token, {
             embeds: [
-              buildSurveyStepEmbed('Todavía no hay grupos creados — volvé a elegir "Mi grupo no está" para crear el primero.'),
+              buildSurveyStepEmbed('Todavía no hay grupos creados — vuelve a elegir "Mi grupo no está" para crear el primero.'),
             ],
             components: [],
           });

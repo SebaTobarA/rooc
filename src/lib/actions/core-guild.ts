@@ -111,7 +111,7 @@ export async function syncGuildDiscordRole(
  * anotó y a quién le falta.
  */
 export async function publishCoreGuildSurvey(channelId: string): Promise<{ error?: string }> {
-  if (!channelId) return { error: "Elegí a qué canal publicar la encuesta." };
+  if (!channelId) return { error: "Elige a qué canal publicar la encuesta." };
   try {
     await renderAndPublishSurveyRoster(channelId);
     return {};

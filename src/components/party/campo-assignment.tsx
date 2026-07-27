@@ -66,7 +66,7 @@ function CampoColumn({ side, campo }: { side: CampoSide; campo: UseCampoReturn }
         onDrop={handleColumnDrop}
         onClick={handleColumnClick}
         role="list"
-        aria-label={`${CAMPO_LABEL[side]}. Toca una party seleccionada para asignarla acá.`}
+        aria-label={`${CAMPO_LABEL[side]}. Toca una party seleccionada para asignarla aquí.`}
       >
         {partiesInSide.map((party) => (
           <PartyCard
@@ -81,7 +81,7 @@ function CampoColumn({ side, campo }: { side: CampoSide; campo: UseCampoReturn }
           />
         ))}
         {partiesInSide.length === 0 && (
-          <p className="pool-empty">Arrastra o toca una party para asignarla acá</p>
+          <p className="pool-empty">Arrastra o toca una party para asignarla aquí</p>
         )}
       </div>
     </div>

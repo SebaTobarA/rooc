@@ -112,7 +112,7 @@ export function BuildClassTabs({
             <p className="font-semibold text-foreground">Todavía no hay una build enviada para tu clase</p>
             <p className="mt-1 text-sm text-muted">
               Cuando un oficial envíe una build de PVP para tu clase desde el panel de administración,
-              va a aparecer acá con el detalle de cada skill.
+              va a aparecer aquí con el detalle de cada skill.
             </p>
           </div>
         )
@@ -121,7 +121,7 @@ export function BuildClassTabs({
           <p className="font-semibold text-foreground">En construcción</p>
           <p className="mt-1 text-sm text-muted">
             La pestaña &quot;{active}&quot; todavía no tiene contenido — próximamente vas a poder
-            armar y compartir acá tu build de PVP.
+            armar y compartir aquí tu build de PVP.
           </p>
         </div>
       )}

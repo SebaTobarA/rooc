@@ -91,7 +91,7 @@ export function DiscordRoleImport({ onImport }: DiscordRoleImportProps) {
   return (
     <div className="import-box">
       <p className="import-hint" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <Users size={12} /> Elegí un rol del server — se importan los miembros que todavía no estén en el
+        <Users size={12} /> Elige un rol del server — se importan los miembros que todavía no estén en el
         pool (incluye a quienes no respondieron la encuesta de asistencia), con la clase que ya tengan
         asignada en Discord.
       </p>

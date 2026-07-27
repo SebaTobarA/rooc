@@ -213,7 +213,7 @@ export function Campo({ label, campo, showSlotsImmediately = false, saveTemplate
           onDrop={(e) => handleZoneDrop(e, null)}
           onClick={() => handleZoneClick(null)}
           role="list"
-          aria-label="Jugadores sin asignar. Toca un jugador seleccionado para moverlo acá."
+          aria-label="Jugadores sin asignar. Toca un jugador seleccionado para moverlo aquí."
         >
           {unassigned.map((p) => (
             <PlayerChip key={p.id} player={p} onRemove={removePlayer} onUpdateClass={updatePlayerClass} />

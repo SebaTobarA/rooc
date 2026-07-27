@@ -126,7 +126,7 @@ export function CoreMembersSection({ initialMembers }: CoreMembersSectionProps) 
       </datalist>
 
       <h2 className="campo-label">Miembros Core</h2>
-      <p className="core-guild-status">Se guarda solo, en vivo — no hace falta Editar ni Guardar acá.</p>
+      <p className="core-guild-status">Se guarda solo, en vivo — no hace falta Editar ni Guardar aquí.</p>
 
       <div className="core-member-toolbar">
         <div className="core-search">

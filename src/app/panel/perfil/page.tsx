@@ -54,7 +54,7 @@ export default async function ProfilePage() {
         <div className="rounded-xl border border-dashed border-border p-6 text-center">
           <p className="font-semibold text-foreground">No encontramos tu membresía en Discord</p>
           <p className="mt-1 text-sm text-muted">
-            Puede que hayas salido del server. Volvé a entrar y reintentá.
+            Puede que hayas salido del server. Vuelve a entrar e inténtalo de nuevo.
           </p>
         </div>
       </div>
@@ -132,7 +132,7 @@ export default async function ProfilePage() {
         <div className="mt-4 rounded-xl border border-dashed border-border p-6 text-center">
           <p className="font-semibold text-foreground">En construcción</p>
           <p className="mt-1 text-sm text-muted">
-            Acá vas a poder ver en qué parties te ubicaron para Guild League y Emperium Overrun.
+            Aquí vas a poder ver en qué parties te ubicaron para Guild League y Emperium Overrun.
           </p>
         </div>
       </section>

@@ -75,7 +75,7 @@ export function DiscordMemberPicker({ onAdd, alreadyInPool }: DiscordMemberPicke
   return (
     <div className="import-box">
       <p className="import-hint" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <UserPlus size={12} /> Buscá a cualquier miembro del server y agregalo al pool, esté o no inscrito
+        <UserPlus size={12} /> Busca a cualquier miembro del server y agrégalo al pool, esté o no inscrito
         en el evento.
       </p>
       <input
