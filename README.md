@@ -24,26 +24,26 @@ producción, es mejor servirlo con un servidor local simple:
 # Opción 1: Python (viene preinstalado en la mayoría de los sistemas)
 python -m http.server 8080
 
-# Opción 2: Node (si tenés Node instalado, sin instalar nada más)
+# Opción 2: Node (si tienes Node instalado, sin instalar nada más)
 npx serve .
 ```
 
-Luego abrí `http://localhost:8080` en el navegador.
+Luego abre `http://localhost:8080` en el navegador.
 
 ## Contenido a completar
 
 - **Videos del carrusel**: se generan desde el arreglo `VIDEOS` al inicio de la
-  sección 2 en `script.js` (buscá `var VIDEOS = [`). Cada objeto necesita
+  sección 2 en `script.js` (busca `var VIDEOS = [`). Cada objeto necesita
   `videoId` (lo que va después de `v=` en la URL de YouTube), `title`,
-  `channel` y `date` (formato `"AAAA-MM-DD"`). Podés tener hasta 10; el orden
+  `channel` y `date` (formato `"AAAA-MM-DD"`). Puedes tener hasta 10; el orden
   en la lista es el orden en que se muestran (no se ordenan solos).
 - **Redes sociales**: en `index.html`, dentro de `.social-links`, los links de
   Twitch e Instagram están como `href="#"` (marcados con `<!-- TODO -->`) — 
-  reemplazalos por las URLs reales cuando las tengan. El de YouTube ya apunta
+  reemplázalos por las URLs reales cuando las tengan. El de YouTube ya apunta
   a `youtube.com/@SpecialDeliveryRO`.
 - **Liderazgo**: en la sección "Acerca de la Guild" quedan pendientes el
-  Comandante ("Por definir") y los 4 Oficiales ("Pendiente") — buscá esos
-  textos en `index.html` dentro de `.org-chart` y reemplazalos por los
+  Comandante ("Por definir") y los 4 Oficiales ("Pendiente") — busca esos
+  textos en `index.html` dentro de `.org-chart` y reemplázalos por los
   nombres reales cuando estén definidos.
 - Textos `[placeholder]` en la sección **Reclutamiento** (requisitos, descripción).
 
@@ -62,17 +62,17 @@ tengas el arte final:
 Cualquiera de estas tres opciones sirve el sitio tal cual está, sin pasos de compilación:
 
 ### GitHub Pages
-1. Subí esta carpeta a un repositorio de GitHub.
-2. En el repo: **Settings → Pages → Source**, elegí la rama `main` y la carpeta `/root`.
+1. Sube esta carpeta a un repositorio de GitHub.
+2. En el repo: **Settings → Pages → Source**, elige la rama `main` y la carpeta `/root`.
 3. GitHub te da una URL tipo `https://tu-usuario.github.io/tu-repo/`.
 
 ### Netlify
-1. Arrastrá la carpeta del proyecto a [app.netlify.com/drop](https://app.netlify.com/drop),
-   o conectá el repo de GitHub desde el dashboard de Netlify.
+1. Arrastra la carpeta del proyecto a [app.netlify.com/drop](https://app.netlify.com/drop),
+   o conecta el repo de GitHub desde el dashboard de Netlify.
 2. Build command: dejar vacío. Publish directory: `.` (raíz del proyecto).
 
 ### Vercel
-1. Importá el repo desde [vercel.com/new](https://vercel.com/new).
+1. Importa el repo desde [vercel.com/new](https://vercel.com/new).
 2. Framework preset: **Other**. Build command: vacío. Output directory: `.`.
 
 ## Notas de performance

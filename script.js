@@ -39,7 +39,7 @@
 
   /* ---------- 2) Carrusel de videos ---------- */
   // Lista editable de videos (máximo 10, se muestran varios a la vez con
-  // scroll horizontal). Para sumar uno nuevo, agregá un objeto con el ID del
+  // scroll horizontal). Para sumar uno nuevo, agrega un objeto con el ID del
   // video de YouTube (lo que va después de "v=" en la URL), el título, el
   // nombre del canal y la fecha de publicación ("AAAA-MM-DD"). Orden manual,
   // de más nuevo a más viejo.
