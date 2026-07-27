@@ -660,10 +660,20 @@ export function useCampo(initialSlots?: SlotLabel[], options: UseCampoOptions = 
     if (!raid) return "Ese raid ya no existe.";
 
     const currentCount = partiesRef.current.filter((p) => p.raidId === raidId).length;
-    const capacity = MAX_PARTIES_PER_RAID - currentCount;
-    if (capacity <= 0) {
+    if (MAX_PARTIES_PER_RAID - currentCount <= 0) {
       return `${raid.name} ya tiene ${MAX_PARTIES_PER_RAID} parties — ese es el máximo.`;
     }
+
+    // El tope por raid no alcanza cuando el evento además limita el total
+    // (Guild League: 16 parties entre los dos campos) — sin este segundo
+    // límite, armar varios raids podía pasarse del máximo global.
+    const globalRoom =
+      maxParties !== undefined ? maxParties - partiesRef.current.length : Number.POSITIVE_INFINITY;
+    if (globalRoom <= 0) {
+      return `Se alcanzó el límite de ${maxParties} parties para este evento.`;
+    }
+
+    const capacity = Math.min(MAX_PARTIES_PER_RAID - currentCount, globalRoom);
 
     const pool = playersRef.current.filter((p) => !p.partyId);
     if (pool.length === 0) {
@@ -685,10 +695,15 @@ export function useCampo(initialSlots?: SlotLabel[], options: UseCampoOptions = 
     );
 
     if (result.cappedOut) {
-      return `${raid.name} llegó al máximo de ${MAX_PARTIES_PER_RAID} parties — algunos jugadores sin asignar quedaron pendientes.`;
+      // Cuál de los dos topes se tocó primero cambia el mensaje: el del raid
+      // o el total del evento.
+      const hitRaidCap = capacity === MAX_PARTIES_PER_RAID - currentCount;
+      return hitRaidCap
+        ? `${raid.name} llegó al máximo de ${MAX_PARTIES_PER_RAID} parties — algunos jugadores sin asignar quedaron pendientes.`
+        : `Se alcanzó el límite de ${maxParties} parties para este evento — algunos jugadores sin asignar quedaron pendientes.`;
     }
     return null;
-  }, []);
+  }, [maxParties]);
 
   return {
     players,
