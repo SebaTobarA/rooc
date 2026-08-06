@@ -6,7 +6,7 @@
  * cruda, no un form submit), y ahí ese directive no aplica.
  */
 
-import type { EventCategory, EventSignupStatus } from "@prisma/client";
+import type { EventCategory, EventSignup, EventSignupStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { editChannelMessage, postChannelMessage } from "@/lib/discord-bot";
 import {
@@ -14,6 +14,8 @@ import {
   buildRosterComponents,
   buildDeclineEventEmbed,
   buildDeclineRosterComponents,
+  buildWeeklyAttendanceEmbed,
+  buildWeeklyAttendanceComponents,
 } from "@/lib/discord-event-embed";
 
 /**
@@ -47,6 +49,14 @@ export async function renderAndPublishEmbed(eventId: string, targetChannelId?: s
     where: { id: eventId },
     include: { template: true },
   });
+
+  // Eventos agrupados (ej. Martes/Jueves/Domingo de una misma semana) se
+  // publican como UN solo mensaje combinado — ver createAttendanceWeek.
+  if (event.weekGroupId) {
+    await renderAndPublishWeeklyGroup(event.weekGroupId, targetChannelId);
+    return;
+  }
+
   const signups = await prisma.eventSignup.findMany({ where: { eventId } });
   const isDecline = event.attendanceMode === "DECLINE";
   const embed = isDecline
@@ -63,6 +73,42 @@ export async function renderAndPublishEmbed(eventId: string, targetChannelId?: s
   const message = await postChannelMessage(channelId, { embeds: [embed], components });
   await prisma.event.update({
     where: { id: eventId },
+    data: { channelId, messageId: message.id, status: "PUBLISHED", publishedAt: new Date() },
+  });
+}
+
+async function renderAndPublishWeeklyGroup(weekGroupId: string, targetChannelId?: string): Promise<void> {
+  const events = await prisma.event.findMany({
+    where: { weekGroupId },
+    include: { template: true },
+    orderBy: { startsAt: "asc" },
+  });
+  if (events.length === 0) return;
+
+  const signups = await prisma.eventSignup.findMany({
+    where: { eventId: { in: events.map((e) => e.id) } },
+  });
+  const signupsByEvent = new Map<string, EventSignup[]>();
+  for (const signup of signups) {
+    const list = signupsByEvent.get(signup.eventId) ?? [];
+    list.push(signup);
+    signupsByEvent.set(signup.eventId, list);
+  }
+
+  const days = events.map((event) => ({ event, signups: signupsByEvent.get(event.id) ?? [] }));
+  const embed = buildWeeklyAttendanceEmbed(days, events[0].template);
+  const components = buildWeeklyAttendanceComponents(days);
+
+  const first = events[0];
+  if (first.channelId && first.messageId) {
+    await editChannelMessage(first.channelId, first.messageId, { embeds: [embed], components });
+    return;
+  }
+
+  const channelId = targetChannelId ?? (await getDefaultEventChannelId());
+  const message = await postChannelMessage(channelId, { embeds: [embed], components });
+  await prisma.event.updateMany({
+    where: { weekGroupId },
     data: { channelId, messageId: message.id, status: "PUBLISHED", publishedAt: new Date() },
   });
 }

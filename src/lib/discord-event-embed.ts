@@ -8,6 +8,19 @@
 import type { Event, EventSignup, EventTemplate } from "@prisma/client";
 import type { DiscordActionRow, DiscordButton, DiscordButtonStyle, DiscordEmbed } from "@/lib/discord-bot";
 import { JOB_ROLE_NAMES, JOB_ROLE_EMOJI } from "@/lib/discord-job-roles";
+import { EVENT_CATEGORY_LABEL } from "@/lib/labels";
+
+const CHILE_TIME_ZONE = "America/Santiago";
+const WEEKDAY_FORMATTER = new Intl.DateTimeFormat("es-419", { weekday: "long", timeZone: CHILE_TIME_ZONE });
+const SHORT_DATE_FORMATTER = new Intl.DateTimeFormat("es-419", {
+  day: "2-digit",
+  month: "2-digit",
+  timeZone: CHILE_TIME_ZONE,
+});
+
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
 
 const FALLBACK_COLOR = 0x6fe0f5;
 const MAX_FIELD_VALUE = 1024;
@@ -159,6 +172,70 @@ export function buildDeclineRosterComponents(eventId: string): DiscordActionRow[
       ],
     },
   ];
+}
+
+export interface WeeklyAttendanceDay {
+  event: Event;
+  signups: EventSignup[];
+}
+
+/**
+ * Un solo embed que agrupa varios eventos DECLINE de la misma semana (ej.
+ * Martes/Jueves Guild League + Domingo WoE) — cada uno se muestra como su
+ * propio campo con el nombre del día calculado en hora de Chile, no
+ * asumido a partir del orden. El horario de cierre de cada día usa
+ * timestamp dinámico de Discord, así cada persona lo ve en su propia zona
+ * horaria.
+ */
+export function buildWeeklyAttendanceEmbed(
+  days: WeeklyAttendanceDay[],
+  template: Pick<EventTemplate, "embedColor">
+): DiscordEmbed {
+  const fields = days.map(({ event, signups }) => {
+    const late = signups.filter((s) => s.status === "LATE");
+    const notAttending = signups.filter((s) => s.status === "NOT_ATTENDING");
+    const closeTimestamp = Math.floor(event.signupsCloseAt.getTime() / 1000);
+    const dayLabel = capitalize(WEEKDAY_FORMATTER.format(event.startsAt));
+    const dateLabel = SHORT_DATE_FORMATTER.format(event.startsAt);
+
+    const lines: string[] = [];
+    if (late.length === 0 && notAttending.length === 0) {
+      lines.push("✅ Participan todos");
+    } else {
+      if (late.length > 0) lines.push(`🟡 Llegan tarde: ${late.map((s) => s.displayName).join(", ")}`);
+      if (notAttending.length > 0) {
+        lines.push(`🔴 No van: ${notAttending.map((s) => s.displayName).join(", ")}`);
+      }
+    }
+    lines.push(`🔒 Cambiás tu respuesta hasta <t:${closeTimestamp}:t> (<t:${closeTimestamp}:R>)`);
+
+    return {
+      name: `${dayLabel} ${dateLabel} — ${EVENT_CATEGORY_LABEL[event.category]}`,
+      value: truncateFieldValue(lines),
+    };
+  });
+
+  return {
+    title: "📋 Asistencia de la semana",
+    description:
+      "Marcá los días en que **no** vas a poder jugar con los botones de abajo — por defecto participan todos. Cada horario ya se muestra ajustado a tu propia zona horaria.",
+    color: hexToDiscordColor(template.embedColor),
+    fields,
+  };
+}
+
+export function buildWeeklyAttendanceComponents(days: WeeklyAttendanceDay[]): DiscordActionRow[] {
+  return days.map(({ event }) => {
+    const dayLabel = capitalize(WEEKDAY_FORMATTER.format(event.startsAt));
+    return {
+      type: 1,
+      components: [
+        button(`${dayLabel}: llego tarde`, 2, makeCustomId("dl", event.id)),
+        button(`${dayLabel}: no voy`, 4, makeCustomId("dn", event.id)),
+        button(`${dayLabel}: sí voy`, 3, makeCustomId("dy", event.id)),
+      ],
+    };
+  });
 }
 
 function button(label: string, style: DiscordButtonStyle, customId: string): DiscordButton {

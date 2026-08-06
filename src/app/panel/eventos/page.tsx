@@ -79,9 +79,17 @@ export default async function EventosPage({
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-xl font-bold text-foreground">Eventos</h1>
-        <Link href="/panel/eventos/nuevo" className="btn-brand px-4 py-2 text-sm">
-          + Nuevo evento
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href="/panel/eventos/nueva-semana"
+            className="rounded-[10px] border border-border px-4 py-2 text-sm font-semibold uppercase tracking-wide text-foreground transition-colors hover:bg-surface-hover"
+          >
+            + Semana de asistencia
+          </Link>
+          <Link href="/panel/eventos/nuevo" className="btn-brand px-4 py-2 text-sm">
+            + Nuevo evento
+          </Link>
+        </div>
       </div>
 
       <section className="grid gap-4 sm:grid-cols-4">

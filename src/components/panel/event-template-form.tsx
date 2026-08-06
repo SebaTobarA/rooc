@@ -103,7 +103,7 @@ export function EventTemplateForm({
         <SubmitButton>{template ? "Guardar cambios" : "Crear template"}</SubmitButton>
       </form>
 
-      <EmbedPreview title={title} icon={icon} embedColor={embedColor} />
+      <EmbedPreview title={title} icon={icon} embedColor={embedColor} attendanceMode={attendanceMode} />
     </div>
   );
 }
