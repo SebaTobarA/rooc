@@ -10,6 +10,8 @@ import { RaidAssignment } from "@/components/party/raid-assignment";
 import { useCampo } from "@/lib/party/use-campo";
 import { signupsToPlayers } from "@/lib/party/from-signups";
 import { getEventSignups } from "@/lib/actions/events";
+import { getSdCoreMembersForEvent } from "@/lib/party/discord-import";
+import { sdCoreResultToPlayers } from "@/lib/party/sd-core-to-players";
 import { DATE_FORMATTER } from "@/lib/discord-event-embed";
 import { EVENT_CATEGORY_LABEL } from "@/lib/labels";
 import { SdCoreDeclineImport } from "@/components/party/sd-core-decline-import";
@@ -60,13 +62,7 @@ export function GuildLeague({
 
   const selectedEvent = events.find((e) => e.id === selectedEventId) ?? null;
 
-  async function handleLoadEvent() {
-    if (!selectedEvent) return;
-    const loaded = signupsToPlayers(selectedEvent.signups);
-    campo.addPlayers(loaded);
-    setMsg(`${selectedEvent.signups.length} inscrito(s) cargado(s).`);
-    setTimeout(() => setMsg(""), 4000);
-
+  async function applyLastCompositionIfMatching(loaded: Player[]) {
     const latest = await findLatestTemplateForCategory("GUILD_LEAGUE");
     if (latest) {
       const loadedIds = new Set(loaded.map((p) => p.id));
@@ -75,6 +71,32 @@ export function GuildLeague({
     } else {
       setLastComposition(null);
     }
+  }
+
+  async function handleLoadEvent() {
+    if (!selectedEvent) return;
+
+    // En modo DECLINE nadie tiene que "unirse": por defecto participa todo
+    // [SD] Core, así que cargarlo automático es lo esperado — EventSignup
+    // solo trae las excepciones (llega tarde / no va).
+    if (selectedEvent.attendanceMode === "DECLINE") {
+      const result = await getSdCoreMembersForEvent(selectedEvent.id, []);
+      const loaded = sdCoreResultToPlayers(result);
+      campo.addPlayers(loaded);
+      const parts = [`${loaded.length} de SD Core cargado(s)`];
+      if (result.lateOnly.length > 0) parts.push(`${result.lateOnly.length} llegan tarde (solo Campo Secundario)`);
+      if (result.notAttending.length > 0) parts.push(`${result.notAttending.length} avisaron que no van`);
+      setMsg(`${parts.join(" — ")}.`);
+      setTimeout(() => setMsg(""), 4000);
+      await applyLastCompositionIfMatching(loaded);
+      return;
+    }
+
+    const loaded = signupsToPlayers(selectedEvent.signups);
+    campo.addPlayers(loaded);
+    setMsg(`${selectedEvent.signups.length} inscrito(s) cargado(s).`);
+    setTimeout(() => setMsg(""), 4000);
+    await applyLastCompositionIfMatching(loaded);
   }
 
   async function handleRefresh() {
@@ -179,7 +201,10 @@ export function GuildLeague({
               {events.map((event) => (
                 <option key={event.id} value={event.id}>
                   {EVENT_CATEGORY_LABEL[event.category]} {DATE_FORMATTER.format(event.startsAt)} (
-                  {event.signups.length} participantes)
+                  {event.attendanceMode === "DECLINE"
+                    ? `${event.signups.length} avisos`
+                    : `${event.signups.length} participantes`}
+                  )
                 </option>
               ))}
             </select>

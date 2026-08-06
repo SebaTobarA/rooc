@@ -3,29 +3,18 @@
 import { useState, useTransition } from "react";
 import { Users } from "lucide-react";
 import type { Player } from "@/types/party";
-import { inferRole } from "@/lib/party/infer-role";
 import {
   listGuildRolesForImport,
   getSdCoreMembersForEvent,
   type DiscordRoleOption,
   type ImportableDiscordMember,
 } from "@/lib/party/discord-import";
+import { sdCoreResultToPlayers } from "@/lib/party/sd-core-to-players";
 
 interface SdCoreDeclineImportProps {
   eventId: string;
   /** Devuelve cuántos jugadores nuevos se agregaron de verdad (los ya presentes en el pool se ignoran). */
   onImport: (players: Player[]) => number;
-}
-
-function toPlayer(m: ImportableDiscordMember, campoRestriction: Player["campoRestriction"]): Player {
-  return {
-    id: m.discordId,
-    nickname: m.nickname,
-    clase: m.suggestedClass ?? "",
-    rol: inferRole(m.suggestedClass ?? ""),
-    partyId: null,
-    campoRestriction,
-  };
 }
 
 /**
@@ -73,10 +62,7 @@ export function SdCoreDeclineImport({ eventId, onImport }: SdCoreDeclineImportPr
     startTransition(async () => {
       try {
         const result = await getSdCoreMembersForEvent(eventId, [...selectedRoleIds]);
-        const players: Player[] = [
-          ...result.available.map((m) => toPlayer(m, null)),
-          ...result.lateOnly.map((m) => toPlayer(m, "secundario")),
-        ];
+        const players: Player[] = sdCoreResultToPlayers(result);
         const addedCount = onImport(players);
         const alreadyIn = players.length - addedCount;
         const parts = [addedCount > 0 ? `${addedCount} nuevo(s) cargado(s)` : "Nadie nuevo para cargar"];
@@ -99,7 +85,7 @@ export function SdCoreDeclineImport({ eventId, onImport }: SdCoreDeclineImportPr
           style={{ background: "none", border: "none", padding: 0, display: "block", font: "inherit" }}
           onClick={handleOpen}
         >
-          Cargar SD Core (con subdivisión)
+          Filtrar por subdivisión (SD1, SD2...)
         </button>
         {message && <p className="import-message success">{message}</p>}
         {error && <p className="import-message error">{error}</p>}
@@ -110,9 +96,10 @@ export function SdCoreDeclineImport({ eventId, onImport }: SdCoreDeclineImportPr
   return (
     <div className="import-box">
       <p className="import-hint" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <Users size={12} /> Carga a todo [SD] Core. Marcá roles de subdivisión (ej. SD1, SD2) para filtrar
-        solo a esos — sin nada marcado, carga a todo Core. Quien avisó que llega tarde solo se puede asignar
-        a Campo Secundario; quien avisó que no va queda aparte, sin agregarse al pool.
+        <Users size={12} /> &quot;Cargar inscritos del evento&quot; ya trae a todo [SD] Core automáticamente.
+        Usa esto solo si querés recargar nada más que una subdivisión puntual (ej. SD1 o SD2). Quien avisó
+        que llega tarde solo se puede asignar a Campo Secundario; quien avisó que no va queda aparte, sin
+        agregarse al pool.
       </p>
 
       <div

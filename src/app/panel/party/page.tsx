@@ -12,6 +12,14 @@ export const metadata = {
   title: "Party Builder",
 };
 
+// Eventos de más de 45 días se vuelven irrelevantes para armar parties
+// nuevas — sin este corte, el desplegable acumula años de historial y se
+// vuelve imposible de navegar. Vive fuera del componente para no llamar
+// Date.now() directo en el render (regla react-hooks/purity).
+function relevantEventsSince(): Date {
+  return new Date(Date.now() - 45 * 24 * 60 * 60 * 1000);
+}
+
 export default async function PartyPage({
   searchParams,
 }: {
@@ -34,16 +42,21 @@ export default async function PartyPage({
 
   const { edit: editingTemplateId } = await searchParams;
 
+  const RELEVANT_SINCE = relevantEventsSince();
+  const RELEVANT_EVENTS_TAKE = 30;
+
   const [guildLeagueEvents, emperiumEvents, templateToEdit] = await Promise.all([
     prisma.event.findMany({
-      where: { category: "GUILD_LEAGUE", status: "PUBLISHED" },
+      where: { category: "GUILD_LEAGUE", status: "PUBLISHED", startsAt: { gte: RELEVANT_SINCE } },
       include: { signups: true },
       orderBy: { startsAt: "desc" },
+      take: RELEVANT_EVENTS_TAKE,
     }),
     prisma.event.findMany({
-      where: { category: "EMPERIUM_OVERRUN", status: "PUBLISHED" },
+      where: { category: "EMPERIUM_OVERRUN", status: "PUBLISHED", startsAt: { gte: RELEVANT_SINCE } },
       include: { signups: true },
       orderBy: { startsAt: "desc" },
+      take: RELEVANT_EVENTS_TAKE,
     }),
     editingTemplateId
       ? prisma.partyTemplate.findUnique({ where: { id: editingTemplateId } })
