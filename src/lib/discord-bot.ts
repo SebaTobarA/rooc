@@ -222,6 +222,21 @@ export async function editChannelMessage(
   }
 }
 
+/**
+ * Borra un mensaje publicado por el bot (ej. al eliminar un evento ya
+ * enviado a Discord). Se ignora un 404 (el mensaje ya no existe, por
+ * ejemplo si alguien lo borró a mano antes) para que borrar el evento en
+ * la app nunca falle por algo que ya no está en Discord.
+ */
+export async function deleteChannelMessage(channelId: string, messageId: string): Promise<void> {
+  const response = await discordBotFetch(`/channels/${channelId}/messages/${messageId}`, {
+    method: "DELETE",
+  });
+  if (!response.ok && response.status !== 404) {
+    throw new Error(`No se pudo borrar el mensaje en Discord (${response.status}).`);
+  }
+}
+
 export type DiscordGuildChannel = {
   id: string;
   name: string;

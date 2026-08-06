@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { getEffectivePermissions } from "@/lib/permissions";
 import { renderAndPublishEmbed } from "@/lib/events";
+import { deleteChannelMessage } from "@/lib/discord-bot";
 
 // Fecha y hora llegan como dos inputs nativos separados (type="date" +
 // type="time", cada uno con su propio selector). Se combinan acá y se les
@@ -143,12 +144,30 @@ export async function getEventSignups(eventId: string) {
   return prisma.eventSignup.findMany({ where: { eventId } });
 }
 
+/**
+ * Borra un evento — a diferencia de antes, ahora también se puede borrar
+ * uno ya publicado (ej. se creó por error, o era de prueba): se intenta
+ * borrar su mensaje de Discord y después el registro. Si el evento
+ * pertenece a una semana combinada (weekGroupId — ver
+ * createAttendanceWeek), se borran los 3 días juntos y el único mensaje
+ * combinado que comparten, para no dejar días huérfanos apuntando a un
+ * mensaje ya borrado.
+ */
 export async function deleteEvent(id: string) {
   const existing = await prisma.event.findUniqueOrThrow({ where: { id } });
-  if (existing.status !== "DRAFT") {
-    throw new Error("Solo se pueden borrar eventos que todavía no se enviaron a Discord.");
+
+  if (existing.weekGroupId) {
+    if (existing.channelId && existing.messageId) {
+      await deleteChannelMessage(existing.channelId, existing.messageId);
+    }
+    await prisma.event.deleteMany({ where: { weekGroupId: existing.weekGroupId } });
+  } else {
+    if (existing.channelId && existing.messageId) {
+      await deleteChannelMessage(existing.channelId, existing.messageId);
+    }
+    await prisma.event.delete({ where: { id } });
   }
-  await prisma.event.delete({ where: { id } });
+
   revalidateEventPaths();
   redirect("/panel/eventos");
 }

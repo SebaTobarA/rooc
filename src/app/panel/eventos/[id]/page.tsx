@@ -9,6 +9,7 @@ import { sendEvent, deleteEvent, resendEvent, updateEventSignupsCloseAt } from "
 import { EVENT_CHANNEL_OPTIONS } from "@/lib/discord-guild-channels";
 import { toLocalDateValue, toLocalTimeValue } from "@/lib/event-date-format";
 import { BackLink } from "@/components/back-link";
+import { DeleteEventButton } from "@/components/panel/delete-event-button";
 
 export const metadata = { title: "Detalle de evento" };
 export const dynamic = "force-dynamic";
@@ -155,11 +156,6 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
                   Enviar a Discord
                 </button>
               </form>
-              <form action={deleteEvent.bind(null, event.id)}>
-                <button type="submit" className="text-sm text-muted hover:text-accent">
-                  Eliminar
-                </button>
-              </form>
             </>
           ) : (
             <>
@@ -185,6 +181,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
               </form>
             </>
           )}
+          <DeleteEventButton action={deleteEvent.bind(null, event.id)} isGrouped={Boolean(event.weekGroupId)} />
         </div>
       </div>
 

@@ -25,6 +25,7 @@ interface SdCoreDeclineImportProps {
  */
 export function SdCoreDeclineImport({ eventId, onImport }: SdCoreDeclineImportProps) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const [roles, setRoles] = useState<DiscordRoleOption[] | null>(null);
   const [selectedRoleIds, setSelectedRoleIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState("");
@@ -93,6 +94,9 @@ export function SdCoreDeclineImport({ eventId, onImport }: SdCoreDeclineImportPr
     );
   }
 
+  const filteredRoles = roles?.filter((r) => r.name.toLowerCase().includes(query.toLowerCase())) ?? [];
+  const selectedRoles = roles?.filter((r) => selectedRoleIds.has(r.id)) ?? [];
+
   return (
     <div className="import-box">
       <p className="import-hint" style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -102,20 +106,45 @@ export function SdCoreDeclineImport({ eventId, onImport }: SdCoreDeclineImportPr
         agregarse al pool.
       </p>
 
+      {selectedRoles.length > 0 && (
+        <div className="import-actions" style={{ flexWrap: "wrap", gap: 4 }}>
+          {selectedRoles.map((role) => (
+            <button
+              key={role.id}
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={() => toggleRole(role.id)}
+            >
+              {role.name} ✕
+            </button>
+          ))}
+        </div>
+      )}
+
+      <input
+        autoFocus
+        type="text"
+        placeholder="Buscar rol de subdivisión..."
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        className="gl-event-picker-select"
+      />
+
       <div
         className="import-actions"
         style={{ flexDirection: "column", alignItems: "stretch", gap: 4, maxHeight: 208, overflowY: "auto" }}
       >
         {isPending && roles === null && <p className="campo-hint">Cargando roles…</p>}
-        {roles?.map((role) => (
-          <label key={role.id} className="campo-hint" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <input
-              type="checkbox"
-              checked={selectedRoleIds.has(role.id)}
-              onChange={() => toggleRole(role.id)}
-            />
+        {filteredRoles.map((role) => (
+          <button
+            key={role.id}
+            type="button"
+            className={`btn btn-sm ${selectedRoleIds.has(role.id) ? "btn-primary" : "btn-secondary"}`}
+            disabled={isPending}
+            onClick={() => toggleRole(role.id)}
+          >
             {role.name}
-          </label>
+          </button>
         ))}
       </div>
 
@@ -123,7 +152,7 @@ export function SdCoreDeclineImport({ eventId, onImport }: SdCoreDeclineImportPr
 
       <div className="import-actions">
         <button type="button" className="btn btn-primary btn-sm" disabled={isPending} onClick={handleLoad}>
-          Cargar SD Core
+          Cargar SD Core{selectedRoles.length > 0 ? ` (${selectedRoles.length} filtro/s)` : ""}
         </button>
         <button type="button" className="btn btn-ghost btn-sm" onClick={() => setOpen(false)} disabled={isPending}>
           Cerrar
