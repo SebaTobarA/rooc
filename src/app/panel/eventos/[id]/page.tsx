@@ -7,7 +7,7 @@ import { EVENT_CATEGORY_LABEL, EVENT_STATUS_LABEL } from "@/lib/labels";
 import { JOB_ROLE_NAMES } from "@/lib/discord-job-roles";
 import { sendEvent, deleteEvent, resendEvent, updateEventSignupsCloseAt } from "@/lib/actions/events";
 import { EVENT_CHANNEL_OPTIONS } from "@/lib/discord-guild-channels";
-import { toLocalDateValue, toLocalTimeValue } from "@/components/forms/event-form";
+import { toLocalDateValue, toLocalTimeValue } from "@/lib/event-date-format";
 import { BackLink } from "@/components/back-link";
 
 export const metadata = { title: "Detalle de evento" };
