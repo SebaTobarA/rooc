@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import type { EventTemplate } from "@prisma/client";
-import { EventCategory } from "@prisma/client";
-import { EVENT_CATEGORY_LABEL } from "@/lib/labels";
+import { EventAttendanceMode, EventCategory } from "@prisma/client";
+import { EVENT_CATEGORY_LABEL, EVENT_ATTENDANCE_MODE_LABEL, EVENT_ATTENDANCE_MODE_HINT } from "@/lib/labels";
 import { Field, SubmitButton, inputClass } from "@/components/forms/form-fields";
 import { EmbedPreview } from "@/components/panel/embed-preview";
 
@@ -23,6 +23,9 @@ export function EventTemplateForm({
   const [category, setCategory] = useState<EventCategory>(template?.category ?? EventCategory.GUILD_LEAGUE);
   const [icon, setIcon] = useState(template?.icon ?? "");
   const [embedColor, setEmbedColor] = useState(template?.embedColor ?? "#6fe0f5");
+  const [attendanceMode, setAttendanceMode] = useState<EventAttendanceMode>(
+    template?.attendanceMode ?? EventAttendanceMode.CONFIRM
+  );
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
@@ -80,6 +83,21 @@ export function EventTemplateForm({
               className={`${inputClass} flex-1`}
             />
           </div>
+        </Field>
+
+        <Field label="Vista de asistencia" hint={EVENT_ATTENDANCE_MODE_HINT[attendanceMode]}>
+          <select
+            name="attendanceMode"
+            value={attendanceMode}
+            onChange={(e) => setAttendanceMode(e.target.value as EventAttendanceMode)}
+            className={inputClass}
+          >
+            {Object.entries(EVENT_ATTENDANCE_MODE_LABEL).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
         </Field>
 
         <SubmitButton>{template ? "Guardar cambios" : "Crear template"}</SubmitButton>

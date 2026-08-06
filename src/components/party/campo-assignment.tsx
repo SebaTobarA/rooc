@@ -43,14 +43,18 @@ function CampoColumn({ side, campo }: { side: CampoSide; campo: UseCampoReturn }
     e.preventDefault();
     const payload = readDragPayload(e);
     if (!payload || payload.kind !== "player") return;
-    assignPlayer(payload.id, partyId);
-    clearSelection();
+    const err = assignPlayer(payload.id, partyId);
+    setError(err ?? "");
+    if (!err) clearSelection();
+    if (err) setTimeout(() => setError(""), 4000);
   }
 
   function handlePlayerClickAssign(partyId: string) {
     if (!selected || selected.kind !== "player") return;
-    assignPlayer(selected.id, partyId);
-    clearSelection();
+    const err = assignPlayer(selected.id, partyId);
+    setError(err ?? "");
+    if (!err) clearSelection();
+    if (err) setTimeout(() => setError(""), 4000);
   }
 
   return (

@@ -1,0 +1,153 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { Users } from "lucide-react";
+import type { Player } from "@/types/party";
+import { inferRole } from "@/lib/party/infer-role";
+import {
+  listGuildRolesForImport,
+  getSdCoreMembersForEvent,
+  type DiscordRoleOption,
+  type ImportableDiscordMember,
+} from "@/lib/party/discord-import";
+
+interface SdCoreDeclineImportProps {
+  eventId: string;
+  /** Devuelve cuántos jugadores nuevos se agregaron de verdad (los ya presentes en el pool se ignoran). */
+  onImport: (players: Player[]) => number;
+}
+
+function toPlayer(m: ImportableDiscordMember, campoRestriction: Player["campoRestriction"]): Player {
+  return {
+    id: m.discordId,
+    nickname: m.nickname,
+    clase: m.suggestedClass ?? "",
+    rol: inferRole(m.suggestedClass ?? ""),
+    partyId: null,
+    campoRestriction,
+  };
+}
+
+/**
+ * Para eventos en modo DECLINE: carga a todo [SD] Core, opcionalmente
+ * cruzado con roles de subdivisión (SD1, SD2...) elegidos acá, separando
+ * quién llega tarde (solo Campo Secundario) y quién avisó que no va
+ * (informativo, no se agrega al pool) — ver getSdCoreMembersForEvent.
+ */
+export function SdCoreDeclineImport({ eventId, onImport }: SdCoreDeclineImportProps) {
+  const [open, setOpen] = useState(false);
+  const [roles, setRoles] = useState<DiscordRoleOption[] | null>(null);
+  const [selectedRoleIds, setSelectedRoleIds] = useState<Set<string>>(new Set());
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const [notAttending, setNotAttending] = useState<ImportableDiscordMember[] | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  function handleOpen() {
+    setOpen(true);
+    setNotAttending(null);
+    if (roles !== null) return;
+    setError("");
+    startTransition(async () => {
+      try {
+        setRoles(await listGuildRolesForImport());
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "No se pudieron cargar los roles de Discord.");
+      }
+    });
+  }
+
+  function toggleRole(roleId: string) {
+    setSelectedRoleIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(roleId)) next.delete(roleId);
+      else next.add(roleId);
+      return next;
+    });
+  }
+
+  function handleLoad() {
+    setError("");
+    setMessage("");
+    setNotAttending(null);
+    startTransition(async () => {
+      try {
+        const result = await getSdCoreMembersForEvent(eventId, [...selectedRoleIds]);
+        const players: Player[] = [
+          ...result.available.map((m) => toPlayer(m, null)),
+          ...result.lateOnly.map((m) => toPlayer(m, "secundario")),
+        ];
+        const addedCount = onImport(players);
+        const alreadyIn = players.length - addedCount;
+        const parts = [addedCount > 0 ? `${addedCount} nuevo(s) cargado(s)` : "Nadie nuevo para cargar"];
+        if (alreadyIn > 0) parts.push(`${alreadyIn} ya estaban en el pool`);
+        if (result.lateOnly.length > 0) parts.push(`${result.lateOnly.length} llegan tarde (solo Campo Secundario)`);
+        setMessage(`${parts.join(" — ")}.`);
+        setNotAttending(result.notAttending);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "No se pudo cargar SD Core.");
+      }
+    });
+  }
+
+  if (!open) {
+    return (
+      <div className="import-collapse">
+        <button
+          type="button"
+          className="import-collapse-summary"
+          style={{ background: "none", border: "none", padding: 0, display: "block", font: "inherit" }}
+          onClick={handleOpen}
+        >
+          Cargar SD Core (con subdivisión)
+        </button>
+        {message && <p className="import-message success">{message}</p>}
+        {error && <p className="import-message error">{error}</p>}
+      </div>
+    );
+  }
+
+  return (
+    <div className="import-box">
+      <p className="import-hint" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <Users size={12} /> Carga a todo [SD] Core. Marcá roles de subdivisión (ej. SD1, SD2) para filtrar
+        solo a esos — sin nada marcado, carga a todo Core. Quien avisó que llega tarde solo se puede asignar
+        a Campo Secundario; quien avisó que no va queda aparte, sin agregarse al pool.
+      </p>
+
+      <div
+        className="import-actions"
+        style={{ flexDirection: "column", alignItems: "stretch", gap: 4, maxHeight: 208, overflowY: "auto" }}
+      >
+        {isPending && roles === null && <p className="campo-hint">Cargando roles…</p>}
+        {roles?.map((role) => (
+          <label key={role.id} className="campo-hint" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <input
+              type="checkbox"
+              checked={selectedRoleIds.has(role.id)}
+              onChange={() => toggleRole(role.id)}
+            />
+            {role.name}
+          </label>
+        ))}
+      </div>
+
+      {error && <p className="import-message error">{error}</p>}
+
+      <div className="import-actions">
+        <button type="button" className="btn btn-primary btn-sm" disabled={isPending} onClick={handleLoad}>
+          Cargar SD Core
+        </button>
+        <button type="button" className="btn btn-ghost btn-sm" onClick={() => setOpen(false)} disabled={isPending}>
+          Cerrar
+        </button>
+      </div>
+
+      {notAttending && notAttending.length > 0 && (
+        <div className="campo-hint" style={{ marginTop: 8 }}>
+          <strong>No van ({notAttending.length}):</strong> {notAttending.map((m) => m.nickname).join(", ")}
+        </div>
+      )}
+    </div>
+  );
+}

@@ -11,6 +11,8 @@ import { getSession } from "@/lib/auth";
 import { getEffectivePermissions } from "@/lib/permissions";
 import { getGuildMembers, getGuildRoles } from "@/lib/discord-bot";
 import { resolveJobFromRoles } from "@/lib/discord-job-roles";
+import { prisma } from "@/lib/prisma";
+import { CORE_GUILD_ROLE_ID } from "@/lib/core-guild/sync";
 
 async function requirePartyManager() {
   const session = await getSession();
@@ -80,4 +82,57 @@ export async function listAllGuildMembers(): Promise<ImportableDiscordMember[]> 
   return members
     .map((m) => toImportable(m, roles))
     .sort((a, b) => a.nickname.localeCompare(b.nickname, "es"));
+}
+
+export interface SdCoreImportResult {
+  // Sin registro en EventSignup, o CONFIRMED — se pueden arrastrar a
+  // cualquier campo/party.
+  available: ImportableDiscordMember[];
+  // Avisaron "Llegaré tarde" — solo se pueden arrastrar a parties de Campo
+  // Secundario (ver campoRestriction en types/party.ts).
+  lateOnly: ImportableDiscordMember[];
+  // Avisaron "No asistiré" — informativo, no se agregan al pool.
+  notAttending: ImportableDiscordMember[];
+}
+
+/**
+ * Para eventos en modo DECLINE ("marcar inasistencia"): carga a todo el rol
+ * [SD] Core, opcionalmente cruzado con roles de subdivisión (ej. SD1, SD2 —
+ * ver core-guild/guild-choice.ts) para poder separar la carga por
+ * sub-guild, y lo cruza contra el EventSignup del evento elegido para saber
+ * quién avisó que llega tarde o que no va. A diferencia de
+ * getMembersByDiscordRole, acá el "rol" de filtro es siempre [SD] Core más
+ * (si se pasan) *alguno* de los roles de subdivisión — no un solo rol
+ * suelto.
+ */
+export async function getSdCoreMembersForEvent(
+  eventId: string,
+  subdivisionRoleIds: string[]
+): Promise<SdCoreImportResult> {
+  await requirePartyManager();
+
+  const [members, roles, signups] = await Promise.all([
+    getGuildMembers(),
+    getGuildRoles(),
+    prisma.eventSignup.findMany({ where: { eventId } }),
+  ]);
+
+  const statusByDiscordId = new Map(signups.map((s) => [s.discordId, s.status]));
+
+  const coreMembers = members.filter(
+    (member) =>
+      member.roles.includes(CORE_GUILD_ROLE_ID) &&
+      (subdivisionRoleIds.length === 0 || subdivisionRoleIds.some((roleId) => member.roles.includes(roleId)))
+  );
+
+  const result: SdCoreImportResult = { available: [], lateOnly: [], notAttending: [] };
+  for (const member of coreMembers) {
+    const importable = toImportable(member, roles);
+    const status = statusByDiscordId.get(member.user.id);
+    if (status === "NOT_ATTENDING") result.notAttending.push(importable);
+    else if (status === "LATE") result.lateOnly.push(importable);
+    else result.available.push(importable);
+  }
+
+  return result;
 }

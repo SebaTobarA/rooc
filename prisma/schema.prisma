@@ -472,6 +472,14 @@ enum EventSignupStatus {
   NOT_ATTENDING
 }
 
+// CONFIRM: modo actual — hay que apretar "Participar" para quedar anotado.
+// DECLINE: modo nuevo — por defecto todos participan; solo hace falta
+// interactuar para avisar que se llega tarde o que no se puede ir.
+enum EventAttendanceMode {
+  CONFIRM
+  DECLINE
+}
+
 // Configuración reutilizable de estilo del embed (color, ícono) — se crea
 // una vez por tipo de evento y se reusa cada vez que se carga una fecha
 // nueva, para no reconfigurar el estilo en cada evento.
@@ -482,6 +490,9 @@ model EventTemplate {
   icon       String?
   embedColor String        @default("#6fe0f5")
   category   EventCategory
+  // Copiado a cada Event creado desde este template (ver createEvent) —
+  // define qué embed/botones se publican y cómo se interpretan los signups.
+  attendanceMode EventAttendanceMode @default(CONFIRM)
 
   createdById String
   createdBy   User    @relation(fields: [createdById], references: [id])
@@ -505,6 +516,10 @@ model Event {
   description String        @default("")
   // Copiada del template elegido al crear el evento.
   category    EventCategory
+  // Copiado del template elegido al crear el evento (ver createEvent) — así
+  // un evento ya publicado no cambia de comportamiento si el template se
+  // edita después.
+  attendanceMode EventAttendanceMode @default(CONFIRM)
   templateId  String
   template    EventTemplate @relation(fields: [templateId], references: [id])
 

@@ -1,5 +1,8 @@
+"use client";
+
+import { useState } from "react";
 import type { Event, EventTemplate } from "@prisma/client";
-import { EVENT_CATEGORY_LABEL } from "@/lib/labels";
+import { EVENT_CATEGORY_LABEL, EVENT_ATTENDANCE_MODE_HINT } from "@/lib/labels";
 import { Field, SubmitButton, inputClass } from "@/components/forms/form-fields";
 
 // Los inputs date/time nativos necesitan "YYYY-MM-DD" y "HH:mm" por
@@ -49,14 +52,23 @@ export function EventForm({
   templates: EventTemplate[];
   action: (formData: FormData) => void | Promise<void>;
 }) {
+  const [templateId, setTemplateId] = useState(event?.templateId ?? "");
+  const selectedTemplate = templates.find((t) => t.id === templateId);
+
   return (
     <form action={action} className="grid max-w-2xl gap-4">
       <Field label="Título">
         <input name="title" defaultValue={event?.title} required className={inputClass} />
       </Field>
 
-      <Field label="Template" hint="Define el color, ícono y categoría del embed en Discord.">
-        <select name="templateId" defaultValue={event?.templateId} required className={inputClass}>
+      <Field label="Template" hint="Define el color, ícono, categoría y forma de tomar asistencia del embed en Discord.">
+        <select
+          name="templateId"
+          value={templateId}
+          onChange={(e) => setTemplateId(e.target.value)}
+          required
+          className={inputClass}
+        >
           <option value="" disabled>
             Elige un template
           </option>
@@ -67,6 +79,10 @@ export function EventForm({
           ))}
         </select>
       </Field>
+
+      {selectedTemplate && (
+        <p className="text-xs text-muted">{EVENT_ATTENDANCE_MODE_HINT[selectedTemplate.attendanceMode]}</p>
+      )}
 
       <div className="grid grid-cols-2 gap-4">
         <Field label="Fecha de inicio">
@@ -111,8 +127,9 @@ export function EventForm({
       </div>
 
       <p className="text-xs text-muted">
-        Las inscripciones quedan abiertas hasta la fecha y hora de fin — el mensaje sigue en
-        Discord hasta que se borre, así que no hace falta un cierre aparte.
+        {selectedTemplate?.attendanceMode === "DECLINE"
+          ? "El cierre de inscripciones arranca igual a la fecha/hora de fin — ajústalo después desde la página del evento a la hora límite que quieras (ej. 18:00 hora de Chile de ese día)."
+          : "Las inscripciones quedan abiertas hasta la fecha y hora de fin — el mensaje sigue en Discord hasta que se borre, así que no hace falta un cierre aparte."}
       </p>
 
       <Field label="Descripción" hint="Se muestra tal cual en el mensaje de Discord.">

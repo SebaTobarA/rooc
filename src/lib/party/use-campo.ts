@@ -212,7 +212,7 @@ export interface UseCampoReturn {
   updatePlayerClass: (playerId: string, clase: string) => void;
   organizeParties: () => string | null; // null = ok, string = error/aviso
   suggestDistribution: () => string | null; // null = ok, string = aviso
-  assignPlayer: (playerId: string, partyId: string | null) => void;
+  assignPlayer: (playerId: string, partyId: string | null) => string | null; // null = ok, string = error
   assignPartyCampo: (partyId: string, campo: Party["campo"]) => string | null; // null = ok, string = error
   distributeCampos: () => { text: string; ok: boolean };
   removePlayer: (playerId: string) => void;
@@ -482,8 +482,20 @@ export function useCampo(initialSlots?: SlotLabel[], options: UseCampoOptions = 
     return cappedMsg;
   }, [maxParties]);
 
-  const assignPlayer = useCallback((playerId: string, partyId: string | null) => {
+  // Quien avisó "Llegaré tarde" en un evento DECLINE solo puede ir a parties
+  // de Campo Secundario (ver campoRestriction en types/party.ts) — null =
+  // sin restricción, se puede mover a cualquier lado.
+  const assignPlayer = useCallback((playerId: string, partyId: string | null): string | null => {
+    const player = playersRef.current.find((p) => p.id === playerId);
+    if (player?.campoRestriction && partyId) {
+      const targetParty = partiesRef.current.find((p) => p.id === partyId);
+      if (targetParty?.campo && targetParty.campo !== player.campoRestriction) {
+        const label = player.campoRestriction === "principal" ? "Campo Principal" : "Campo Secundario";
+        return `${player.nickname} llega tarde — solo se puede asignar a una party de ${label}.`;
+      }
+    }
     setPlayers((prev) => prev.map((p) => (p.id === playerId ? { ...p, partyId } : p)));
+    return null;
   }, []);
 
   // Asigna una party completa a un campo (Guild League) — ver
@@ -495,6 +507,14 @@ export function useCampo(initialSlots?: SlotLabel[], options: UseCampoOptions = 
       if (countInCampo >= MAX_PARTIES_PER_CAMPO) {
         const label = campo === "principal" ? "Campo Principal" : "Campo Secundario";
         return `${label} ya tiene ${MAX_PARTIES_PER_CAMPO} parties — ese es el máximo.`;
+      }
+
+      const blockedMember = playersRef.current.find(
+        (p) => p.partyId === partyId && p.campoRestriction && p.campoRestriction !== campo
+      );
+      if (blockedMember) {
+        const label = blockedMember.campoRestriction === "principal" ? "Campo Principal" : "Campo Secundario";
+        return `Esta party tiene a ${blockedMember.nickname}, que llega tarde y solo puede ir a ${label}.`;
       }
     }
     setParties((prev) => prev.map((p) => (p.id === partyId ? { ...p, campo } : p)));

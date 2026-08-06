@@ -70,7 +70,12 @@ export async function createEvent(formData: FormData) {
   const template = await prisma.eventTemplate.findUniqueOrThrow({ where: { id: data.templateId } });
 
   const event = await prisma.event.create({
-    data: { ...data, category: template.category, createdById: user.id },
+    data: {
+      ...data,
+      category: template.category,
+      attendanceMode: template.attendanceMode,
+      createdById: user.id,
+    },
   });
 
   revalidateEventPaths(event.id);

@@ -266,6 +266,48 @@ async function handleComponent(interaction: Required<DiscordInteraction>) {
       return Response.json({ type: 6 });
     }
 
+    case "dl":
+    case "dn": {
+      // Modo DECLINE — Llegaré tarde / No asistiré: igual que "l"/"o" pero
+      // en el roster donde por defecto todos participan (no hace falta
+      // haber hecho "Participar" antes).
+      after(async () => {
+        try {
+          const guildRoles = await getGuildRolesCached();
+          const currentJob = resolveJobFromRoles(interaction.member.roles, guildRoles);
+          const jobRoles = listJobGuildRoles(guildRoles);
+          const target = currentJob ? jobRoles.find((role) => role.name === currentJob) : undefined;
+          await upsertEventSignup(eventId, actorId, {
+            displayName,
+            className: target?.name ?? "Sin clase",
+            classRoleId: target?.id ?? "",
+            status: action === "dl" ? "LATE" : "NOT_ATTENDING",
+          });
+          await renderAndPublishEmbed(eventId);
+        } catch {
+          // Igual que en "l"/"o": si falla, el próximo clic reintenta el
+          // render completo, así que no hace falta avisar el error acá.
+        }
+      });
+      return Response.json({ type: 6 });
+    }
+
+    case "dy": {
+      // Modo DECLINE — Voy a tiempo: deshace un aviso anterior de "llego
+      // tarde"/"no asisto", volviendo al estado por defecto (participa sin
+      // necesidad de ningún registro en EventSignup).
+      after(async () => {
+        try {
+          await prisma.eventSignup.deleteMany({ where: { eventId, discordId: actorId } });
+          await renderAndPublishEmbed(eventId);
+        } catch {
+          // Igual que en "l"/"o": si falla, el próximo clic reintenta el
+          // render completo, así que no hace falta avisar el error acá.
+        }
+      });
+      return Response.json({ type: 6 });
+    }
+
     default:
       return Response.json({ type: 4, data: { flags: 64, content: "Acción no reconocida." } });
   }

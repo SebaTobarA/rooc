@@ -9,7 +9,12 @@
 import type { EventCategory, EventSignupStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { editChannelMessage, postChannelMessage } from "@/lib/discord-bot";
-import { buildEventEmbed, buildRosterComponents } from "@/lib/discord-event-embed";
+import {
+  buildEventEmbed,
+  buildRosterComponents,
+  buildDeclineEventEmbed,
+  buildDeclineRosterComponents,
+} from "@/lib/discord-event-embed";
 
 /**
  * A qué canal se publican los eventos por defecto — configurable desde
@@ -43,8 +48,11 @@ export async function renderAndPublishEmbed(eventId: string, targetChannelId?: s
     include: { template: true },
   });
   const signups = await prisma.eventSignup.findMany({ where: { eventId } });
-  const embed = buildEventEmbed(event, signups, event.template);
-  const components = buildRosterComponents(eventId);
+  const isDecline = event.attendanceMode === "DECLINE";
+  const embed = isDecline
+    ? buildDeclineEventEmbed(event, signups, event.template)
+    : buildEventEmbed(event, signups, event.template);
+  const components = isDecline ? buildDeclineRosterComponents(eventId) : buildRosterComponents(eventId);
 
   if (event.channelId && event.messageId) {
     await editChannelMessage(event.channelId, event.messageId, { embeds: [embed], components });

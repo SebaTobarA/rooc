@@ -3,6 +3,7 @@ import type {
   CardRarity,
   CardSlot,
   Element,
+  EventAttendanceMode,
   EventCategory,
   EventStatus,
   ItemRarity,
@@ -95,6 +96,17 @@ export const EVENT_CATEGORY_LABEL: Record<EventCategory, string> = {
 export const EVENT_STATUS_LABEL: Record<EventStatus, string> = {
   DRAFT: "Borrador",
   PUBLISHED: "Enviado a Discord",
+};
+
+export const EVENT_ATTENDANCE_MODE_LABEL: Record<EventAttendanceMode, string> = {
+  CONFIRM: "Confirmar asistencia (Participar / Llego tarde / No alcanzo)",
+  DECLINE: "Marcar inasistencia (por defecto todos participan)",
+};
+
+export const EVENT_ATTENDANCE_MODE_HINT: Record<EventAttendanceMode, string> = {
+  CONFIRM: "Cada persona tiene que apretar \"Participar\" y elegir su clase para quedar anotada.",
+  DECLINE:
+    "Se asume que todo el rol participa: solo hace falta interactuar para avisar que se llega tarde o que no se puede ir.",
 };
 
 export const APPLICATION_STATUS_LABEL: Record<ApplicationStatus, string> = {

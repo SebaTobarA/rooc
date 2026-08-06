@@ -57,9 +57,12 @@ export function PlayerChip({ player, onRemove, onUpdateClass }: PlayerChipProps)
       onKeyDown={handleKeyDown}
       role="listitem"
       tabIndex={0}
-      aria-label={`${player.nickname}, ${player.clase || "sin clase"}${isSelected ? " (seleccionado)" : ""}`}
+      aria-label={`${player.nickname}, ${player.clase || "sin clase"}${player.campoRestriction ? ", llega tarde" : ""}${isSelected ? " (seleccionado)" : ""}`}
     >
-      <span className="chip-nick">{player.nickname}</span>
+      <span className="chip-nick">
+        {player.campoRestriction && <span title="Llega tarde — solo Campo Secundario">⏰ </span>}
+        {player.nickname}
+      </span>
       {!player.clase && onUpdateClass ? (
         <input
           key={player.id}

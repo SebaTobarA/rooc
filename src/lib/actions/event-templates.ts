@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { EventCategory } from "@prisma/client";
+import { EventAttendanceMode, EventCategory } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 
@@ -15,6 +15,7 @@ const templateSchema = z.object({
     .optional()
     .transform((value) => value || null),
   embedColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, "El color tiene que ser un hex válido, ej: #6fe0f5"),
+  attendanceMode: z.nativeEnum(EventAttendanceMode),
 });
 
 function parseTemplateForm(formData: FormData) {
@@ -23,6 +24,7 @@ function parseTemplateForm(formData: FormData) {
     category: formData.get("category"),
     icon: formData.get("icon") ?? "",
     embedColor: formData.get("embedColor"),
+    attendanceMode: formData.get("attendanceMode") ?? "CONFIRM",
   });
 }
 

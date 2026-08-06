@@ -106,6 +106,61 @@ export function buildEventEmbed(
   };
 }
 
+/**
+ * Embed del roster para templates en modo DECLINE ("marcar inasistencia"):
+ * a diferencia de buildEventEmbed, acá no hay que confirmar nada para
+ * participar — solo se lista a quienes avisaron que llegan tarde o que no
+ * van. El horario de cierre se muestra con timestamp dinámico de Discord
+ * (<t:...>) en vez de una hora fija, para que cada persona lo vea ya
+ * convertido a su propia zona horaria.
+ */
+export function buildDeclineEventEmbed(
+  event: Event,
+  signups: EventSignup[],
+  template: Pick<EventTemplate, "icon" | "embedColor">
+): DiscordEmbed {
+  const late = signups.filter((s) => s.status === "LATE");
+  const notAttending = signups.filter((s) => s.status === "NOT_ATTENDING");
+  const closeTimestamp = Math.floor(event.signupsCloseAt.getTime() / 1000);
+
+  return {
+    title: template.icon ? `${template.icon} ${event.title}` : event.title,
+    description: [
+      "**Event Info:**",
+      formatEventRange(event.startsAt, event.endsAt),
+      `🔒 Podés cambiar tu respuesta hasta <t:${closeTimestamp}:t> (<t:${closeTimestamp}:R>)`,
+      "",
+      "Por defecto **participan todos**. Si vas a llegar tarde o no vas a poder ir, avisá con los botones de abajo.",
+      "",
+      "**Description:**",
+      event.description || "-",
+    ].join("\n"),
+    color: hexToDiscordColor(template.embedColor),
+    fields: [
+      { name: `Llegan tarde (${late.length})`, value: truncateFieldValue(late.map((s) => s.displayName)) },
+      {
+        name: `No asisten (${notAttending.length})`,
+        value: truncateFieldValue(notAttending.map((s) => s.displayName)),
+      },
+    ],
+    footer: { text: `${late.length} llegan tarde · ${notAttending.length} no asisten · el resto participa` },
+    timestamp: event.startsAt.toISOString(),
+  };
+}
+
+export function buildDeclineRosterComponents(eventId: string): DiscordActionRow[] {
+  return [
+    {
+      type: 1,
+      components: [
+        button("Llegaré tarde", 2, makeCustomId("dl", eventId)),
+        button("No asistiré", 4, makeCustomId("dn", eventId)),
+        button("Voy a tiempo", 3, makeCustomId("dy", eventId)),
+      ],
+    },
+  ];
+}
+
 function button(label: string, style: DiscordButtonStyle, customId: string): DiscordButton {
   return { type: 2, style, label, custom_id: customId };
 }
@@ -151,7 +206,7 @@ export function buildClassPickerComponents(
   }));
 }
 
-export type InteractionAction = "j" | "l" | "o" | "y" | "n" | "p";
+export type InteractionAction = "j" | "l" | "o" | "y" | "n" | "p" | "dl" | "dn" | "dy";
 
 export function makeCustomId(action: InteractionAction, eventId: string, roleId?: string): string {
   return roleId ? `${action}:${eventId}:${roleId}` : `${action}:${eventId}`;

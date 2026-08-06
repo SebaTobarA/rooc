@@ -4,15 +4,19 @@ export type SlotLabel = "Tanque" | "Daño" | "Soporte" | "Flexible";
 
 export type EventType = "guild" | "emperium" | null;
 
+export type CampoSide = "principal" | "secundario";
+
 export interface Player {
   id: string;
   nickname: string;
   clase: string;
   rol: Role;
   partyId: string | null;
+  // Si viene de un evento en modo DECLINE y avisó que llega tarde, solo
+  // puede arrastrarse a parties de ese campo (ver use-campo.ts
+  // assignPlayer/assignPartyCampo). null/undefined = sin restricción.
+  campoRestriction?: CampoSide | null;
 }
-
-export type CampoSide = "principal" | "secundario";
 
 export interface Party {
   id: string;

@@ -10,6 +10,9 @@ import { RaidAssignment } from "@/components/party/raid-assignment";
 import { useCampo } from "@/lib/party/use-campo";
 import { signupsToPlayers } from "@/lib/party/from-signups";
 import { getEventSignups } from "@/lib/actions/events";
+import { DATE_FORMATTER } from "@/lib/discord-event-embed";
+import { EVENT_CATEGORY_LABEL } from "@/lib/labels";
+import { SdCoreDeclineImport } from "@/components/party/sd-core-decline-import";
 import type { EditingTemplate } from "@/components/party/party-builder-app";
 import {
   createPartyTemplate,
@@ -175,7 +178,8 @@ export function GuildLeague({
             >
               {events.map((event) => (
                 <option key={event.id} value={event.id}>
-                  {event.title} ({event.signups.length} inscritos)
+                  {EVENT_CATEGORY_LABEL[event.category]} {DATE_FORMATTER.format(event.startsAt)} (
+                  {event.signups.length} participantes)
                 </option>
               ))}
             </select>
@@ -193,11 +197,15 @@ export function GuildLeague({
           abajo.
         </p>
       )}
-      {events.length > 0 && (
+      {events.length > 0 && selectedEvent?.attendanceMode !== "DECLINE" && (
         <p className="campo-hint" style={{ textAlign: "left", padding: "0 0 12px" }}>
           ¿Alguien no respondió la encuesta de asistencia? Carga los inscritos y después usa &quot;Importar
           por rol de Discord&quot; más abajo para sumar al resto del rol.
         </p>
+      )}
+
+      {selectedEvent?.attendanceMode === "DECLINE" && (
+        <SdCoreDeclineImport eventId={selectedEvent.id} onImport={campo.addPlayers} />
       )}
       {msg && <p className="suggest-msg">{msg}</p>}
 
