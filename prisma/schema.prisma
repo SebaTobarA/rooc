@@ -367,6 +367,15 @@ enum ApplicationStatus {
   PENDING
   APPROVED
   WAITLISTED
+  // Rechazada desde el botón del canal de reclutamiento. Se distingue de
+  // WAITLISTED a propósito: "lista de espera" es un no por ahora, esto es un no.
+  REJECTED
+}
+
+/** Guild a la que se suma un postulante aprobado. */
+enum GuildBranch {
+  SD1
+  SD2
 }
 
 // Postulación de ingreso a la guild, enviada desde /panel/postulacion por
@@ -386,10 +395,34 @@ model GuildApplication {
   availability  String
   aboutYou      String @default("")
 
+  // Capturas de pantalla del progreso in-game que el postulante sube desde
+  // /panel/postulacion (ver APPLICATION_SCREENSHOTS en src/lib/recruitment-screenshots.ts,
+  // que es la fuente única de la lista y su orden). Son URLs públicas de
+  // Vercel Blob con nombre aleatorio, igual que las imágenes de equipamiento.
+  // Con @default("") para que las postulaciones ya existentes no se rompan:
+  // las viejas quedan sin capturas y el panel lo muestra como tal.
+  shotPlayerPower     String @default("")
+  shotFeathers        String @default("")
+  shotGearRefine      String @default("")
+  shotMountLevel      String @default("")
+  shotMountKiwis      String @default("")
+  shotMonsterResearch String @default("")
+  shotCards           String @default("")
+  shotPets            String @default("")
+
   status     ApplicationStatus @default(PENDING)
   // Mensaje que ve el postulante junto al estado (ej. el texto de lista de
   // espera). Vacío mientras está PENDING.
   reviewNote String            @default("")
+
+  // Guild asignada al aprobar (se pregunta en el mismo aviso de Discord).
+  // El rol correspondiente se le da al postulante en ese momento.
+  branch GuildBranch?
+
+  // Mensaje del canal de reclutamiento que publica el bot al recibir la
+  // postulación. Se guarda para poder editarlo cuando alguien decide, y así
+  // el aviso queda resuelto en vez de con los botones colgando.
+  discordMessageId String @default("")
 
   reviewedByDiscordId String?
   reviewedByUsername  String?

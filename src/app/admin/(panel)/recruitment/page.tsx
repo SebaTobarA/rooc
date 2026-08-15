@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { discordAvatarUrl } from "@/lib/discord-avatar";
 import { APPLICATION_STATUS_COLOR, APPLICATION_STATUS_LABEL } from "@/lib/labels";
 import { RecruitmentReviewForm } from "@/components/admin/recruitment-review-form";
+import { APPLICATION_SCREENSHOTS } from "@/lib/recruitment-screenshots";
 
 export const dynamic = "force-dynamic";
 
@@ -100,6 +101,54 @@ export default async function AdminRecruitmentPage() {
                   </div>
                 )}
               </dl>
+
+              {(() => {
+                // Las postulaciones anteriores a que las capturas fueran
+                // obligatorias no tienen ninguna: en vez de mostrar 8 huecos
+                // vacíos, se avisa una sola vez.
+                const shots = APPLICATION_SCREENSHOTS.map((shot) => ({
+                  ...shot,
+                  url: application[shot.field],
+                })).filter((shot) => shot.url);
+
+                if (shots.length === 0) {
+                  return (
+                    <p className="mt-3 border-t border-border pt-3 text-xs text-muted">
+                      Esta postulación se envió antes de que se pidieran las capturas de progreso.
+                    </p>
+                  );
+                }
+
+                return (
+                  <div className="mt-3 border-t border-border pt-3">
+                    <p className="text-xs uppercase tracking-wide text-muted">
+                      Capturas de progreso ({shots.length}/{APPLICATION_SCREENSHOTS.length})
+                    </p>
+                    <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      {shots.map((shot) => (
+                        <a
+                          key={shot.field}
+                          href={shot.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="group flex flex-col gap-1"
+                          title={`Abrir "${shot.label}" en tamaño completo`}
+                        >
+                          <img
+                            src={shot.url}
+                            alt={shot.label}
+                            loading="lazy"
+                            className="h-24 w-full rounded-md border border-border bg-background-elevated object-cover transition group-hover:border-accent"
+                          />
+                          <span className="text-[11px] leading-tight text-muted group-hover:text-foreground">
+                            {shot.label}
+                          </span>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div className="mt-3 border-t border-border pt-3 text-xs text-muted">
                 {application.reviewedByUsername ? (

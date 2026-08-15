@@ -113,10 +113,12 @@ export const APPLICATION_STATUS_LABEL: Record<ApplicationStatus, string> = {
   PENDING: "Pendiente de revisión",
   APPROVED: "Aprobada",
   WAITLISTED: "Lista de espera",
+  REJECTED: "Rechazada",
 };
 
 export const APPLICATION_STATUS_COLOR: Record<ApplicationStatus, string> = {
   PENDING: "text-amber-400 border-amber-500/40",
   APPROVED: "text-emerald-400 border-emerald-500/40",
   WAITLISTED: "text-sky-400 border-sky-500/40",
+  REJECTED: "text-rose-400 border-rose-500/40",
 };

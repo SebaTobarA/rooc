@@ -23,6 +23,8 @@ import { renderAndPublishEmbed, upsertEventSignup } from "@/lib/events";
 import { buildClassPickerComponents, buildConfirmComponents, parseCustomId } from "@/lib/discord-event-embed";
 import { requiredRoleForChannel } from "@/lib/discord-guild-channels";
 import { handleCoreGuildSurveyComponent, handleCoreGuildSurveyModalSubmit } from "@/lib/core-guild/survey-interactions";
+import { RECRUITMENT_CUSTOM_ID_PREFIX } from "@/lib/recruitment-discord";
+import { handleRecruitmentComponent } from "@/lib/recruitment-interactions";
 
 export const runtime = "nodejs";
 export const maxDuration = 15;
@@ -84,6 +86,15 @@ export async function POST(request: Request) {
         token: interaction.token,
         member: interaction.member,
         data: { custom_id: interaction.data.custom_id, values: interaction.data.values },
+      });
+    }
+    // Igual que "cgs:": el aviso de reclutamiento usa su propio esquema de
+    // custom_id ("rec:...") y no pasa por el parseCustomId de eventos.
+    if (interaction.data.custom_id.startsWith(RECRUITMENT_CUSTOM_ID_PREFIX)) {
+      return handleRecruitmentComponent({
+        token: interaction.token,
+        member: interaction.member,
+        customId: interaction.data.custom_id,
       });
     }
     return handleComponent(interaction as Required<DiscordInteraction>);

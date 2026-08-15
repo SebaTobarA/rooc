@@ -2,6 +2,8 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { JOB_ROLE_NAMES } from "@/lib/discord-job-roles";
 import { submitApplication } from "@/lib/actions/recruitment";
+import { ApplicationForm } from "@/components/panel/application-form";
+import { APPLICATION_SCREENSHOTS } from "@/lib/recruitment-screenshots";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +23,10 @@ const STATUS_COPY: Record<string, { title: string; text: string }> = {
   WAITLISTED: {
     title: "En lista de espera",
     text: "",
+  },
+  REJECTED: {
+    title: "Postulación no aprobada",
+    text: "Gracias por postular a Special Delivery. Por ahora no vamos a avanzar con tu postulación.",
   },
 };
 
@@ -42,7 +48,9 @@ export default async function PostulacionPage() {
       </h1>
       <p className="mt-2 text-sm text-muted">
         Completa este formulario para solicitar tu ingreso a la guild. Un Guild Leader, Vice
-        Guild Leader u Oficial va a revisar tu postulación.
+        Guild Leader u Oficial va a revisar tu postulación. Vas a necesitar{" "}
+        {APPLICATION_SCREENSHOTS.length} capturas de tu progreso in-game, así que ten el juego
+        a mano.
       </p>
 
       {application ? (
@@ -84,72 +92,7 @@ export default async function PostulacionPage() {
           </dl>
         </div>
       ) : (
-        <form action={submitApplication} className="mt-6 flex flex-col gap-4">
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="text-muted">Nombre de personaje</span>
-            <input
-              type="text"
-              name="characterName"
-              required
-              placeholder="Ej: PolloGomez"
-              className="rounded-md border border-border bg-background-elevated px-3 py-2 text-sm text-foreground outline-none focus:border-accent"
-            />
-          </label>
-
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="text-muted">Clase</span>
-            <select
-              name="className"
-              required
-              defaultValue=""
-              className="rounded-md border border-border bg-background-elevated px-3 py-2 text-sm text-foreground outline-none focus:border-accent"
-            >
-              <option value="" disabled>
-                Elige tu clase
-              </option>
-              {JOB_ROLE_NAMES.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="text-muted">Nivel actual (opcional)</span>
-            <input
-              type="text"
-              name="levelText"
-              placeholder="Ej: 99/70"
-              className="rounded-md border border-border bg-background-elevated px-3 py-2 text-sm text-foreground outline-none focus:border-accent"
-            />
-          </label>
-
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="text-muted">Disponibilidad horaria</span>
-            <input
-              type="text"
-              name="availability"
-              required
-              placeholder="Ej: noches entre semana y fines de semana"
-              className="rounded-md border border-border bg-background-elevated px-3 py-2 text-sm text-foreground outline-none focus:border-accent"
-            />
-          </label>
-
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="text-muted">Cuéntanos un poco de ti (opcional)</span>
-            <textarea
-              name="aboutYou"
-              rows={4}
-              placeholder="Experiencia previa en guilds, qué buscas en Special Delivery, etc."
-              className="rounded-md border border-border bg-background-elevated px-3 py-2 text-sm text-foreground outline-none focus:border-accent"
-            />
-          </label>
-
-          <button type="submit" className="btn-brand mt-2 self-start px-5 py-2.5 text-sm">
-            Enviar postulación
-          </button>
-        </form>
+        <ApplicationForm action={submitApplication} jobRoleNames={JOB_ROLE_NAMES} />
       )}
     </div>
   );

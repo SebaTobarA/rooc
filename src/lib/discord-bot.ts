@@ -58,6 +58,10 @@ export type DiscordEmbed = {
   fields?: { name: string; value: string; inline?: boolean }[];
   footer?: { text: string };
   timestamp?: string;
+  /** Un embed muestra una sola imagen: para varias hacen falta varios embeds
+   *  (hasta 10 por mensaje). Ver buildApplicationEmbeds. */
+  image?: { url: string };
+  author?: { name: string; icon_url?: string };
 };
 
 /** Estilos de botón de la API de Discord (1=azul, 2=gris, 3=verde, 4=rojo). */
@@ -193,7 +197,13 @@ export async function removeGuildMemberRole(discordId: string, roleId: string): 
 /** Postea un mensaje nuevo (con embed y/o botones) en un canal. Devuelve el ID del mensaje creado. */
 export async function postChannelMessage(
   channelId: string,
-  body: { content?: string; embeds?: DiscordEmbed[]; components?: DiscordActionRow[] }
+  body: {
+    content?: string;
+    embeds?: DiscordEmbed[];
+    components?: DiscordActionRow[];
+    /** `{ parse: [] }` deja las menciones visibles pero sin notificar a nadie. */
+    allowed_mentions?: { parse: string[] };
+  }
 ): Promise<{ id: string }> {
   const response = await discordBotFetch(`/channels/${channelId}/messages`, {
     method: "POST",

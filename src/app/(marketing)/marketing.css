@@ -1610,6 +1610,99 @@ ul {
   color: var(--color-primary);
 }
 
+/* Par de CTA del hero de reclutamiento (postulación primaria + Discord secundario) */
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.9rem;
+}
+
+/* ---------- Bloque de postulación ---------- */
+/* El formulario en sí vive en el panel (/panel/postulacion): acá solo está la
+   tarjeta que explica qué hay que tener listo y enlaza hacia allá. */
+
+/* Variante secundaria de botón: mismo peso visual que .btn pero sin relleno,
+   para no competir con el CTA principal cuando aparecen juntos. */
+.btn-ghost {
+  background: transparent;
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+
+.btn-ghost:hover,
+.btn-ghost:focus-visible {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  box-shadow: 0 8px 24px rgba(111, 224, 245, 0.18);
+}
+
+.apply-card {
+  margin-top: 2rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1.6rem 1.3rem;
+}
+
+.apply-cta {
+  text-align: center;
+}
+
+.apply-cta-text {
+  margin: 0 auto;
+  max-width: 52ch;
+  color: var(--color-text-muted);
+}
+
+.apply-cta-text strong {
+  color: var(--color-text);
+}
+
+/* Lista de capturas requeridas: dos columnas en pantallas anchas para que no
+   se lea como una lista interminable antes del botón. */
+.apply-checklist {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.5rem 1.5rem;
+  list-style: none;
+  padding: 0;
+  margin: 1.4rem auto;
+  max-width: 46rem;
+  text-align: left;
+}
+
+.apply-checklist li {
+  position: relative;
+  padding-left: 1.6rem;
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+}
+
+.apply-checklist li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.55em;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--gradient-line);
+}
+
+@media (min-width: 720px) {
+  .apply-checklist {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.apply-legal {
+  margin: 1.4rem auto 0;
+  max-width: 52ch;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
 /* ---------- Footer ---------- */
 .site-footer {
   border-top: 1px solid var(--color-border);

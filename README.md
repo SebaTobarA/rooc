@@ -207,6 +207,60 @@ Si `DISCORD_CLIENT_ID`/`DISCORD_CLIENT_SECRET` no están configurados, el
 botón de Discord simplemente va a fallar al hacer clic — el login por
 usuario/contraseña sigue funcionando igual.
 
+## Reclutamiento (postulaciones)
+
+El circuito completo vive acá, no en el sitio estático de GitHub Pages:
+
+| Paso | Dónde |
+| --- | --- |
+| El postulante completa el formulario | `/panel/postulacion` (requiere login con Discord) |
+| Las capturas se suben | `POST /api/postulacion/upload` → Vercel Blob (store público) |
+| Se guarda la postulación | `submitApplication` en `src/lib/actions/recruitment.ts` → modelo `GuildApplication` |
+| Los oficiales revisan | `/admin/recruitment` (permiso `canManageRecruitment`) |
+
+La página de marketing `/reclutamiento` solo explica el proceso y enlaza al
+formulario. El sitio estático (repo `special-delivery`) hace lo mismo: no
+tiene formulario propio, para que exista una sola bandeja de entrada.
+
+### Capturas de progreso obligatorias
+
+`src/lib/recruitment-screenshots.ts` es la **fuente única** de qué capturas se
+piden y en qué orden. Hoy son 8: poder de jugador, plumas, equipamiento y
+refine, montura (nivel y kiwis por separado), monster research, cartas y pets.
+Ese archivo alimenta a la vez el formulario, el checklist de `/reclutamiento`,
+la validación del servidor y la grilla del panel de revisión.
+
+Para pedir una captura más:
+
+1. Agrega la entrada en `APPLICATION_SCREENSHOTS`, con un `field` nuevo.
+2. Agrega la columna `shot...` con el mismo nombre en `GuildApplication`
+   (`prisma/schema.prisma`), como `String @default("")` para no romper las
+   postulaciones ya guardadas.
+3. Corre la migración.
+
+No hace falta tocar el formulario ni el panel: los dos recorren la lista.
+
+### Validaciones
+
+- **Clase**: tiene que ser una de `JOB_ROLE_NAMES` (los roles de clase del
+  server). El `<select>` ya lo limita, pero se revalida en el servidor porque
+  el `FormData` viene del cliente.
+- **Nivel**: se acepta `99` o `99/70`. Base máximo 99, job máximo 70.
+- **Capturas**: las 8 son obligatorias y solo se aceptan URLs del propio store
+  de Vercel Blob, para que un envío manipulado no pueda inyectar una imagen de
+  otro origen en el panel de los oficiales.
+- **Tamaño**: 4 MB por captura. Cada una se sube en su propia petición, así
+  ninguna se acerca al límite de 4.5 MB que Vercel impone al cuerpo de las
+  peticiones.
+
+### Privacidad de las capturas
+
+Se guardan en el store **público** de Blob (el store privado original no admite
+`access: "public"`, y el panel necesita poder mostrarlas). Las URLs llevan un
+UUID aleatorio, así que no se pueden adivinar ni listar, pero cualquiera que
+tenga el enlace puede abrirlo. Son capturas de progreso in-game, no datos
+sensibles, pero conviene tenerlo presente.
+
 ## Arquitectura y extensibilidad
 
 El esquema (`prisma/schema.prisma`) tiene los modelos principales — `Item`,
