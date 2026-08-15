@@ -1,12 +1,13 @@
 # Special Delivery — Sitio web de la guild (ROOC)
 
-Sitio estático de una sola página (HTML + CSS + JS vanilla, sin frameworks ni build step).
+Sitio estático (HTML + CSS + JS vanilla, sin frameworks ni build step).
 
 ## Estructura
 
 ```
 /
 ├── index.html
+├── reclutamiento.html                (página dedicada; enlaza al formulario del panel)
 ├── styles.css
 ├── script.js
 ├── assets/
@@ -46,6 +47,24 @@ Luego abre `http://localhost:8080` en el navegador.
   textos en `index.html` dentro de `.org-chart` y reemplázalos por los
   nombres reales cuando estén definidos.
 - Textos `[placeholder]` en la sección **Reclutamiento** (requisitos, descripción).
+
+## Postulaciones
+
+Este sitio **no** tiene formulario propio. Las postulaciones se gestionan en el
+panel (proyecto `roocbuilder`, desplegado en Vercel):
+
+- Formulario: <https://specialdelivery.vercel.app/panel/postulacion> — pide
+  iniciar sesión con Discord y sube 8 capturas de progreso in-game.
+- Revisión: `/admin/recruitment` en ese mismo proyecto.
+
+La sección `#postular` de `reclutamiento.html` solo explica qué hay que tener
+listo y enlaza ahí. Se hizo así para que haya una sola bandeja de entrada: un
+formulario propio acá no llegaría nunca al panel de los oficiales.
+
+Si cambia la lista de capturas, la fuente única es
+`src/lib/recruitment-screenshots.ts` en `roocbuilder` — hay que actualizar a
+mano la lista de `.apply-checklist` en `reclutamiento.html` para que no queden
+desincronizadas.
 
 ## Reemplazar el logo del fantasma
 

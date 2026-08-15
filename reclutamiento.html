@@ -64,16 +64,27 @@
       <span class="eyebrow">Reclutamiento abierto</span>
       <h1 class="reclutamiento-hero-title">Únete a Special Delivery</h1>
       <p class="reclutamiento-hero-text">Buscamos jugadores comprometidos que quieran crecer junto al gremio en Ragnarok Origin: Classic — competitivos cuando importa, buena onda siempre.</p>
-      <a href="https://discord.gg/XnTrEKEGw" target="_blank" rel="noopener noreferrer" class="btn btn-discord btn-large">
-        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-          <path fill="currentColor" d="M20.317 4.369a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.058a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128c.126-.094.252-.192.372-.291a.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.009c.12.099.246.198.373.292a.077.077 0 0 1-.006.128 12.3 12.3 0 0 1-1.873.891.076.076 0 0 0-.04.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.029 19.84 19.84 0 0 0 6.002-3.03.077.077 0 0 0 .032-.055c.5-5.177-.838-9.674-3.549-13.662a.06.06 0 0 0-.031-.028zM8.02 15.331c-1.183 0-2.157-1.086-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.211 0 2.176 1.096 2.157 2.419 0 1.333-.955 2.419-2.157 2.419zm7.975 0c-1.183 0-2.157-1.086-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.419 0 1.333-.946 2.419-2.157 2.419z"/>
-        </svg>
-        <span>Postular por Discord</span>
-        <span class="discord-online" data-discord-online hidden>
-          <span class="discord-online-dot" aria-hidden="true"></span>
-          <span class="discord-online-count" data-discord-online-count></span>
-        </span>
-      </a>
+
+      <!-- El formulario es la vía principal; Discord queda como alternativa secundaria -->
+      <div class="hero-actions">
+        <a href="#postular" class="btn btn-discord btn-large">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path fill="currentColor" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zm-1 7V3.5L18.5 9zM8 13h8v2H8zm0 4h8v2H8zm0-8h3v2H8z"/>
+          </svg>
+          <span>Completar postulación</span>
+        </a>
+
+        <a href="https://discord.gg/XnTrEKEGw" target="_blank" rel="noopener noreferrer" class="btn btn-ghost btn-large">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path fill="currentColor" d="M20.317 4.369a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.058a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128c.126-.094.252-.192.372-.291a.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.009c.12.099.246.198.373.292a.077.077 0 0 1-.006.128 12.3 12.3 0 0 1-1.873.891.076.076 0 0 0-.04.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.029 19.84 19.84 0 0 0 6.002-3.03.077.077 0 0 0 .032-.055c.5-5.177-.838-9.674-3.549-13.662a.06.06 0 0 0-.031-.028zM8.02 15.331c-1.183 0-2.157-1.086-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.211 0 2.176 1.096 2.157 2.419 0 1.333-.955 2.419-2.157 2.419zm7.975 0c-1.183 0-2.157-1.086-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.419 0 1.333-.946 2.419-2.157 2.419z"/>
+          </svg>
+          <span>Hablar por Discord</span>
+          <span class="discord-online" data-discord-online hidden>
+            <span class="discord-online-dot" aria-hidden="true"></span>
+            <span class="discord-online-count" data-discord-online-count></span>
+          </span>
+        </a>
+      </div>
     </section>
 
     <!-- ============ QUÉ BUSCAMOS ============ -->
@@ -130,36 +141,57 @@
 
         <ol class="process-steps reveal-stagger">
           <li class="process-step reveal">
-            <h3 class="process-step-title">Postulá por Discord</h3>
-            <p class="process-step-text">Entrá a nuestro servidor y presentate en el canal de reclutamiento: personaje, clase y disponibilidad.</p>
+            <h3 class="process-step-title">Completa el formulario</h3>
+            <p class="process-step-text">Llena la postulación acá abajo: personaje, clase, nivel y disponibilidad. Toma un par de minutos.</p>
           </li>
           <li class="process-step reveal">
             <h3 class="process-step-title">Conversemos</h3>
-            <p class="process-step-text">Un oficial te va a contactar para conocerte un poco más y resolver dudas sobre el gremio.</p>
+            <p class="process-step-text">Un oficial te va a contactar por Discord para conocerte un poco más y resolver dudas sobre el gremio.</p>
           </li>
           <li class="process-step reveal">
             <h3 class="process-step-title">Bienvenida</h3>
-            <p class="process-step-text">Si encajás con el equipo, te sumamos oficialmente a Special Delivery. ¡A jugar!</p>
+            <p class="process-step-text">Si encajas con el equipo, te sumamos oficialmente a Special Delivery. ¡A jugar!</p>
           </li>
         </ol>
       </div>
     </section>
 
-    <!-- ============ CTA FINAL ============ -->
-    <section class="section section-alt">
+    <!-- ============ POSTULACIÓN ============ -->
+    <!-- Las postulaciones se gestionan en el panel (Next.js + Postgres), no acá:
+         el formulario vive en /panel/postulacion y los oficiales las revisan en
+         /admin/recruitment. Este sitio solo explica el proceso y enlaza ahí, así
+         hay una sola bandeja de entrada. -->
+    <section class="section section-alt watermark-host" id="postular">
+      <div class="watermark" aria-hidden="true"><span>Postular</span></div>
       <div class="section-inner">
-        <div class="recruit-cta recruit-cta-centered reveal">
-          <p class="recruit-cta-text">Las postulaciones se gestionan por Discord.</p>
-          <a href="https://discord.gg/XnTrEKEGw" target="_blank" rel="noopener noreferrer" class="btn btn-discord btn-large">
-            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              <path fill="currentColor" d="M20.317 4.369a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.058a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128c.126-.094.252-.192.372-.291a.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.009c.12.099.246.198.373.292a.077.077 0 0 1-.006.128 12.3 12.3 0 0 1-1.873.891.076.076 0 0 0-.04.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.029 19.84 19.84 0 0 0 6.002-3.03.077.077 0 0 0 .032-.055c.5-5.177-.838-9.674-3.549-13.662a.06.06 0 0 0-.031-.028zM8.02 15.331c-1.183 0-2.157-1.086-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.211 0 2.176 1.096 2.157 2.419 0 1.333-.955 2.419-2.157 2.419zm7.975 0c-1.183 0-2.157-1.086-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.419 0 1.333-.946 2.419-2.157 2.419z"/>
-            </svg>
-            <span>Postular por Discord</span>
-            <span class="discord-online" data-discord-online hidden>
-              <span class="discord-online-dot" aria-hidden="true"></span>
-              <span class="discord-online-count" data-discord-online-count></span>
-            </span>
-          </a>
+        <span class="eyebrow reveal">Último paso</span>
+        <h2 class="section-subtitle reveal">Envía tu postulación</h2>
+        <p class="section-text reveal">El formulario está en nuestro panel. Inicias sesión con Discord, lo completas y un oficial lo revisa desde ahí mismo.</p>
+
+        <div class="apply-card reveal">
+          <div class="apply-cta">
+            <p class="apply-cta-text">Antes de empezar, ten a mano el juego: te vamos a pedir <strong>8 capturas</strong> de tu progreso.</p>
+
+            <ul class="apply-checklist">
+              <li>Poder de jugador (desde el ícono de personaje)</li>
+              <li>Registro de Plumas</li>
+              <li>Registro de Equipamiento y Refine</li>
+              <li>Registro de Montura — nivel</li>
+              <li>Registro de Montura — kiwis</li>
+              <li>Monster Research</li>
+              <li>Cartas</li>
+              <li>Pets</li>
+            </ul>
+
+            <a href="https://specialdelivery.vercel.app/panel/postulacion" class="btn btn-discord btn-large">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path fill="currentColor" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zm-1 7V3.5L18.5 9zM8 13h8v2H8zm0 4h8v2H8zm0-8h3v2H8z"/>
+              </svg>
+              <span>Ir al formulario</span>
+            </a>
+
+            <p class="apply-legal">Necesitas iniciar sesión con Discord y ser parte de nuestro servidor. Solo compartimos estos datos con el liderazgo del gremio.</p>
+          </div>
         </div>
       </div>
     </section>

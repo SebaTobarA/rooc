@@ -6,6 +6,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["serve", ".", "-l", "5050"],
       "port": 5050
+    },
+    {
+      "name": "roocbuilder-dev",
+      "runtimeExecutable": "C:\\Program Files\\nodejs\\npm.cmd",
+      "runtimeArgs": ["--prefix", "../roocbuilder", "run", "dev"],
+      "port": 3000
     }
   ]
 }
