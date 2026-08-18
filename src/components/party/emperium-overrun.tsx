@@ -10,6 +10,7 @@ import { getEventSignups } from "@/lib/actions/events";
 import { getEventRosterMembers } from "@/lib/party/discord-import";
 import { rosterResultToPlayers } from "@/lib/party/event-roster-players";
 import { EventRosterImport } from "@/components/party/event-roster-import";
+import { EventSurveyPicker } from "@/components/party/event-survey-picker";
 import type { EditingTemplate } from "@/components/party/party-builder-app";
 
 type EventWithSignups = Event & { signups: EventSignup[] };
@@ -86,27 +87,21 @@ export function EmperiumOverrun({
   return (
     <div className="event-layout">
       {events.length > 0 ? (
-        <div className="gl-event-picker">
-          <label className="gl-event-picker-label">
-            Evento de Discord
-            <select
-              value={selectedEventId}
-              onChange={(e) => setSelectedEventId(e.target.value)}
-              className="gl-event-picker-select"
-            >
-              {events.map((event) => (
-                <option key={event.id} value={event.id}>
-                  {event.title} ({event.signups.length} inscritos)
-                </option>
-              ))}
-            </select>
-          </label>
-          <button type="button" className="btn btn-primary" onClick={handleLoadEvent}>
-            Cargar inscritos del evento
-          </button>
-          <button type="button" className="btn btn-secondary" onClick={handleRefresh}>
-            Actualizar inscritos
-          </button>
+        <div className="gl-event-picker" style={{ flexDirection: "column", alignItems: "stretch", gap: 8 }}>
+          <EventSurveyPicker
+            events={events}
+            selectedEventId={selectedEventId}
+            onSelect={setSelectedEventId}
+            otherDaysHint="Martes y jueves (Guild League) se arman en la pestaña Guild League."
+          />
+          <div className="import-actions">
+            <button type="button" className="btn btn-primary" onClick={handleLoadEvent}>
+              Cargar inscritos del evento
+            </button>
+            <button type="button" className="btn btn-secondary" onClick={handleRefresh}>
+              Actualizar inscritos
+            </button>
+          </div>
         </div>
       ) : (
         <p className="campo-hint">
