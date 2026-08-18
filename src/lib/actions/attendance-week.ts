@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { chileWallTimeToUtc, addDaysToDateString } from "@/lib/chile-time";
 import { renderAndPublishEmbed } from "@/lib/events";
+import { readAllowedRoleIds } from "@/lib/discord-survey-roles";
 
 const schema = z.object({
   guildLeagueTemplateId: z.string().min(1, "Elige el template de Guild League"),
@@ -35,6 +36,11 @@ export async function createAttendanceWeek(formData: FormData) {
     endTime: formData.get("endTime"),
     channelId: formData.get("channelId"),
   });
+
+  // Mismos roles habilitados para los 3 días: la semana se publica como un
+  // solo mensaje, así que no tendría sentido que cada día aceptara gente
+  // distinta.
+  const allowedRoleIds = readAllowedRoleIds(formData);
 
   const session = await getSession();
   const user = session?.discordId
@@ -81,6 +87,7 @@ export async function createAttendanceWeek(formData: FormData) {
         endsAt,
         signupsCloseAt,
         weekGroupId,
+        allowedRoleIds,
         createdById: user.id,
       },
     });

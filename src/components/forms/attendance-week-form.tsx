@@ -1,14 +1,18 @@
 import type { EventTemplate } from "@prisma/client";
-import { Field, SubmitButton, inputClass } from "@/components/forms/form-fields";
+import { Field, inputClass } from "@/components/forms/form-fields";
 import { EVENT_CHANNEL_OPTIONS } from "@/lib/discord-guild-channels";
+import type { SurveyRoleOption } from "@/lib/discord-survey-roles";
+import { EventAudienceFields } from "@/components/panel/event-audience-fields";
 
 export function AttendanceWeekForm({
   guildLeagueTemplates,
   emperiumTemplates,
+  surveyRoleOptions,
   action,
 }: {
   guildLeagueTemplates: EventTemplate[];
   emperiumTemplates: EventTemplate[];
+  surveyRoleOptions: SurveyRoleOption[];
   action: (formData: FormData) => void | Promise<void>;
 }) {
   return (
@@ -58,20 +62,11 @@ export function AttendanceWeekForm({
         </Field>
       </div>
 
-      <Field label="Canal de Discord">
-        <select name="channelId" required defaultValue="" className={inputClass}>
-          <option value="" disabled>
-            ¿A qué canal comunicarlo?
-          </option>
-          {EVENT_CHANNEL_OPTIONS.map((channel) => (
-            <option key={channel.id} value={channel.id}>
-              {channel.label}
-            </option>
-          ))}
-        </select>
-      </Field>
-
-      <SubmitButton>Publicar semana</SubmitButton>
+      <EventAudienceFields
+        channels={EVENT_CHANNEL_OPTIONS}
+        roles={surveyRoleOptions}
+        submitLabel="Publicar semana"
+      />
     </form>
   );
 }

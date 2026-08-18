@@ -21,7 +21,6 @@ import { jobGuildRoleIds, listJobGuildRoles, resolveJobFromRoles } from "@/lib/d
 import { swapMemberJobClass } from "@/lib/discord-role-swap";
 import { renderAndPublishEmbed, upsertEventSignup } from "@/lib/events";
 import { buildClassPickerComponents, buildConfirmComponents, parseCustomId } from "@/lib/discord-event-embed";
-import { requiredRoleForChannel } from "@/lib/discord-guild-channels";
 import { handleCoreGuildSurveyComponent, handleCoreGuildSurveyModalSubmit } from "@/lib/core-guild/survey-interactions";
 import { RECRUITMENT_CUSTOM_ID_PREFIX } from "@/lib/recruitment-discord";
 import { handleRecruitmentComponent } from "@/lib/recruitment-interactions";
@@ -49,8 +48,13 @@ function actorDisplayName(member: NonNullable<DiscordInteraction["member"]>): st
   return member.nick ?? member.user.global_name ?? member.user.username;
 }
 
-async function findEventGuard(eventId: string): Promise<{ signupsCloseAt: Date; channelId: string | null } | null> {
-  return prisma.event.findUnique({ where: { id: eventId }, select: { signupsCloseAt: true, channelId: true } });
+async function findEventGuard(
+  eventId: string
+): Promise<{ signupsCloseAt: Date; allowedRoleIds: string[] } | null> {
+  return prisma.event.findUnique({
+    where: { id: eventId },
+    select: { signupsCloseAt: true, allowedRoleIds: true },
+  });
 }
 
 async function safeEdit(token: string, content: string) {
@@ -131,18 +135,22 @@ async function handleComponent(interaction: Required<DiscordInteraction>) {
     });
   }
 
-  const requiredRoleId = guard.channelId ? requiredRoleForChannel(guard.channelId) : null;
-  if (requiredRoleId && !interaction.member.roles.includes(requiredRoleId)) {
+  // Único filtro de quién puede responder: los roles elegidos al enviar el
+  // evento a Discord (ver sendEvent). Vacío solo en eventos publicados antes
+  // de que existiera la pregunta — ahí responde cualquiera, como antes.
+  const { allowedRoleIds } = guard;
+  if (allowedRoleIds.length > 0 && !allowedRoleIds.some((roleId) => interaction.member.roles.includes(roleId))) {
+    // Se nombran los roles con <@&id> (Discord los renderiza con su nombre
+    // real) en vez de un "te falta el rol" genérico — si no, esto se
+    // confunde con que las inscripciones estén cerradas.
+    const mentions = allowedRoleIds.map((roleId) => `<@&${roleId}>`).join(", ");
+    const content =
+      allowedRoleIds.length === 1
+        ? `Esta encuesta la responde quien tenga el rol ${mentions}. Pídeselo a un oficial y vuelve a intentarlo.`
+        : `Esta encuesta la responde quien tenga alguno de estos roles: ${mentions}. Pídeselo a un oficial y vuelve a intentarlo.`;
     return Response.json({
       type: 4,
-      data: {
-        flags: 64,
-        // Se nombra el rol con <@&id> (Discord lo renderiza con su nombre
-        // real) en vez de un "te falta el rol" genérico — si no, esto se
-        // confunde con que las inscripciones estén cerradas.
-        content: `Para anotarte en este canal necesitas el rol <@&${requiredRoleId}>. Pídeselo a un oficial y vuelve a intentarlo.`,
-        allowed_mentions: { parse: [] },
-      },
+      data: { flags: 64, content, allowed_mentions: { parse: [] } },
     });
   }
 

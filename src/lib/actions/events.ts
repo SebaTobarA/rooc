@@ -8,6 +8,7 @@ import { getSession } from "@/lib/auth";
 import { getEffectivePermissions } from "@/lib/permissions";
 import { renderAndPublishEmbed } from "@/lib/events";
 import { deleteChannelMessage } from "@/lib/discord-bot";
+import { readAllowedRoleIds } from "@/lib/discord-survey-roles";
 
 // Fecha y hora llegan como dos inputs nativos separados (type="date" +
 // type="time", cada uno con su propio selector). Se combinan acá y se les
@@ -86,6 +87,13 @@ export async function createEvent(formData: FormData) {
 export async function sendEvent(id: string, formData: FormData) {
   const channelId = String(formData.get("channelId") ?? "");
   if (!channelId) throw new Error("Elige a qué canal comunicar el evento.");
+
+  // Los roles habilitados se guardan antes de publicar: el embed los lista y
+  // el endpoint de interacciones los usa para dejar (o no) responder a quien
+  // aprieta los botones — ver buildEventEmbed y handleComponent.
+  const allowedRoleIds = readAllowedRoleIds(formData);
+  await prisma.event.update({ where: { id }, data: { allowedRoleIds } });
+
   await renderAndPublishEmbed(id, channelId);
   revalidateEventPaths(id);
 }

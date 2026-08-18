@@ -7,9 +7,11 @@ import { EVENT_CATEGORY_LABEL, EVENT_STATUS_LABEL } from "@/lib/labels";
 import { JOB_ROLE_NAMES } from "@/lib/discord-job-roles";
 import { sendEvent, deleteEvent, resendEvent, updateEventSignupsCloseAt } from "@/lib/actions/events";
 import { EVENT_CHANNEL_OPTIONS } from "@/lib/discord-guild-channels";
+import { loadSurveyRoleOptions, surveyRoleNames } from "@/lib/discord-survey-roles";
 import { toLocalDateValue, toLocalTimeValue } from "@/lib/event-date-format";
 import { BackLink } from "@/components/back-link";
 import { DeleteEventButton } from "@/components/panel/delete-event-button";
+import { EventAudienceFields } from "@/components/panel/event-audience-fields";
 
 export const metadata = { title: "Detalle de evento" };
 export const dynamic = "force-dynamic";
@@ -46,6 +48,9 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
     include: { signups: { orderBy: { displayName: "asc" } }, template: true },
   });
   if (!event) notFound();
+
+  const surveyRoleOptions = await loadSurveyRoleOptions();
+  const allowedRoleNames = surveyRoleNames(event.allowedRoleIds, surveyRoleOptions);
 
   const guildId = process.env.DISCORD_GUILD_ID;
   const discordUrl =
@@ -95,6 +100,12 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
             <dt className="text-xs uppercase tracking-wide text-muted">Cierre de inscripciones</dt>
             <dd className="text-foreground">{DATE_FORMATTER.format(event.signupsCloseAt)}</dd>
           </div>
+          <div className="col-span-2">
+            <dt className="text-xs uppercase tracking-wide text-muted">Pueden responder la encuesta</dt>
+            <dd className="text-foreground">
+              {allowedRoleNames.length > 0 ? allowedRoleNames.join(", ") : "Se elige al enviar a Discord"}
+            </dd>
+          </div>
         </dl>
         {event.description && (
           <p className="mt-4 whitespace-pre-wrap text-sm text-muted">{event.description}</p>
@@ -135,26 +146,12 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
         <div className="mt-5 flex flex-wrap gap-3">
           {event.status === "DRAFT" ? (
             <>
-              <form action={sendEvent.bind(null, event.id)} className="flex flex-wrap items-center gap-2">
-                <select
-                  name="channelId"
-                  required
-                  defaultValue=""
-                  className="rounded-[10px] border border-border bg-surface px-3 py-2 text-sm text-foreground"
-                  aria-label="Canal de Discord donde comunicar el evento"
-                >
-                  <option value="" disabled>
-                    ¿A qué canal comunicarlo?
-                  </option>
-                  {EVENT_CHANNEL_OPTIONS.map((channel) => (
-                    <option key={channel.id} value={channel.id}>
-                      {channel.label}
-                    </option>
-                  ))}
-                </select>
-                <button type="submit" className="btn-brand px-4 py-2 text-sm">
-                  Enviar a Discord
-                </button>
+              <form action={sendEvent.bind(null, event.id)} className="w-full">
+                <EventAudienceFields
+                  channels={EVENT_CHANNEL_OPTIONS}
+                  roles={surveyRoleOptions}
+                  submitLabel="Enviar a Discord"
+                />
               </form>
             </>
           ) : (

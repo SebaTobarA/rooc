@@ -567,6 +567,13 @@ model Event {
   messageId   String?
   publishedAt DateTime?
 
+  // Roles de Discord habilitados para responder la encuesta de asistencia —
+  // se eligen al enviar el evento a Discord (ver sendEvent) y son los únicos
+  // que pueden tocar los botones del roster. Vacío = se cae al rol del canal
+  // (requiredRoleForChannel), que es como se comportaban los eventos
+  // publicados antes de que existiera esta pregunta.
+  allowedRoleIds String[] @default([])
+
   // Agrupa varios eventos (ej. Martes/Jueves/Domingo de una misma semana)
   // que se publican juntos como UN solo mensaje de Discord en vez de uno
   // por evento — ver createAttendanceWeek/buildWeeklyAttendanceEmbed. null

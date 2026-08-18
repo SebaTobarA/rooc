@@ -4,6 +4,7 @@ import { getEffectivePermissions } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { AttendanceWeekForm } from "@/components/forms/attendance-week-form";
 import { createAttendanceWeek } from "@/lib/actions/attendance-week";
+import { loadSurveyRoleOptions } from "@/lib/discord-survey-roles";
 import { BackLink } from "@/components/back-link";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +25,8 @@ export default async function NewAttendanceWeekPage() {
     );
   }
 
-  const [guildLeagueTemplates, emperiumTemplates] = await Promise.all([
+  const [surveyRoleOptions, guildLeagueTemplates, emperiumTemplates] = await Promise.all([
+    loadSurveyRoleOptions(),
     prisma.eventTemplate.findMany({
       where: { category: "GUILD_LEAGUE", attendanceMode: "DECLINE" },
       orderBy: { title: "asc" },
@@ -54,6 +56,7 @@ export default async function NewAttendanceWeekPage() {
         <AttendanceWeekForm
           guildLeagueTemplates={guildLeagueTemplates}
           emperiumTemplates={emperiumTemplates}
+          surveyRoleOptions={surveyRoleOptions}
           action={createAttendanceWeek}
         />
       )}

@@ -44,6 +44,19 @@ export function hexToDiscordColor(hex: string): number {
   return Number.isNaN(parsed) ? FALLBACK_COLOR : parsed;
 }
 
+/**
+ * Línea "quiénes pueden responder" del embed, a partir de los roles
+ * elegidos al publicar (Event.allowedRoleIds). Se nombran con <@&id> para
+ * que Discord los muestre con su nombre y color reales; las menciones
+ * dentro de un embed nunca notifican, así que esto no pingea a nadie.
+ * Devuelve null para eventos publicados antes de que existiera la pregunta:
+ * ahí el embed queda igual que siempre.
+ */
+export function formatAllowedRolesLine(allowedRoleIds: string[]): string | null {
+  if (allowedRoleIds.length === 0) return null;
+  return `👥 Pueden responder: ${allowedRoleIds.map((roleId) => `<@&${roleId}>`).join(" ")}`;
+}
+
 function formatEventRange(startsAt: Date, endsAt: Date): string {
   const sameDay = DATE_FORMATTER.format(startsAt) === DATE_FORMATTER.format(endsAt);
   if (sameDay) {
@@ -108,10 +121,13 @@ export function buildEventEmbed(
       // dato que define hasta cuándo los botones de abajo siguen aceptando
       // gente, y no tiene por qué coincidir con el fin del evento.
       `🔒 Inscripciones hasta ${DATE_FORMATTER.format(event.signupsCloseAt)} ${TIME_FORMATTER.format(event.signupsCloseAt)}`,
+      formatAllowedRolesLine(event.allowedRoleIds),
       "",
       "**Description:**",
       event.description || "-",
-    ].join("\n"),
+    ]
+      .filter((line): line is string => line !== null)
+      .join("\n"),
     color: hexToDiscordColor(template.embedColor),
     fields,
     footer: { text: `${confirmed} confirmados · ${late} tarde · ${cant} no asisten` },
@@ -142,12 +158,15 @@ export function buildDeclineEventEmbed(
       "**Event Info:**",
       formatEventRange(event.startsAt, event.endsAt),
       `🔒 Podés cambiar tu respuesta hasta <t:${closeTimestamp}:t> (<t:${closeTimestamp}:R>)`,
+      formatAllowedRolesLine(event.allowedRoleIds),
       "",
       "Por defecto **participan todos**. Si vas a llegar tarde o no vas a poder ir, avisá con los botones de abajo.",
       "",
       "**Description:**",
       event.description || "-",
-    ].join("\n"),
+    ]
+      .filter((line): line is string => line !== null)
+      .join("\n"),
     color: hexToDiscordColor(template.embedColor),
     fields: [
       { name: `Llegan tarde (${late.length})`, value: truncateFieldValue(late.map((s) => s.displayName)) },
@@ -215,10 +234,18 @@ export function buildWeeklyAttendanceEmbed(
     };
   });
 
+  // Los 3 días de una semana comparten los mismos roles habilitados (ver
+  // createAttendanceWeek), así que alcanza con mirar el primero.
+  const allowedRolesLine = formatAllowedRolesLine(days[0]?.event.allowedRoleIds ?? []);
+
   return {
     title: "📋 Asistencia de la semana",
-    description:
+    description: [
       "Marcá los días en que **no** vas a poder jugar con los botones de abajo — por defecto participan todos. Cada horario ya se muestra ajustado a tu propia zona horaria.",
+      allowedRolesLine,
+    ]
+      .filter((line): line is string => line !== null)
+      .join("\n\n"),
     color: hexToDiscordColor(template.embedColor),
     fields,
   };
