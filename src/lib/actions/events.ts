@@ -99,6 +99,38 @@ export async function sendEvent(id: string, formData: FormData) {
 }
 
 /**
+ * Cambia los roles habilitados de un evento ya publicado y reescribe el
+ * mensaje en Discord. Sirve sobre todo para las encuestas publicadas antes
+ * de que existiera la pregunta: sin roles guardados el embed no sabe a quién
+ * listar y muestra el formato viejo, así que elegirlos acá las convierte al
+ * roster por jobs sin perder ninguna respuesta.
+ *
+ * En una semana combinada los 3 días comparten el mensaje, así que los roles
+ * se aplican al grupo entero.
+ */
+export async function updateEventAllowedRoles(id: string, formData: FormData) {
+  const allowedRoleIds = readAllowedRoleIds(formData);
+  const event = await prisma.event.findUniqueOrThrow({
+    where: { id },
+    select: { weekGroupId: true, channelId: true, messageId: true },
+  });
+
+  if (event.weekGroupId) {
+    await prisma.event.updateMany({ where: { weekGroupId: event.weekGroupId }, data: { allowedRoleIds } });
+  } else {
+    await prisma.event.update({ where: { id }, data: { allowedRoleIds } });
+  }
+
+  // Si todavía no se envió a Discord no hay mensaje que reescribir: los
+  // roles quedan guardados y se usan cuando se publique.
+  if (event.channelId && event.messageId) {
+    await renderAndPublishEmbed(id);
+  }
+
+  revalidateEventPaths(id);
+}
+
+/**
  * Vuelve a publicar el roster como mensaje nuevo — para cuando alguien borró
  * la publicación original en Discord a mano. Se olvida el channelId/messageId
  * guardados (apuntan a un mensaje que ya no existe) para que

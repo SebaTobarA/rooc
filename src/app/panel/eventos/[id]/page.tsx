@@ -5,13 +5,19 @@ import { getEffectivePermissions } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { EVENT_CATEGORY_LABEL, EVENT_STATUS_LABEL } from "@/lib/labels";
 import { JOB_ROLE_NAMES } from "@/lib/discord-job-roles";
-import { sendEvent, deleteEvent, resendEvent, updateEventSignupsCloseAt } from "@/lib/actions/events";
+import {
+  sendEvent,
+  deleteEvent,
+  resendEvent,
+  updateEventSignupsCloseAt,
+  updateEventAllowedRoles,
+} from "@/lib/actions/events";
 import { loadEventChannelOptions } from "@/lib/discord-guild-channels";
 import { loadSurveyRoleOptions, surveyRoleNames } from "@/lib/discord-survey-roles";
 import { toLocalDateValue, toLocalTimeValue } from "@/lib/event-date-format";
 import { BackLink } from "@/components/back-link";
 import { DeleteEventButton } from "@/components/panel/delete-event-button";
-import { EventAudienceFields } from "@/components/panel/event-audience-fields";
+import { EventAudienceFields, SurveyRolesFieldset } from "@/components/panel/event-audience-fields";
 
 export const metadata = { title: "Detalle de evento" };
 export const dynamic = "force-dynamic";
@@ -183,6 +189,24 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
           )}
           <DeleteEventButton action={deleteEvent.bind(null, event.id)} isGrouped={Boolean(event.weekGroupId)} />
         </div>
+
+        {event.status !== "DRAFT" && (
+          <form
+            action={updateEventAllowedRoles.bind(null, event.id)}
+            className="mt-5 w-full border-t border-border pt-4"
+          >
+            <SurveyRolesFieldset
+              roles={surveyRoleOptions}
+              initialSelected={event.allowedRoleIds}
+              submitLabel="Guardar roles y actualizar el mensaje"
+              hint={
+                event.allowedRoleIds.length === 0
+                  ? "Esta encuesta se publicó sin roles, así que el mensaje muestra el formato viejo. Elígelos acá y el embed se reescribe con la lista por job, sin perder ninguna respuesta."
+                  : "Cambia quién puede responder. Se reescribe el mensaje ya publicado, sin perder las respuestas."
+              }
+            />
+          </form>
+        )}
       </div>
 
       <div className="mt-6">

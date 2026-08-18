@@ -44,14 +44,6 @@ export function EventAudienceFields({
   submitLabel: string;
   channelLabel?: string;
 }) {
-  const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
-
-  function toggleRole(roleId: string) {
-    setSelectedRoleIds((current) =>
-      current.includes(roleId) ? current.filter((id) => id !== roleId) : [...current, roleId]
-    );
-  }
-
   return (
     <div className="flex w-full flex-col gap-4">
       <label className="flex flex-col gap-1 text-sm">
@@ -85,14 +77,43 @@ export function EventAudienceFields({
         </select>
       </label>
 
+      <SurveyRolesFieldset roles={roles} submitLabel={submitLabel} />
+    </div>
+  );
+}
+
+/**
+ * La pregunta de los roles por separado, para poder reusarla en un evento ya
+ * publicado (ahí solo se corrigen los roles: el canal no se cambia porque el
+ * mensaje ya está posteado). `initialSelected` precarga lo que el evento
+ * tenga guardado.
+ */
+export function SurveyRolesFieldset({
+  roles,
+  submitLabel,
+  initialSelected = [],
+  hint = "Marca todos los que correspondan. Solo quienes tengan alguno de estos roles van a poder usar los botones de asistencia; al resto le aparece un aviso privado.",
+}: {
+  roles: SurveyRoleOption[];
+  submitLabel: string;
+  initialSelected?: string[];
+  hint?: string;
+}) {
+  const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>(initialSelected);
+
+  function toggleRole(roleId: string) {
+    setSelectedRoleIds((current) =>
+      current.includes(roleId) ? current.filter((id) => id !== roleId) : [...current, roleId]
+    );
+  }
+
+  return (
+    <div className="flex w-full flex-col gap-4">
       <fieldset className="rounded-xl border border-border bg-surface p-4">
         <legend className="px-1 text-sm font-medium text-foreground">
           ¿Qué roles pueden responder la encuesta?
         </legend>
-        <p className="mb-3 text-xs text-muted">
-          Marca todos los que correspondan. Solo quienes tengan alguno de estos roles van a poder usar
-          los botones de asistencia; al resto le aparece un aviso privado.
-        </p>
+        <p className="mb-3 text-xs text-muted">{hint}</p>
 
         {roles.length === 0 ? (
           <p className="text-sm text-muted">
@@ -121,7 +142,7 @@ export function EventAudienceFields({
 
         <p className="mt-3 text-xs text-muted">
           {selectedRoleIds.length === 0
-            ? "Elige al menos un rol para poder enviar."
+            ? "Elige al menos un rol para poder continuar."
             : `${selectedRoleIds.length} ${selectedRoleIds.length === 1 ? "rol elegido" : "roles elegidos"}.`}
         </p>
       </fieldset>
