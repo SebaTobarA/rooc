@@ -128,7 +128,12 @@ async function handleComponent(interaction: Required<DiscordInteraction>) {
       data: { flags: 64, content: "Este evento ya no está disponible." },
     });
   }
-  if (guard.signupsCloseAt.getTime() < Date.now()) {
+  // El cierre limita las respuestas de asistencia, no el cambio de clase:
+  // corregir el job es arreglar un dato del roster (aparecer en la columna
+  // correcta) y tiene que poder hacerse en cualquier momento, incluso
+  // después del cierre o con el evento ya en curso.
+  const isJobChange = action === "dj" || action === "q";
+  if (!isJobChange && guard.signupsCloseAt.getTime() < Date.now()) {
     return Response.json({
       type: 4,
       data: { flags: 64, content: "Las inscripciones para este evento ya cerraron." },
