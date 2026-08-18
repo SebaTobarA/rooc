@@ -7,6 +7,7 @@
 
 import type { Event, EventSignup, EventTemplate } from "@prisma/client";
 import type { DiscordActionRow, DiscordButton, DiscordButtonStyle, DiscordEmbed } from "@/lib/discord-bot";
+import type { RosterMember } from "@/lib/event-roster";
 import { JOB_ROLE_NAMES, JOB_ROLE_EMOJI } from "@/lib/discord-job-roles";
 import { EVENT_CATEGORY_LABEL } from "@/lib/labels";
 
@@ -84,6 +85,73 @@ export function truncateFieldValue(lines: string[]): string {
     value = next;
   }
   return value;
+}
+
+/** Una persona del roster tal como se pinta en su columna de job. */
+interface RosterEntry extends RosterMember {
+  /** Aclaración al lado del nombre, ej. "tarde" o "Inasistencia: D". */
+  note: string | null;
+}
+
+/**
+ * Las 14 columnas de clases en el orden canónico (el mismo de
+ * JOB_ROLE_NAMES), más una columna extra con quienes todavía no tienen rol
+ * de clase en Discord — esos son justamente los que necesitan el botón
+ * "Cambiar de job". Los campos van inline: Discord los acomoda de a 3 por
+ * fila.
+ */
+function buildJobFields(
+  entries: RosterEntry[],
+  withEmoji: boolean
+): { name: string; value: string; inline?: boolean }[] {
+  const fields = JOB_ROLE_NAMES.map((jobName) => {
+    const list = entries.filter((entry) => entry.job === jobName);
+    const emoji = withEmoji ? JOB_ROLE_EMOJI[jobName] : undefined;
+    const prefix = emoji ? `${emoji} ` : "";
+    const lines = list.map((entry) => `${prefix}${entry.displayName}${entry.note ? ` (${entry.note})` : ""}`);
+    return { name: `${jobName} (${list.length})`, value: truncateFieldValue(lines), inline: true };
+  });
+
+  const sinClase = entries.filter((entry) => entry.job === null);
+  if (sinClase.length > 0) {
+    fields.push({
+      name: `Sin clase (${sinClase.length})`,
+      value: truncateFieldValue(
+        sinClase.map((entry) => `${entry.displayName}${entry.note ? ` (${entry.note})` : ""}`)
+      ),
+      inline: true,
+    });
+  }
+
+  return fields;
+}
+
+/**
+ * Un embed entero no puede pasar de 6000 caracteres. El roster lista a toda
+ * la gente con el rol habilitado (más de 120 hoy), así que si el server
+ * crece los emojis de clase —35 caracteres cada uno— son lo primero que
+ * sobra: se arman los campos con emoji y, si no entran en el presupuesto,
+ * se rehacen sin ellos. Lo que queda fuera del presupuesto lo recorta
+ * truncateFieldValue campo por campo.
+ */
+const ROSTER_FIELDS_BUDGET = 5000;
+
+function fieldsLength(fields: { name: string; value: string }[]): number {
+  return fields.reduce((total, field) => total + field.name.length + field.value.length, 0);
+}
+
+function buildRosterFields(
+  entries: RosterEntry[],
+  extraFields: { name: string; value: string }[]
+): { name: string; value: string; inline?: boolean }[] {
+  const withEmoji = [...buildJobFields(entries, true), ...extraFields];
+  if (fieldsLength(withEmoji) <= ROSTER_FIELDS_BUDGET) return withEmoji;
+  return [...buildJobFields(entries, false), ...extraFields];
+}
+
+/** "Domingo" -> "D". Se usa para marcar de qué día avisó que falta. */
+export function weekdayLetter(date: Date): string {
+  return capitalize(WEEKDAY_FORMATTER.format(date)).charAt(0);
 }
 
 export function buildEventEmbed(
@@ -180,6 +248,72 @@ export function buildDeclineEventEmbed(
   };
 }
 
+/**
+ * Roster en modo DECLINE con la misma estructura de columnas por job que el
+ * embed de confirmación: cada clase con la gente del server que la tiene
+ * asignada y que además tiene alguno de los roles habilitados para responder
+ * (ver loadEventRoster). Nadie se anota — se arranca con todos adentro y
+ * quien avisa que no va desaparece de su columna.
+ */
+export function buildDeclineRosterEmbed(
+  event: Event,
+  roster: RosterMember[],
+  signups: EventSignup[],
+  template: Pick<EventTemplate, "icon" | "embedColor">
+): DiscordEmbed {
+  const byDiscordId = new Map(signups.map((signup) => [signup.discordId, signup]));
+  const closeTimestamp = Math.floor(event.signupsCloseAt.getTime() / 1000);
+
+  const attending: RosterEntry[] = [];
+  const notAttending: RosterMember[] = [];
+  let lateCount = 0;
+
+  for (const member of roster) {
+    const status = byDiscordId.get(member.discordId)?.status;
+    if (status === "NOT_ATTENDING") {
+      notAttending.push(member);
+      continue;
+    }
+    if (status === "LATE") lateCount++;
+    attending.push({ ...member, note: status === "LATE" ? "tarde" : null });
+  }
+
+  const fields = buildRosterFields(
+    attending,
+    notAttending.length > 0
+      ? [
+          {
+            name: `No asisten (${notAttending.length})`,
+            value: truncateFieldValue(notAttending.map((member) => member.displayName)),
+          },
+        ]
+      : []
+  );
+
+  return {
+    title: template.icon ? `${template.icon} ${event.title}` : event.title,
+    description: [
+      "**Event Info:**",
+      formatEventRange(event.startsAt, event.endsAt),
+      `🔒 Podés cambiar tu respuesta hasta <t:${closeTimestamp}:t> (<t:${closeTimestamp}:R>)`,
+      formatAllowedRolesLine(event.allowedRoleIds),
+      "",
+      "Por defecto **participan todos**. Si no vas a poder ir, avisá con los botones de abajo y salís de la lista.",
+      "",
+      "**Description:**",
+      event.description || "-",
+    ]
+      .filter((line): line is string => line !== null)
+      .join("\n"),
+    color: hexToDiscordColor(template.embedColor),
+    fields,
+    footer: {
+      text: `${attending.length} participan · ${lateCount} llegan tarde · ${notAttending.length} no asisten`,
+    },
+    timestamp: event.startsAt.toISOString(),
+  };
+}
+
 export function buildDeclineRosterComponents(eventId: string): DiscordActionRow[] {
   return [
     {
@@ -188,6 +322,7 @@ export function buildDeclineRosterComponents(eventId: string): DiscordActionRow[
         button("Llegaré tarde", 2, makeCustomId("dl", eventId)),
         button("No asistiré", 4, makeCustomId("dn", eventId)),
         button("Voy a tiempo", 3, makeCustomId("dy", eventId)),
+        button("Cambiar de job", 1, makeCustomId("dj", eventId)),
       ],
     },
   ];
@@ -251,8 +386,89 @@ export function buildWeeklyAttendanceEmbed(
   };
 }
 
-export function buildWeeklyAttendanceComponents(days: WeeklyAttendanceDay[]): DiscordActionRow[] {
-  return days.map(({ event }) => {
+/**
+ * Igual que buildWeeklyAttendanceEmbed pero con las columnas por job del
+ * roster (ver buildDeclineRosterEmbed): una sola lista para toda la semana,
+ * donde al lado del nombre se anota de qué días avisó que falta con la
+ * inicial del día ("Inasistencia: D" si no va el domingo). Quien avisa que
+ * falta a todos los días sale de la lista.
+ */
+export function buildWeeklyRosterEmbed(
+  days: WeeklyAttendanceDay[],
+  roster: RosterMember[],
+  template: Pick<EventTemplate, "embedColor">
+): DiscordEmbed {
+  const statusByMember = new Map<string, Map<string, EventSignup["status"]>>();
+  for (const { event, signups } of days) {
+    for (const signup of signups) {
+      const perDay = statusByMember.get(signup.discordId) ?? new Map();
+      perDay.set(event.id, signup.status);
+      statusByMember.set(signup.discordId, perDay);
+    }
+  }
+
+  const attending: RosterEntry[] = [];
+  const fullyOut: RosterMember[] = [];
+
+  for (const member of roster) {
+    const perDay = statusByMember.get(member.discordId);
+    const absentDays = days.filter(({ event }) => perDay?.get(event.id) === "NOT_ATTENDING");
+    const lateDays = days.filter(({ event }) => perDay?.get(event.id) === "LATE");
+
+    if (absentDays.length === days.length && days.length > 0) {
+      fullyOut.push(member);
+      continue;
+    }
+
+    const notes: string[] = [];
+    if (absentDays.length > 0) {
+      notes.push(`Inasistencia: ${absentDays.map(({ event }) => weekdayLetter(event.startsAt)).join(" ")}`);
+    }
+    if (lateDays.length > 0) {
+      notes.push(`Tarde: ${lateDays.map(({ event }) => weekdayLetter(event.startsAt)).join(" ")}`);
+    }
+    attending.push({ ...member, note: notes.length > 0 ? notes.join(" · ") : null });
+  }
+
+  const dayLines = days.map(({ event }) => {
+    const closeTimestamp = Math.floor(event.signupsCloseAt.getTime() / 1000);
+    const dayLabel = capitalize(WEEKDAY_FORMATTER.format(event.startsAt));
+    return `🗓️ **${dayLabel} ${SHORT_DATE_FORMATTER.format(event.startsAt)}** (${weekdayLetter(event.startsAt)}) — ${EVENT_CATEGORY_LABEL[event.category]} · cierra <t:${closeTimestamp}:t>`;
+  });
+
+  const fields = buildRosterFields(
+    attending,
+    fullyOut.length > 0
+      ? [
+          {
+            name: `No asisten ningún día (${fullyOut.length})`,
+            value: truncateFieldValue(fullyOut.map((member) => member.displayName)),
+          },
+        ]
+      : []
+  );
+
+  return {
+    title: "📋 Asistencia de la semana",
+    description: [
+      ...dayLines,
+      "",
+      "Por defecto **participan todos**. Marcá con los botones los días en que no vas a poder jugar: al lado de tu nombre queda la inicial del día que faltás, y si no vas ninguno salís de la lista.",
+      formatAllowedRolesLine(days[0]?.event.allowedRoleIds ?? []),
+    ]
+      .filter((line): line is string => line !== null)
+      .join("\n"),
+    color: hexToDiscordColor(template.embedColor),
+    fields,
+    footer: { text: `${attending.length} participan · ${fullyOut.length} no asisten ningún día` },
+  };
+}
+
+export function buildWeeklyAttendanceComponents(
+  days: WeeklyAttendanceDay[],
+  withJobButton = false
+): DiscordActionRow[] {
+  const rows: DiscordActionRow[] = days.map(({ event }) => {
     const dayLabel = capitalize(WEEKDAY_FORMATTER.format(event.startsAt));
     return {
       type: 1,
@@ -263,6 +479,19 @@ export function buildWeeklyAttendanceComponents(days: WeeklyAttendanceDay[]): Di
       ],
     };
   });
+
+  // El cambio de job no es por día: alcanza con un botón para toda la
+  // semana, colgado del primer evento del grupo (cualquiera re-renderiza el
+  // mismo mensaje combinado). Discord admite hasta 5 filas, así que solo se
+  // agrega si hay lugar.
+  if (withJobButton && days.length > 0 && rows.length < 5) {
+    rows.push({
+      type: 1,
+      components: [button("Cambiar de job", 1, makeCustomId("dj", days[0].event.id))],
+    });
+  }
+
+  return rows;
 }
 
 function button(label: string, style: DiscordButtonStyle, customId: string): DiscordButton {
@@ -300,17 +529,24 @@ export function buildConfirmComponents(eventId: string): DiscordActionRow[] {
   ];
 }
 
+/**
+ * `action` distingue para qué se está eligiendo la clase: "p" es el flujo de
+ * confirmación (cambia el rol y además anota al jugador), "q" es el botón
+ * "Cambiar de job" del roster DECLINE, que solo cambia el rol sin tocar la
+ * asistencia.
+ */
 export function buildClassPickerComponents(
   eventId: string,
-  jobRoles: { id: string; name: string }[]
+  jobRoles: { id: string; name: string }[],
+  action: "p" | "q" = "p"
 ): DiscordActionRow[] {
   return chunk(jobRoles, 5).map((row) => ({
     type: 1,
-    components: row.map((role) => button(role.name, 2, makeCustomId("p", eventId, role.id))),
+    components: row.map((role) => button(role.name, 2, makeCustomId(action, eventId, role.id))),
   }));
 }
 
-export type InteractionAction = "j" | "l" | "o" | "y" | "n" | "p" | "dl" | "dn" | "dy";
+export type InteractionAction = "j" | "l" | "o" | "y" | "n" | "p" | "q" | "dl" | "dn" | "dy" | "dj";
 
 export function makeCustomId(action: InteractionAction, eventId: string, roleId?: string): string {
   return roleId ? `${action}:${eventId}:${roleId}` : `${action}:${eventId}`;

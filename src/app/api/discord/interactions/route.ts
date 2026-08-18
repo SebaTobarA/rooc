@@ -311,6 +311,58 @@ async function handleComponent(interaction: Required<DiscordInteraction>) {
       return Response.json({ type: 6 });
     }
 
+    case "dj": {
+      // Modo DECLINE — "Cambiar de job": abre el selector de clases en un
+      // mensaje efímero. Sincrónico: solo depende de la lista de roles
+      // (cacheada 5 min), no de Prisma ni de escrituras a Discord.
+      const guildRoles = await getGuildRolesCached();
+      return Response.json({
+        type: 4,
+        data: {
+          flags: 64,
+          content: "Elige tu job — se cambia tu rol en Discord y la lista se actualiza sola:",
+          components: buildClassPickerComponents(eventId, listJobGuildRoles(guildRoles), "q"),
+        },
+      });
+    }
+
+    case "q": {
+      // Clase elegida desde "Cambiar de job": cambia el rol en Discord (y
+      // por lo tanto la columna en la que aparece en el roster) sin tocar
+      // su asistencia — a diferencia de "p", acá no se anota a nadie.
+      after(async () => {
+        try {
+          if (!roleId) throw new Error("Falta la clase elegida.");
+          const result = await swapMemberJobClass(actorId, roleId);
+          if (result.error || !result.roleIds) {
+            await safeEdit(token, result.error ?? "No se pudo cambiar tu clase en Discord.");
+            return;
+          }
+          await prisma.user.updateMany({ where: { discordId: actorId }, data: { roles: result.roleIds } });
+
+          // El nombre de la clase queda guardado también en el signup si ya
+          // había avisado algo (tarde/no voy), para que el panel no siga
+          // mostrando la clase vieja.
+          const guildRoles = await getGuildRolesCached();
+          const target = listJobGuildRoles(guildRoles).find((role) => role.id === roleId);
+          const className = target?.name ?? "Clase desconocida";
+          await prisma.eventSignup.updateMany({
+            where: { eventId, discordId: actorId },
+            data: { className, classRoleId: roleId },
+          });
+
+          await renderAndPublishEmbed(eventId);
+          await editInteractionOriginal(token, {
+            content: `Listo ✅ Ahora eres **${className}**.`,
+            components: [],
+          });
+        } catch (err) {
+          await safeEdit(token, err instanceof Error ? err.message : "Ocurrió un error, intenta de nuevo.");
+        }
+      });
+      return Response.json({ type: 5, data: { flags: 64 } });
+    }
+
     case "dy": {
       // Modo DECLINE — Voy a tiempo: deshace un aviso anterior de "llego
       // tarde"/"no asisto", volviendo al estado por defecto (participa sin

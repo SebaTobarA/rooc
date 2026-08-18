@@ -13,10 +13,13 @@ import {
   buildEventEmbed,
   buildRosterComponents,
   buildDeclineEventEmbed,
+  buildDeclineRosterEmbed,
   buildDeclineRosterComponents,
   buildWeeklyAttendanceEmbed,
+  buildWeeklyRosterEmbed,
   buildWeeklyAttendanceComponents,
 } from "@/lib/discord-event-embed";
+import { loadEventRoster } from "@/lib/event-roster";
 
 /**
  * A qué canal se publican los eventos por defecto — configurable desde
@@ -59,9 +62,17 @@ export async function renderAndPublishEmbed(eventId: string, targetChannelId?: s
 
   const signups = await prisma.eventSignup.findMany({ where: { eventId } });
   const isDecline = event.attendanceMode === "DECLINE";
-  const embed = isDecline
-    ? buildDeclineEventEmbed(event, signups, event.template)
-    : buildEventEmbed(event, signups, event.template);
+
+  // En modo DECLINE el roster se arma con la gente del server que tiene
+  // alguno de los roles habilitados (ver loadEventRoster). Si viene vacío
+  // —evento publicado antes de que se eligieran roles— se cae al embed
+  // viejo, que solo lista a quienes avisaron.
+  const roster = isDecline ? await loadEventRoster(event.allowedRoleIds) : [];
+  const embed = !isDecline
+    ? buildEventEmbed(event, signups, event.template)
+    : roster.length > 0
+      ? buildDeclineRosterEmbed(event, roster, signups, event.template)
+      : buildDeclineEventEmbed(event, signups, event.template);
   const components = isDecline ? buildDeclineRosterComponents(eventId) : buildRosterComponents(eventId);
 
   if (event.channelId && event.messageId) {
@@ -96,8 +107,15 @@ async function renderAndPublishWeeklyGroup(weekGroupId: string, targetChannelId?
   }
 
   const days = events.map((event) => ({ event, signups: signupsByEvent.get(event.id) ?? [] }));
-  const embed = buildWeeklyAttendanceEmbed(days, events[0].template);
-  const components = buildWeeklyAttendanceComponents(days);
+
+  // Los 3 días comparten los mismos roles habilitados (ver
+  // createAttendanceWeek), así que el roster se arma una sola vez.
+  const roster = await loadEventRoster(events[0].allowedRoleIds);
+  const embed =
+    roster.length > 0
+      ? buildWeeklyRosterEmbed(days, roster, events[0].template)
+      : buildWeeklyAttendanceEmbed(days, events[0].template);
+  const components = buildWeeklyAttendanceComponents(days, roster.length > 0);
 
   const first = events[0];
   if (first.channelId && first.messageId) {

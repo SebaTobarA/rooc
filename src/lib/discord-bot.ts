@@ -37,7 +37,14 @@ async function discordBotFetch(path: string, init?: RequestInit): Promise<Respon
 }
 
 export type DiscordGuildMember = {
-  user: { id: string; username: string; global_name: string | null; avatar: string | null };
+  user: {
+    id: string;
+    username: string;
+    global_name: string | null;
+    avatar: string | null;
+    /** Solo viene en las cuentas de bot; en las de persona Discord lo omite. */
+    bot?: boolean;
+  };
   nick: string | null;
   roles: string[];
   joined_at: string;
