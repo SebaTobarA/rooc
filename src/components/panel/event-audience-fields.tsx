@@ -15,6 +15,24 @@ import type { SurveyRoleOption } from "@/lib/discord-survey-roles";
  * ningún rol marcado; la misma validación se repite en el servidor (ver
  * sendEvent / createAttendanceWeek).
  */
+/**
+ * Canales en tramos consecutivos por categoría, respetando el orden que ya
+ * trae la lista (el mismo de la barra lateral de Discord) — cada tramo se
+ * pinta como un <optgroup>, salvo los sueltos sin categoría.
+ */
+function groupByCategory(channels: EventChannelOption[]): [string | null, EventChannelOption[]][] {
+  const groups: [string | null, EventChannelOption[]][] = [];
+  for (const channel of channels) {
+    const last = groups[groups.length - 1];
+    if (last && last[0] === channel.category) {
+      last[1].push(channel);
+    } else {
+      groups.push([channel.category, [channel]]);
+    }
+  }
+  return groups;
+}
+
 export function EventAudienceFields({
   channels,
   roles,
@@ -47,11 +65,23 @@ export function EventAudienceFields({
           <option value="" disabled>
             ¿A qué canal comunicarlo?
           </option>
-          {channels.map((channel) => (
-            <option key={channel.id} value={channel.id}>
-              {channel.label}
-            </option>
-          ))}
+          {groupByCategory(channels).map(([category, group]) =>
+            category === null ? (
+              group.map((channel) => (
+                <option key={channel.id} value={channel.id}>
+                  {channel.label}
+                </option>
+              ))
+            ) : (
+              <optgroup key={category} label={category}>
+                {group.map((channel) => (
+                  <option key={channel.id} value={channel.id}>
+                    {channel.label}
+                  </option>
+                ))}
+              </optgroup>
+            )
+          )}
         </select>
       </label>
 

@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { EVENT_CATEGORY_LABEL, EVENT_STATUS_LABEL } from "@/lib/labels";
 import { JOB_ROLE_NAMES } from "@/lib/discord-job-roles";
 import { sendEvent, deleteEvent, resendEvent, updateEventSignupsCloseAt } from "@/lib/actions/events";
-import { EVENT_CHANNEL_OPTIONS } from "@/lib/discord-guild-channels";
+import { loadEventChannelOptions } from "@/lib/discord-guild-channels";
 import { loadSurveyRoleOptions, surveyRoleNames } from "@/lib/discord-survey-roles";
 import { toLocalDateValue, toLocalTimeValue } from "@/lib/event-date-format";
 import { BackLink } from "@/components/back-link";
@@ -49,7 +49,10 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
   });
   if (!event) notFound();
 
-  const surveyRoleOptions = await loadSurveyRoleOptions();
+  const [surveyRoleOptions, channelOptions] = await Promise.all([
+    loadSurveyRoleOptions(),
+    loadEventChannelOptions(),
+  ]);
   const allowedRoleNames = surveyRoleNames(event.allowedRoleIds, surveyRoleOptions);
 
   const guildId = process.env.DISCORD_GUILD_ID;
@@ -148,7 +151,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
             <>
               <form action={sendEvent.bind(null, event.id)} className="w-full">
                 <EventAudienceFields
-                  channels={EVENT_CHANNEL_OPTIONS}
+                  channels={channelOptions}
                   roles={surveyRoleOptions}
                   submitLabel="Enviar a Discord"
                 />

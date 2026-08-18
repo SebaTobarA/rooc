@@ -1,4 +1,4 @@
-import type { DiscordGuildChannel } from "@/lib/discord-bot";
+import type { EventChannelOption } from "@/lib/discord-guild-channels";
 import { setDefaultEventChannel } from "@/lib/actions/guild-event-settings";
 import { Field, SubmitButton, inputClass } from "@/components/forms/form-fields";
 
@@ -6,7 +6,7 @@ export function ChannelSettingsForm({
   channels,
   currentChannelId,
 }: {
-  channels: DiscordGuildChannel[];
+  channels: EventChannelOption[];
   currentChannelId: string | null;
 }) {
   return (
@@ -18,7 +18,7 @@ export function ChannelSettingsForm({
           </option>
           {channels.map((channel) => (
             <option key={channel.id} value={channel.id}>
-              #{channel.name}
+              {channel.category ? `${channel.category} / ${channel.label}` : channel.label}
             </option>
           ))}
         </select>

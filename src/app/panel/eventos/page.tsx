@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import { getEffectivePermissions } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { getGuildChannels } from "@/lib/discord-bot";
+import { listEventChannelOptions, type EventChannelOption } from "@/lib/discord-guild-channels";
 import { EVENT_CATEGORY_LABEL, EVENT_STATUS_LABEL } from "@/lib/labels";
 import { BotErrorNotice } from "@/components/admin/bot-error-notice";
 import { ChannelSettingsForm } from "@/components/panel/channel-settings-form";
@@ -60,10 +61,10 @@ export default async function EventosPage({
         : Promise.resolve(null),
     ]);
 
-  let channels: Awaited<ReturnType<typeof getGuildChannels>> = [];
+  let channels: EventChannelOption[] = [];
   let botError: string | null = null;
   try {
-    channels = await getGuildChannels();
+    channels = listEventChannelOptions(await getGuildChannels());
   } catch (err) {
     botError = err instanceof Error ? err.message : "Error desconocido";
   }

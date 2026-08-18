@@ -252,17 +252,29 @@ export type DiscordGuildChannel = {
   name: string;
   type: number;
   position: number;
+  /** Categoría que lo contiene (un canal type 4), o null si está suelto arriba de todo. */
+  parent_id: string | null;
 };
 
-/** Canales de texto del server (type 0), ordenados por posición — para el selector de canal de eventos. */
+/**
+ * Todos los canales del server tal como los devuelve Discord, ordenados por
+ * posición. Sin filtrar por tipo: quién puede recibir un evento lo decide
+ * listEventChannelOptions (ver discord-guild-channels.ts), que además los
+ * agrupa por categoría.
+ */
 export async function getGuildChannels(): Promise<DiscordGuildChannel[]> {
   const response = await discordBotFetch(`/guilds/${getGuildId()}/channels`);
   if (!response.ok) {
     throw new Error(`No se pudieron obtener los canales del server (${response.status}).`);
   }
   const channels = (await response.json()) as DiscordGuildChannel[];
-  return channels.filter((channel) => channel.type === 0).sort((a, b) => a.position - b.position);
+  return channels.sort((a, b) => a.position - b.position);
 }
+
+/** Como getGuildChannels pero cacheada 5 minutos — los canales casi no cambian. */
+export const getGuildChannelsCached = unstable_cache(getGuildChannels, ["guild-channels"], {
+  revalidate: 300,
+});
 
 /** Todos los miembros del server, paginado (Discord devuelve como máximo 1000 por página). */
 export async function getGuildMembers(): Promise<DiscordGuildMember[]> {
