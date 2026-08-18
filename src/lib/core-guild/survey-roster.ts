@@ -20,11 +20,14 @@ export async function renderAndPublishSurveyRoster(targetChannelId?: string): Pr
   const components = buildAreYouInGuildComponents();
 
   if (data.surveyMessage) {
-    await editChannelMessage(data.surveyMessage.channelId, data.surveyMessage.messageId, {
+    const edited = await editChannelMessage(data.surveyMessage.channelId, data.surveyMessage.messageId, {
       embeds: [embed],
       components,
     });
-    return;
+    if (edited) return;
+    // El mensaje ya no está en Discord (lo borraron a mano): se republica en
+    // el mismo canal en vez de fallar.
+    targetChannelId = targetChannelId ?? data.surveyMessage.channelId;
   }
 
   if (!targetChannelId) {

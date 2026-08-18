@@ -75,9 +75,14 @@ export async function renderAndPublishEmbed(eventId: string, targetChannelId?: s
       : buildDeclineEventEmbed(event, signups, event.template);
   const components = isDecline ? buildDeclineRosterComponents(eventId) : buildRosterComponents(eventId);
 
+  // Si el mensaje guardado ya no existe (alguien lo borró a mano en
+  // Discord), editChannelMessage devuelve false y se publica de nuevo en el
+  // mismo canal en vez de fallar — antes eso rompía cualquier acción que
+  // redibujara el embed.
   if (event.channelId && event.messageId) {
-    await editChannelMessage(event.channelId, event.messageId, { embeds: [embed], components });
-    return;
+    const edited = await editChannelMessage(event.channelId, event.messageId, { embeds: [embed], components });
+    if (edited) return;
+    targetChannelId = event.channelId;
   }
 
   const channelId = targetChannelId ?? (await getDefaultEventChannelId());
@@ -117,10 +122,13 @@ async function renderAndPublishWeeklyGroup(weekGroupId: string, targetChannelId?
       : buildWeeklyAttendanceEmbed(days, events[0].template);
   const components = buildWeeklyAttendanceComponents(days, roster.length > 0);
 
+  // Igual que arriba: si el mensaje combinado ya no está en Discord, se
+  // vuelve a publicar en su canal en vez de fallar.
   const first = events[0];
   if (first.channelId && first.messageId) {
-    await editChannelMessage(first.channelId, first.messageId, { embeds: [embed], components });
-    return;
+    const edited = await editChannelMessage(first.channelId, first.messageId, { embeds: [embed], components });
+    if (edited) return;
+    targetChannelId = first.channelId;
   }
 
   const channelId = targetChannelId ?? (await getDefaultEventChannelId());

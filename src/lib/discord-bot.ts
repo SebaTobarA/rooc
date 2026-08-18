@@ -228,15 +228,21 @@ export async function editChannelMessage(
   channelId: string,
   messageId: string,
   body: { content?: string; embeds?: DiscordEmbed[]; components?: DiscordActionRow[] }
-): Promise<void> {
+): Promise<boolean> {
   const response = await discordBotFetch(`/channels/${channelId}/messages/${messageId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+  // 404 = el mensaje ya no está (alguien lo borró a mano en Discord). No es
+  // un error del que haya que avisar: quien llama decide qué hacer, y en el
+  // caso de los eventos lo que corresponde es publicarlo de nuevo (ver
+  // renderAndPublishEmbed).
+  if (response.status === 404) return false;
   if (!response.ok) {
     throw new Error(`No se pudo editar el mensaje en Discord (${response.status}).`);
   }
+  return true;
 }
 
 /**

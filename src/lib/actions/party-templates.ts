@@ -148,7 +148,10 @@ export async function communicatePartyTemplate(templateId: string): Promise<void
   const content = `<@&${PARTY_COMMS_ROLE_ID}> te comunicamos que el roster para ${eventCategoryLabel(template.event)} será el siguiente:`;
 
   if (template.channelId && template.messageId) {
-    await editChannelMessage(template.channelId, template.messageId, { content, embeds: [embed] });
+    const edited = await editChannelMessage(template.channelId, template.messageId, { content, embeds: [embed] });
+    if (!edited) {
+      throw new Error("La comunicación anterior ya no existe en Discord — alguien borró ese mensaje.");
+    }
     await prisma.partyTemplate.update({ where: { id: templateId }, data: { communicatedAt: new Date() } });
   } else {
     const message = await postChannelMessage(PARTY_COMMS_CHANNEL_ID, { content, embeds: [embed] });

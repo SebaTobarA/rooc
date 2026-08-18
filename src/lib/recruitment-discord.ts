@@ -204,6 +204,9 @@ export async function markApplicationResolved(
     inline: false,
   });
 
+  // Si el aviso ya no está en Discord no hay nada que marcar como resuelto:
+  // la resolución igual quedó guardada en la base, así que no se corta el
+  // flujo por eso.
   await editChannelMessage(RECRUITMENT_CHANNEL_ID, application.discordMessageId, {
     embeds,
     components: [],
