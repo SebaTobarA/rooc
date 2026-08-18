@@ -84,7 +84,7 @@ export async function listAllGuildMembers(): Promise<ImportableDiscordMember[]> 
     .sort((a, b) => a.nickname.localeCompare(b.nickname, "es"));
 }
 
-export interface SdCoreImportResult {
+export interface EventRosterResult {
   // Sin registro en EventSignup, o CONFIRMED — se pueden arrastrar a
   // cualquier campo/party.
   available: ImportableDiscordMember[];
@@ -93,40 +93,54 @@ export interface SdCoreImportResult {
   lateOnly: ImportableDiscordMember[];
   // Avisaron "No asistiré" — informativo, no se agregan al pool.
   notAttending: ImportableDiscordMember[];
+  // Con qué roles se armó la lista, para poder decirlo en la interfaz
+  // ("70 cargados con el rol SD1").
+  roleNames: string[];
 }
 
 /**
- * Para eventos en modo DECLINE ("marcar inasistencia"): carga a todo el rol
- * [SD] Core, opcionalmente cruzado con roles de subdivisión (ej. SD1, SD2 —
- * ver core-guild/guild-choice.ts) para poder separar la carga por
- * sub-guild, y lo cruza contra el EventSignup del evento elegido para saber
- * quién avisó que llega tarde o que no va. A diferencia de
- * getMembersByDiscordRole, acá el "rol" de filtro es siempre [SD] Core más
- * (si se pasan) *alguno* de los roles de subdivisión — no un solo rol
- * suelto.
+ * El roster de un evento en modo DECLINE ("marcar inasistencia"): la misma
+ * gente que ve el embed en Discord, o sea los miembros que tienen alguno de
+ * los roles habilitados para responder esa encuesta (Event.allowedRoleIds —
+ * si se publicó solo para SD1, acá vienen los de SD1) con la clase que
+ * tienen asignada hoy en Discord. Se cruza contra EventSignup para separar
+ * a quien avisó que llega tarde o que no va.
+ *
+ * `extraRoleIds` acota todavía más la carga (ej. una sola subdivisión
+ * dentro de los roles habilitados). Los eventos publicados antes de que
+ * existiera la pregunta de roles no tienen allowedRoleIds: para esos se
+ * mantiene el comportamiento anterior, [SD] Core.
  */
-export async function getSdCoreMembersForEvent(
+export async function getEventRosterMembers(
   eventId: string,
-  subdivisionRoleIds: string[]
-): Promise<SdCoreImportResult> {
+  extraRoleIds: string[]
+): Promise<EventRosterResult> {
   await requirePartyManager();
 
-  const [members, roles, signups] = await Promise.all([
+  const [event, members, roles, signups] = await Promise.all([
+    prisma.event.findUniqueOrThrow({ where: { id: eventId }, select: { allowedRoleIds: true } }),
     getGuildMembers(),
     getGuildRoles(),
     prisma.eventSignup.findMany({ where: { eventId } }),
   ]);
 
+  const surveyRoleIds = event.allowedRoleIds.length > 0 ? event.allowedRoleIds : [CORE_GUILD_ROLE_ID];
   const statusByDiscordId = new Map(signups.map((s) => [s.discordId, s.status]));
 
-  const coreMembers = members.filter(
+  const rosterMembers = members.filter(
     (member) =>
-      member.roles.includes(CORE_GUILD_ROLE_ID) &&
-      (subdivisionRoleIds.length === 0 || subdivisionRoleIds.some((roleId) => member.roles.includes(roleId)))
+      !member.user.bot &&
+      surveyRoleIds.some((roleId) => member.roles.includes(roleId)) &&
+      (extraRoleIds.length === 0 || extraRoleIds.some((roleId) => member.roles.includes(roleId)))
   );
 
-  const result: SdCoreImportResult = { available: [], lateOnly: [], notAttending: [] };
-  for (const member of coreMembers) {
+  const result: EventRosterResult = {
+    available: [],
+    lateOnly: [],
+    notAttending: [],
+    roleNames: surveyRoleIds.map((roleId) => roles.find((role) => role.id === roleId)?.name ?? roleId),
+  };
+  for (const member of rosterMembers) {
     const importable = toImportable(member, roles);
     const status = statusByDiscordId.get(member.user.id);
     if (status === "NOT_ATTENDING") result.notAttending.push(importable);

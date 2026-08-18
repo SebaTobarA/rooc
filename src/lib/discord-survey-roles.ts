@@ -8,7 +8,6 @@
  */
 
 import { getGuildRolesCached, type DiscordGuildRole } from "@/lib/discord-bot";
-import { GUILD_CHOICE_LABELS, GUILD_CHOICE_ROLE_ID } from "@/lib/core-guild/guild-choice";
 
 export interface SurveyRoleOption {
   id: string;
@@ -31,24 +30,17 @@ export function listSurveyRoleOptions(
 }
 
 /**
- * Lista mínima para cuando la API de Discord no responde (o falta el token
- * del bot en local): al menos deja elegir las guilds, que es el caso real
- * del 99% de los eventos, en vez de dejar el formulario vacío.
- */
-export const FALLBACK_SURVEY_ROLE_OPTIONS: SurveyRoleOption[] = (["SD1", "SD2", "SD3"] as const)
-  .map((choice) => ({ id: GUILD_CHOICE_ROLE_ID[choice], name: GUILD_CHOICE_LABELS[choice] }))
-  .filter((option): option is SurveyRoleOption => Boolean(option.id));
-
-/**
  * Los roles del server listos para poblar la pregunta. Si Discord no
- * responde (o falta el token del bot en local) se cae a la lista mínima de
- * guilds en vez de romper la página que la muestra.
+ * responde devuelve la lista vacía y el formulario avisa que no se pudieron
+ * cargar: antes acá había una lista de respaldo con ids fijos, pero uno de
+ * esos roles ya no existía en el server — mejor no ofrecer nada que ofrecer
+ * un rol muerto.
  */
 export async function loadSurveyRoleOptions(): Promise<SurveyRoleOption[]> {
   try {
     return listSurveyRoleOptions(await getGuildRolesCached());
   } catch {
-    return FALLBACK_SURVEY_ROLE_OPTIONS;
+    return [];
   }
 }
 

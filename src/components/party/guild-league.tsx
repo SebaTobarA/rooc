@@ -10,11 +10,11 @@ import { RaidAssignment } from "@/components/party/raid-assignment";
 import { useCampo } from "@/lib/party/use-campo";
 import { signupsToPlayers } from "@/lib/party/from-signups";
 import { getEventSignups } from "@/lib/actions/events";
-import { getSdCoreMembersForEvent } from "@/lib/party/discord-import";
-import { sdCoreResultToPlayers } from "@/lib/party/sd-core-to-players";
+import { getEventRosterMembers } from "@/lib/party/discord-import";
+import { rosterResultToPlayers } from "@/lib/party/event-roster-players";
 import { DATE_FORMATTER } from "@/lib/discord-event-embed";
 import { EVENT_CATEGORY_LABEL } from "@/lib/labels";
-import { SdCoreDeclineImport } from "@/components/party/sd-core-decline-import";
+import { EventRosterImport } from "@/components/party/event-roster-import";
 import type { EditingTemplate } from "@/components/party/party-builder-app";
 import {
   createPartyTemplate,
@@ -76,14 +76,15 @@ export function GuildLeague({
   async function handleLoadEvent() {
     if (!selectedEvent) return;
 
-    // En modo DECLINE nadie tiene que "unirse": por defecto participa todo
-    // [SD] Core, así que cargarlo automático es lo esperado — EventSignup
-    // solo trae las excepciones (llega tarde / no va).
+    // En modo DECLINE nadie tiene que "unirse": participan por defecto
+    // todos los que podían responder la encuesta, así que se carga ese mismo
+    // roster (con la clase que tienen en Discord) — EventSignup solo trae
+    // las excepciones (llega tarde / no va).
     if (selectedEvent.attendanceMode === "DECLINE") {
-      const result = await getSdCoreMembersForEvent(selectedEvent.id, []);
-      const loaded = sdCoreResultToPlayers(result);
+      const result = await getEventRosterMembers(selectedEvent.id, []);
+      const loaded = rosterResultToPlayers(result);
       campo.addPlayers(loaded);
-      const parts = [`${loaded.length} de SD Core cargado(s)`];
+      const parts = [`${loaded.length} cargado(s) con ${result.roleNames.join(", ")}`];
       if (result.lateOnly.length > 0) parts.push(`${result.lateOnly.length} llegan tarde (solo Campo Secundario)`);
       if (result.notAttending.length > 0) parts.push(`${result.notAttending.length} avisaron que no van`);
       setMsg(`${parts.join(" — ")}.`);
@@ -101,6 +102,21 @@ export function GuildLeague({
 
   async function handleRefresh() {
     if (!selectedEvent) return;
+
+    // En DECLINE la fuente es el roster (los signups solo traen las
+    // excepciones), así que refrescar es volver a pedirlo: si no, alguien
+    // que avisó "llego tarde" entraría al pool sin la restricción de Campo
+    // Secundario.
+    if (selectedEvent.attendanceMode === "DECLINE") {
+      const result = await getEventRosterMembers(selectedEvent.id, []);
+      const knownIds = new Set(campo.players.map((p) => p.id));
+      const newOnes = rosterResultToPlayers(result).filter((p) => !knownIds.has(p.id));
+      if (newOnes.length > 0) campo.addPlayers(newOnes);
+      setMsg(newOnes.length > 0 ? `${newOnes.length} jugador(es) nuevo(s) agregado(s).` : "No hay jugadores nuevos.");
+      setTimeout(() => setMsg(""), 4000);
+      return;
+    }
+
     const fresh = await getEventSignups(selectedEvent.id);
     const knownIds = new Set(campo.players.map((p) => p.id));
     const newOnes = signupsToPlayers(fresh).filter((p) => !knownIds.has(p.id));
@@ -230,7 +246,7 @@ export function GuildLeague({
       )}
 
       {selectedEvent?.attendanceMode === "DECLINE" && (
-        <SdCoreDeclineImport eventId={selectedEvent.id} onImport={campo.addPlayers} />
+        <EventRosterImport eventId={selectedEvent.id} onImport={campo.addPlayers} />
       )}
       {msg && <p className="suggest-msg">{msg}</p>}
 

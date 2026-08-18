@@ -5,25 +5,27 @@ import { Users } from "lucide-react";
 import type { Player } from "@/types/party";
 import {
   listGuildRolesForImport,
-  getSdCoreMembersForEvent,
+  getEventRosterMembers,
   type DiscordRoleOption,
   type ImportableDiscordMember,
 } from "@/lib/party/discord-import";
-import { sdCoreResultToPlayers } from "@/lib/party/sd-core-to-players";
+import { rosterResultToPlayers } from "@/lib/party/event-roster-players";
 
-interface SdCoreDeclineImportProps {
+interface EventRosterImportProps {
   eventId: string;
   /** Devuelve cuántos jugadores nuevos se agregaron de verdad (los ya presentes en el pool se ignoran). */
   onImport: (players: Player[]) => number;
 }
 
 /**
- * Para eventos en modo DECLINE: carga a todo [SD] Core, opcionalmente
- * cruzado con roles de subdivisión (SD1, SD2...) elegidos acá, separando
- * quién llega tarde (solo Campo Secundario) y quién avisó que no va
- * (informativo, no se agrega al pool) — ver getSdCoreMembersForEvent.
+ * Para eventos en modo DECLINE: recarga el roster de la encuesta acotado a
+ * un rol puntual, separando quién llega tarde (solo Campo Secundario) y
+ * quién avisó que no va (informativo, no se agrega al pool) — ver
+ * getEventRosterMembers. El botón principal ya trae a todos los roles
+ * habilitados; esto sirve cuando la encuesta salió para varios (ej. SD1 y
+ * SD2) y se quiere armar el campo de uno solo.
  */
-export function SdCoreDeclineImport({ eventId, onImport }: SdCoreDeclineImportProps) {
+export function EventRosterImport({ eventId, onImport }: EventRosterImportProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [roles, setRoles] = useState<DiscordRoleOption[] | null>(null);
@@ -62,8 +64,8 @@ export function SdCoreDeclineImport({ eventId, onImport }: SdCoreDeclineImportPr
     setNotAttending(null);
     startTransition(async () => {
       try {
-        const result = await getSdCoreMembersForEvent(eventId, [...selectedRoleIds]);
-        const players: Player[] = sdCoreResultToPlayers(result);
+        const result = await getEventRosterMembers(eventId, [...selectedRoleIds]);
+        const players: Player[] = rosterResultToPlayers(result);
         const addedCount = onImport(players);
         const alreadyIn = players.length - addedCount;
         const parts = [addedCount > 0 ? `${addedCount} nuevo(s) cargado(s)` : "Nadie nuevo para cargar"];
@@ -72,7 +74,7 @@ export function SdCoreDeclineImport({ eventId, onImport }: SdCoreDeclineImportPr
         setMessage(`${parts.join(" — ")}.`);
         setNotAttending(result.notAttending);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "No se pudo cargar SD Core.");
+        setError(err instanceof Error ? err.message : "No se pudo cargar el roster.");
       }
     });
   }
@@ -86,7 +88,7 @@ export function SdCoreDeclineImport({ eventId, onImport }: SdCoreDeclineImportPr
           style={{ background: "none", border: "none", padding: 0, display: "block", font: "inherit" }}
           onClick={handleOpen}
         >
-          Filtrar por subdivisión (SD1, SD2...)
+          Filtrar por un rol puntual (SD1, SD2...)
         </button>
         {message && <p className="import-message success">{message}</p>}
         {error && <p className="import-message error">{error}</p>}
@@ -100,10 +102,10 @@ export function SdCoreDeclineImport({ eventId, onImport }: SdCoreDeclineImportPr
   return (
     <div className="import-box">
       <p className="import-hint" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <Users size={12} /> &quot;Cargar inscritos del evento&quot; ya trae a todo [SD] Core automáticamente.
-        Usa esto solo si querés recargar nada más que una subdivisión puntual (ej. SD1 o SD2). Quien avisó
-        que llega tarde solo se puede asignar a Campo Secundario; quien avisó que no va queda aparte, sin
-        agregarse al pool.
+        <Users size={12} /> &quot;Cargar inscritos del evento&quot; ya trae automáticamente a todos los roles
+        que podían responder esa encuesta. Usa esto solo si quieres recargar nada más que uno (ej. SD1 o
+        SD2). Quien avisó que llega tarde solo se puede asignar a Campo Secundario; quien avisó que no va
+        queda aparte, sin agregarse al pool.
       </p>
 
       {selectedRoles.length > 0 && (
@@ -152,7 +154,7 @@ export function SdCoreDeclineImport({ eventId, onImport }: SdCoreDeclineImportPr
 
       <div className="import-actions">
         <button type="button" className="btn btn-primary btn-sm" disabled={isPending} onClick={handleLoad}>
-          Cargar SD Core{selectedRoles.length > 0 ? ` (${selectedRoles.length} filtro/s)` : ""}
+          Cargar roster{selectedRoles.length > 0 ? ` (${selectedRoles.length} filtro/s)` : ""}
         </button>
         <button type="button" className="btn btn-ghost btn-sm" onClick={() => setOpen(false)} disabled={isPending}>
           Cerrar
