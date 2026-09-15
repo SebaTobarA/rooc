@@ -14,7 +14,7 @@
  */
 
 import { after } from "next/server";
-import { getGuildRolesCached } from "@/lib/discord-bot";
+import { getGuildRolesCached, type DiscordModalSubmitComponent } from "@/lib/discord-bot";
 import { resolveJobFromRoles } from "@/lib/discord-job-roles";
 import { editInteractionOriginal } from "@/lib/discord-interaction-webhook";
 import {
@@ -48,7 +48,7 @@ export interface SurveyComponentInteraction {
 export interface SurveyModalInteraction {
   token: string;
   member: SurveyInteractionMember;
-  data: { custom_id: string; components: { components: { custom_id: string; value: string }[] }[] };
+  data: { custom_id: string; components: DiscordModalSubmitComponent[] };
 }
 
 function parseGuildChoice(value: string | undefined): GuildChoice | null {
@@ -187,7 +187,7 @@ export async function handleCoreGuildSurveyComponent(interaction: SurveyComponen
 export async function handleCoreGuildSurveyModalSubmit(interaction: SurveyModalInteraction): Promise<Response> {
   const parts = interaction.data.custom_id.split(":");
   const guild = parseGuildChoice(parts[2]);
-  const tag = interaction.data.components[0]?.components[0]?.value?.trim();
+  const tag = interaction.data.components[0]?.components?.[0]?.value?.trim();
   const token = interaction.token;
 
   if (!guild || !tag) {

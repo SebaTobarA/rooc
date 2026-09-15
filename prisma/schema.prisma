@@ -838,3 +838,33 @@ model CoreGuildBoard {
   updatedAt          DateTime @updatedAt
   createdAt          DateTime @default(now())
 }
+
+// ---------------------------------------------------------------------------
+// Registro en Discord: quien entra al server toca "Registrarme" en el mensaje
+// fijo que publica Boo (ver src/lib/registration-discord.ts) y completa job,
+// nick in-game y si es Pilot/Joki. Boo le asigna el rol de job + Pronterian@s
+// y le cambia el apodo; acá queda guardado lo que eligió, que es la única
+// forma de saber quién es Pilot (a propósito no tiene rol de job) y de
+// precargar el formulario cuando vuelve a "Actualizar datos".
+// ---------------------------------------------------------------------------
+
+model MemberRegistration {
+  id              String   @id @default(cuid())
+  discordId       String   @unique
+  discordUsername String
+  nickname        String
+  jobRoleId       String
+  jobName         String
+  isPilot         Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// Fila única con dónde quedó publicado el mensaje de registro, para editarlo
+// en el lugar al republicar en vez de dejar copias en el canal.
+model RegistrationSettings {
+  id        String   @id @default(cuid())
+  channelId String?
+  messageId String?
+  updatedAt DateTime @updatedAt
+}

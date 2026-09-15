@@ -16,7 +16,7 @@ import { after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyDiscordRequest } from "@/lib/discord-verify";
 import { editInteractionOriginal } from "@/lib/discord-interaction-webhook";
-import { getGuildRolesCached } from "@/lib/discord-bot";
+import { getGuildRolesCached, type DiscordModalSubmitComponent } from "@/lib/discord-bot";
 import { jobGuildRoleIds, listJobGuildRoles, resolveJobFromRoles } from "@/lib/discord-job-roles";
 import { swapMemberJobClass } from "@/lib/discord-role-swap";
 import { renderAndPublishEmbed, upsertEventSignup } from "@/lib/events";
@@ -24,6 +24,8 @@ import { buildClassPickerComponents, buildConfirmComponents, parseCustomId } fro
 import { handleCoreGuildSurveyComponent, handleCoreGuildSurveyModalSubmit } from "@/lib/core-guild/survey-interactions";
 import { RECRUITMENT_CUSTOM_ID_PREFIX } from "@/lib/recruitment-discord";
 import { handleRecruitmentComponent } from "@/lib/recruitment-interactions";
+import { REGISTRATION_CUSTOM_ID_PREFIX, REGISTRATION_MODAL_ID } from "@/lib/registration-discord";
+import { handleRegistrationComponent, handleRegistrationModalSubmit } from "@/lib/registration-interactions";
 
 export const runtime = "nodejs";
 export const maxDuration = 15;
@@ -40,7 +42,7 @@ type DiscordInteraction = {
     custom_id: string;
     values?: string[];
     // Solo presente en interacciones type 5 (MODAL_SUBMIT).
-    components?: { components: { custom_id: string; value: string }[] }[];
+    components?: DiscordModalSubmitComponent[];
   };
 };
 
@@ -101,7 +103,27 @@ export async function POST(request: Request) {
         customId: interaction.data.custom_id,
       });
     }
+    // Mensaje fijo de registro ("reg:..."): abre el modal de job + nick.
+    if (interaction.data.custom_id.startsWith(REGISTRATION_CUSTOM_ID_PREFIX)) {
+      return handleRegistrationComponent({
+        member: interaction.member,
+        customId: interaction.data.custom_id,
+      });
+    }
     return handleComponent(interaction as Required<DiscordInteraction>);
+  }
+
+  if (
+    interaction.type === 5 &&
+    interaction.data?.custom_id === REGISTRATION_MODAL_ID &&
+    interaction.member &&
+    interaction.data.components
+  ) {
+    return handleRegistrationModalSubmit({
+      token: interaction.token,
+      member: interaction.member,
+      components: interaction.data.components,
+    });
   }
 
   if (interaction.type === 5 && interaction.data?.custom_id.startsWith("cgs:") && interaction.member && interaction.data.components) {

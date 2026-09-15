@@ -261,6 +261,36 @@ UUID aleatorio, así que no se pueden adivinar ni listar, pero cualquiera que
 tenga el enlace puede abrirlo. Son capturas de progreso in-game, no datos
 sensibles, pero conviene tenerlo presente.
 
+## Registro en Discord
+
+Mismo esquema que el server de Nostra: quien entra al server ve un canal de
+registro con un mensaje de Boo y el botón **Registrarme / Actualizar datos**.
+El botón abre un modal con tres campos: job (desplegable con los roles de job
+del server), nick in-game y tipo de registro (propia cuenta o Pilot/Joki).
+
+Al enviarlo, Boo:
+
+- asigna el rol de job elegido y quita cualquier otro rol de job;
+- asigna **Pronterian@s** (`REGISTRATION_ACCESS_ROLE_ID`), el rol que
+  desbloquea los canales públicos;
+- cambia el apodo del server por el nick in-game;
+- guarda lo elegido en `MemberRegistration`.
+
+Un **Pilot/Joki** (juega la cuenta de otro miembro) recibe solo Pronterian@s,
+sin rol de job, y ` [Pilot]` al final del apodo: los rosters de eventos y el
+Party Builder arman las columnas por rol de job, así que no ocupa lugar.
+
+Registrarse no es entrar a la guild: eso sigue siendo `/panel/postulacion`.
+
+- Publicar o republicar el mensaje: `/admin/registro` (elige el canal; si ya
+  estaba en ese canal se edita en el lugar).
+- Código: `src/lib/registration-discord.ts` (mensaje y modal) y
+  `src/lib/registration-interactions.ts` (botón y envío).
+- Boo necesita **Gestionar roles** y **Gestionar apodos**, y su rol tiene que
+  estar por encima de los roles de job y de Pronterian@s. Al dueño del server
+  y a quien tenga un rol por encima del de Boo no se le puede cambiar el
+  apodo: el registro igual asigna los roles y le avisa que lo cambie a mano.
+
 ## Arquitectura y extensibilidad
 
 El esquema (`prisma/schema.prisma`) tiene los modelos principales — `Item`,

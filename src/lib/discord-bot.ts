@@ -85,6 +85,10 @@ export type DiscordSelectOption = {
   label: string;
   value: string;
   description?: string;
+  /** Emoji personalizado del server (ej. los de JOB_ROLE_EMOJI). */
+  emoji?: { id: string; name: string };
+  /** Opción preseleccionada al abrir el menú. */
+  default?: boolean;
 };
 
 /** Menú desplegable de una sola elección (component_type 3) — ocupa toda su fila, no se puede combinar con botones en la misma. */
@@ -118,11 +122,44 @@ export type DiscordModalActionRow = {
   components: DiscordTextInput[];
 };
 
+/** Campo de texto dentro de un Label: el título va en el Label, no en el campo. */
+export type DiscordModalTextInput = Omit<DiscordTextInput, "label"> & {
+  /** Texto precargado. */
+  value?: string;
+};
+
+/** Desplegable dentro de un modal: a diferencia de los de mensajes, puede marcarse obligatorio. */
+export type DiscordModalStringSelect = DiscordSelectMenu & { required?: boolean };
+
+/**
+ * Envoltorio con título y descripción (component type 18). Es lo que permite
+ * poner desplegables en un modal, no solo campos de texto.
+ */
+export type DiscordModalLabel = {
+  type: 18;
+  label: string;
+  description?: string;
+  component: DiscordModalStringSelect | DiscordModalTextInput;
+};
+
 /** Formulario emergente (interaction response type 9) — la única forma de pedir texto libre en una interacción de Discord. */
 export type DiscordModal = {
   custom_id: string;
   title: string;
-  components: DiscordModalActionRow[];
+  /** Entre 1 y 5. */
+  components: (DiscordModalActionRow | DiscordModalLabel)[];
+};
+
+export type DiscordModalSubmitValue = { custom_id: string; value?: string; values?: string[] };
+
+/**
+ * Un campo tal como vuelve en un MODAL_SUBMIT: dentro de una fila clásica
+ * (`components`, type 1) o de un Label (`component`, type 18).
+ */
+export type DiscordModalSubmitComponent = {
+  type: number;
+  components?: DiscordModalSubmitValue[];
+  component?: DiscordModalSubmitValue;
 };
 
 /** Un solo miembro por ID. Devuelve null si no pertenece al server (404). */
@@ -199,6 +236,26 @@ export async function removeGuildMemberRole(discordId: string, roleId: string): 
   if (!response.ok) {
     throw new Error(`No se pudo quitar el rol en Discord (${response.status}).`);
   }
+}
+
+/**
+ * Cambia el apodo de un miembro en el server. Requiere el permiso "Gestionar
+ * apodos" y, como con los roles, que el rol del bot esté por encima del rol
+ * más alto del miembro; al dueño del server no se le puede cambiar nunca.
+ * Devuelve un aviso para mostrarle al usuario en vez de lanzar: un apodo que
+ * no se pudo cambiar no debería deshacer lo demás.
+ */
+export async function setGuildMemberNickname(discordId: string, nick: string): Promise<string | null> {
+  const response = await discordBotFetch(`/guilds/${getGuildId()}/members/${discordId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ nick }),
+  });
+  if (response.ok) return null;
+  if (response.status === 403) {
+    return "No pude cambiar tu apodo del server (Boo no tiene permiso sobre tu cuenta): cámbialo a mano por tu nick in-game.";
+  }
+  return `No pude cambiar tu apodo del server (${response.status}): cámbialo a mano por tu nick in-game.`;
 }
 
 /** Postea un mensaje nuevo (con embed y/o botones) en un canal. Devuelve el ID del mensaje creado. */
