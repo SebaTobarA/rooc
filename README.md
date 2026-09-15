@@ -349,6 +349,20 @@ assets-source/
    a esa base), o cargá tus datos reales por el panel admin / importación
    masiva.
 
+### Proyecto único
+
+Este repo es la única app de Special Delivery: se despliega en el proyecto de
+Vercel `acup/rooc`, con el dominio `specialdelivery.vercel.app`. Absorbió dos
+proyectos que antes estaban separados y cuyos repos se retiraron. Su historial
+completo quedó guardado como tags en este mismo repo:
+
+- `archive/special-delivery`: el sitio estático original (HTML/CSS/JS), hoy
+  el grupo `src/app/(marketing)`.
+- `archive/rooc-party-builder`: el Party Builder en Vite + React, hoy
+  `/panel/party`.
+
+Para revisarlos: `git fetch --tags && git checkout archive/special-delivery`.
+
 ## Limitaciones conocidas de la v1
 
 - Sin buscador full-text ni ranking de relevancia: los filtros son por
