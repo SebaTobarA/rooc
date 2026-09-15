@@ -1,5 +1,10 @@
 import { prisma } from "@/lib/prisma";
-import { loadEventChannelOptions } from "@/lib/discord-guild-channels";
+import { getGuildChannels } from "@/lib/discord-bot";
+import {
+  FALLBACK_EVENT_CHANNEL_OPTIONS,
+  listEventChannelOptions,
+  type EventChannelOption,
+} from "@/lib/discord-guild-channels";
 import { RegistrationPublishForm } from "@/components/admin/registration-publish-form";
 
 export const dynamic = "force-dynamic";
@@ -17,9 +22,21 @@ const DATE_FORMATTER = new Intl.DateTimeFormat("es-419", {
   timeZone: "America/Santiago",
 });
 
+/**
+ * Sin la cache de 5 minutos de loadEventChannelOptions: el canal de registro
+ * suele crearse justo antes de publicar, y con la cache no aparecía.
+ */
+async function loadFreshChannelOptions(): Promise<EventChannelOption[]> {
+  try {
+    return listEventChannelOptions(await getGuildChannels());
+  } catch {
+    return FALLBACK_EVENT_CHANNEL_OPTIONS;
+  }
+}
+
 export default async function AdminRegistrationPage() {
   const [channels, settings, registrations] = await Promise.all([
-    loadEventChannelOptions(),
+    loadFreshChannelOptions(),
     prisma.registrationSettings.findFirst(),
     prisma.memberRegistration.findMany({ orderBy: { updatedAt: "desc" } }),
   ]);
