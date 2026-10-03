@@ -172,6 +172,39 @@ export async function getGuildMember(discordId: string): Promise<DiscordGuildMem
   return response.json();
 }
 
+/**
+ * En qué canal de voz está conectado un miembro ahora mismo, o null si no
+ * está en ninguno. Boo no tiene conexión permanente a Discord (corre como
+ * funciones de Vercel), así que no recibe los eventos de voz: la única forma
+ * de saberlo es preguntar por cada persona. No hay endpoint que liste un
+ * canal entero.
+ *
+ * A diferencia de discordBotFetch, acá un 429 se espera y se reintenta:
+ * tomar lista son ~78 llamadas seguidas (ver takeVoiceAttendance) y cortar
+ * todo por un rate limit puntual dejaría la lista a medias.
+ */
+export async function getMemberVoiceChannelId(discordId: string): Promise<string | null> {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const response = await fetch(`${DISCORD_API}/guilds/${getGuildId()}/voice-states/${discordId}`, {
+      headers: { Authorization: `Bot ${getBotToken()}` },
+      cache: "no-store",
+    });
+    if (response.status === 429) {
+      const retryAfter = Number(response.headers.get("retry-after") ?? "1");
+      await new Promise((resolve) => setTimeout(resolve, Math.min(Math.max(retryAfter, 0.25), 5) * 1000));
+      continue;
+    }
+    // 404 = no está conectado a voz (o ya no está en el server).
+    if (response.status === 404) return null;
+    if (!response.ok) {
+      throw new Error(`No se pudo leer el estado de voz en Discord (${response.status}).`);
+    }
+    const state = (await response.json()) as { channel_id: string | null };
+    return state.channel_id;
+  }
+  throw new Error("Discord rate-limited la lectura de voz. Prueba de nuevo en unos segundos.");
+}
+
 /** Todos los roles del server, ordenados por posición (mayor jerarquía primero). */
 export async function getGuildRoles(): Promise<DiscordGuildRole[]> {
   const response = await discordBotFetch(`/guilds/${getGuildId()}/roles`);

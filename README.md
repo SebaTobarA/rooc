@@ -291,6 +291,58 @@ Registrarse no es entrar a la guild: eso sigue siendo `/panel/postulacion`.
   y a quien tenga un rol por encima del de Boo no se le puede cambiar el
   apodo: el registro igual asigna los roles y le avisa que lo cambie a mano.
 
+## Censo Core
+
+Control de los miembros con el rol **[SD] Core** (máximo acordado: 78) para
+decidir si siguen en el core de la guild. Vive en `/admin/core-guild/censo`
+(solo admins), como pestaña de Core Guild.
+
+| Qué | Dónde |
+| --- | --- |
+| Panel del mes: ficha, asistencia, rendimiento y tier de cada miembro | `/admin/core-guild/censo?mes=AAAA-MM` |
+| Ficha de equipo de un miembro + su historial de eventos | `/admin/core-guild/censo/miembro/[discordId]` |
+| Carga de un evento: juego, Discord, puntos, KDA, justificación | `/admin/core-guild/censo/evento/[eventId]` |
+| Lo que ve el propio jugador (solo lectura) | `/panel/perfil`, sección "Mi ficha Core" |
+
+### Ficha de equipo
+
+La completan los oficiales. Los mínimos están en
+`src/lib/core-census/requirements.ts`, que es la **fuente única** (el panel, la
+ficha y el perfil recorren esa lista): Refine +14, Medallas 170.000, MR +20,
+Plumas +9, Enchants +30, cartas PVP, equipo S2 naranja y árbol de skills PVP.
+Un campo vacío es "sin evaluar", no "no cumple".
+
+### Participación por evento
+
+Los eventos son los mismos de `/panel/eventos` (la semana de asistencia crea
+martes y jueves de Guild League y domingo de Emperium Overrun). Al terminar
+cada uno, un oficial abre su carga, marca quién estuvo en el juego y en
+Discord, escribe puntos y KDA y aprieta **Guardar censo**. Recién ahí el
+evento cuenta para el tier (`Event.coreCensusAt`).
+
+**Discord.** Boo corre como funciones de Vercel, sin conexión permanente a
+Discord, así que no se entera solo de quién entra a voz, y el registro de
+auditoría de Discord no guarda entradas ni salidas de canales de voz. Lo que sí
+puede hacer es preguntar persona por persona: el botón **Tomar lista de voz con
+Boo** revisa a cada miembro Core en ese instante y marca a los que están en los
+canales del evento (`src/lib/core-census/voice.ts`: los dos canales en Guild
+League, solo el primero en Emperium Overrun). Hay que apretarlo **durante** el
+evento; se puede repetir y solo suma gente. El resto se marca a mano.
+
+### Asistencia regular (tier mensual)
+
+Se calcula en `src/lib/core-census/tier.ts`, por mes en hora de Chile:
+
+- **S**: ninguna falta en el mes.
+- **A**: 1 o 2 faltas.
+- **B**: 3 faltas o más.
+
+Es falta un evento censado en el que la persona no estuvo en el juego **o** no
+estuvo en la voz de Discord. Una falta **justificada** (avisó con anticipación;
+exige nota) queda registrada pero no baja el tier. La carga del evento muestra
+quién avisó en la encuesta de asistencia de Discord, para saber a quién
+corresponde justificar.
+
 ## Arquitectura y extensibilidad
 
 El esquema (`prisma/schema.prisma`) tiene los modelos principales — `Item`,

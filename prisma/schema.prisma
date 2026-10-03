@@ -343,24 +343,24 @@ model User {
 // panel. Se administra desde /admin/roles; los permisos efectivos de un
 // usuario son el OR de todas las filas cuyo discordRoleId esté en User.roles.
 model RolePermission {
-  id               String   @id @default(cuid())
-  discordRoleId    String   @unique
+  id                   String   @id @default(cuid())
+  discordRoleId        String   @unique
   // Cacheado desde la API del bot (GET /guilds/{id}/roles), se refresca cada
   // vez que se abre /admin/roles.
-  roleName         String
-  canViewPanel     Boolean  @default(true)
-  canViewParty     Boolean  @default(true)
-  canManageParty   Boolean  @default(false)
-  canManageContent Boolean  @default(false)
+  roleName             String
+  canViewPanel         Boolean  @default(true)
+  canViewParty         Boolean  @default(true)
+  canManageParty       Boolean  @default(false)
+  canManageContent     Boolean  @default(false)
   // Ve el módulo "Reclutamiento" en /admin/recruitment (revisar/aprobar
   // postulaciones), sin necesitar ser admin del sitio.
-  canManageRecruitment Boolean @default(false)
+  canManageRecruitment Boolean  @default(false)
   // Un usuario cuyo único rol con fila guardada tiene esto en true queda
   // "solo postulante": en vez del panel normal, cualquier ruta de /panel
   // lo redirige a /panel/postulacion (ver proxy.ts). Si además tiene otro
   // rol con canViewPanel true, esta bandera se ignora (getEffectivePermissions).
-  isApplicantRole  Boolean  @default(false)
-  updatedAt        DateTime @updatedAt
+  isApplicantRole      Boolean  @default(false)
+  updatedAt            DateTime @updatedAt
 }
 
 enum ApplicationStatus {
@@ -372,7 +372,9 @@ enum ApplicationStatus {
   REJECTED
 }
 
-/** Guild a la que se suma un postulante aprobado. */
+/**
+ * Guild a la que se suma un postulante aprobado.
+ */
 enum GuildBranch {
   SD1
   SD2
@@ -517,12 +519,12 @@ enum EventAttendanceMode {
 // una vez por tipo de evento y se reusa cada vez que se carga una fecha
 // nueva, para no reconfigurar el estilo en cada evento.
 model EventTemplate {
-  id         String        @id @default(cuid())
-  title      String
+  id             String              @id @default(cuid())
+  title          String
   // Emoji corto opcional, antepuesto al título del embed en Discord.
-  icon       String?
-  embedColor String        @default("#6fe0f5")
-  category   EventCategory
+  icon           String?
+  embedColor     String              @default("#6fe0f5")
+  category       EventCategory
   // Copiado a cada Event creado desde este template (ver createEvent) —
   // define qué embed/botones se publican y cómo se interpretan los signups.
   attendanceMode EventAttendanceMode @default(CONFIRM)
@@ -544,17 +546,17 @@ model GuildEventSettings {
 }
 
 model Event {
-  id          String        @id @default(cuid())
-  title       String
-  description String        @default("")
+  id             String              @id @default(cuid())
+  title          String
+  description    String              @default("")
   // Copiada del template elegido al crear el evento.
-  category    EventCategory
+  category       EventCategory
   // Copiado del template elegido al crear el evento (ver createEvent) — así
   // un evento ya publicado no cambia de comportamiento si el template se
   // edita después.
   attendanceMode EventAttendanceMode @default(CONFIRM)
-  templateId  String
-  template    EventTemplate @relation(fields: [templateId], references: [id])
+  templateId     String
+  template       EventTemplate       @relation(fields: [templateId], references: [id])
 
   startsAt       DateTime
   endsAt         DateTime
@@ -581,10 +583,17 @@ model Event {
   // siempre).
   weekGroupId String?
 
+  // Cuándo un oficial guardó el censo Core de este evento (ver
+  // saveEventCensus). Recién ahí el evento cuenta para el tier mensual:
+  // tomar la lista de voz con Boo durante el evento crea filas en
+  // CoreEventRecord, pero no lo da por cerrado.
+  coreCensusAt DateTime?
+
   createdById    String
-  createdBy      User            @relation(fields: [createdById], references: [id])
+  createdBy      User              @relation(fields: [createdById], references: [id])
   signups        EventSignup[]
   partyTemplates PartyTemplate[]
+  coreRecords    CoreEventRecord[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -712,12 +721,12 @@ enum JobTier {
 }
 
 model Job {
-  id   String  @id @default(cuid())
-  name String
-  tier JobTier
+  id    String  @id @default(cuid())
+  name  String
+  tier  JobTier
   // Orden entre hermanos (columnas en el selector, o ramas dentro de una
   // misma clase base, ej. Knight antes que Crusader).
-  order Int    @default(0)
+  order Int     @default(0)
 
   iconUrl     String?
   // Retrato de cuerpo/busto mostrado en la tarjeta de personaje del
@@ -743,9 +752,9 @@ model Skill {
   jobId String
   job   Job    @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
-  name     String
-  iconUrl  String?
-  maxLevel Int     @default(10)
+  name              String
+  iconUrl           String?
+  maxLevel          Int      @default(10)
   // Descripción de cada nivel (índice 0 = nivel 1, etc.) — se muestra la
   // que corresponda al nivel actualmente invertido en el simulador.
   levelDescriptions String[] @default([])
@@ -867,4 +876,77 @@ model RegistrationSettings {
   channelId String?
   messageId String?
   updatedAt DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Censo Core: control de los miembros con el rol "[SD] Core" para decidir si
+// siguen en el core de la guild. Dos piezas, las dos cargadas por oficiales
+// desde /admin/core-guild/censo:
+//  - CoreCharacterSheet: ficha de equipo, se compara contra los mínimos de
+//    src/lib/core-census/requirements.ts.
+//  - CoreEventRecord: participación de cada miembro en cada evento de guild
+//    (juego + voz de Discord + rendimiento), de donde sale el tier mensual
+//    (ver src/lib/core-census/tier.ts).
+// ---------------------------------------------------------------------------
+
+// Todos los campos de evaluación son opcionales: null = todavía sin evaluar,
+// que no es lo mismo que "no cumple".
+model CoreCharacterSheet {
+  id        String @id @default(cuid())
+  discordId String @unique
+
+  // Nombre del personaje in-game. Vacío = se muestra el nick del registro
+  // (MemberRegistration) o el apodo del server.
+  characterName String @default("")
+
+  refine       Int?
+  medals       Int?
+  mr           Int?
+  feathers     Int?
+  enchants     Int?
+  // Cartas PVP.
+  cardsPvp     Boolean?
+  // Equipo S2 naranja.
+  s2Orange     Boolean?
+  // Árbol de skills PVP: true = sí, false = "mejorar".
+  skillTreePvp Boolean?
+
+  notes String @default("")
+
+  updatedByUsername String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model CoreEventRecord {
+  id      String @id @default(cuid())
+  eventId String
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  discordId   String
+  // Snapshot del nombre al guardar, para que el historial siga legible si la
+  // persona se va del server.
+  displayName String
+
+  // Estuvo en el evento dentro del juego (lo marca el oficial).
+  inGame      Boolean   @default(false)
+  // Estuvo en los canales de voz del evento (lo marca el oficial o Boo).
+  inDiscord   Boolean   @default(false)
+  // Última vez que Boo lo vio en voz al tomar lista; null si se marcó a mano.
+  voiceSeenAt DateTime?
+
+  points  Int?
+  kills   Int?
+  deaths  Int?
+  assists Int?
+
+  // Falta avisada con anticipación: no cuenta para el tier. Exige nota.
+  justified Boolean @default(false)
+  note      String  @default("")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([eventId, discordId])
+  @@index([discordId])
 }

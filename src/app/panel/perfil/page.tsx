@@ -6,6 +6,8 @@ import { discordAvatarUrl } from "@/lib/discord-avatar";
 import { siteConfig } from "@/config/site";
 import { BotErrorNotice } from "@/components/admin/bot-error-notice";
 import { ClassEditor } from "@/components/panel/class-editor";
+import { CoreSheetCard } from "@/components/panel/core-sheet-card";
+import { CORE_GUILD_ROLE_ID } from "@/lib/core-guild/sync";
 
 export const metadata = {
   title: "Mi perfil",
@@ -124,6 +126,8 @@ export default async function ProfilePage() {
           )}
         </div>
       </section>
+
+      {member.roles.includes(CORE_GUILD_ROLE_ID) && <CoreSheetCard discordId={member.user.id} />}
 
       <section className="mt-8 rounded-xl border border-border bg-surface p-5">
         <h2 className="font-semibold text-foreground">
