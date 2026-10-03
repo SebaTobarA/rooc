@@ -52,6 +52,7 @@ export default async function CoreEvaluationPage({ searchParams }: { searchParam
     avatarUrl: discordAvatarUrl(player.discordId, player.avatarHash, 32),
     characterName: player.characterName,
     job: player.job,
+    desiredJob: player.sheet.comfortableWithJob === false ? (player.sheet.desiredJob ?? "") : null,
     inCore: player.inCore,
     requirements: SHEET_REQUIREMENTS.map((requirement) => ({
       value: formatRequirementValue(requirement, player.sheet),

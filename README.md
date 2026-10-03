@@ -328,6 +328,11 @@ PVP, equipo S2 naranja y árbol de skills PVP. Un campo vacío es "sin revisar",
 no "no cumple". Cada revisión que cambia algo deja una foto en
 `CoreSheetRevision`, para ver cómo avanzó el jugador.
 
+La ficha también guarda la respuesta a **"¿Se siente cómod@ con el job que
+juega?"**; si es "No", se elige de una lista el job que desea jugar. No es un
+mínimo ni entra en el historial de revisiones: es un dato de la persona, y en
+el listado aparece como "Quiere cambiar de job".
+
 ### Reporte post evento
 
 Los eventos son los mismos de `/panel/eventos` (martes y jueves Guild League,
@@ -350,6 +355,16 @@ lista de voz con Boo** revisa a cada miembro Core en ese instante y marca a los
 que están en los canales del evento (`src/lib/core-census/voice.ts`: los dos
 canales en Guild League, solo el primero en Emperium Overrun). Hay que
 apretarlo **durante** el evento; se puede repetir y solo suma gente.
+
+### Rendimiento
+
+La hoja de vida grafica los puntos por evento, separados por tipo (Guild
+League y Emperium Overrun no comparten escala), y cuenta cuántas veces jugó
+cada job. Para eso cada reporte guarda, por jugador, el **job** y la **party**
+con que jugó (`CoreEventRecord.jobName`/`partyName`): salen de la última
+plantilla del Party Builder enlazada al evento (`PartyTemplate.eventId`) y, si
+no hay, el job sale del rol de Discord. El análisis por party y compañeros
+está marcado "En construcción": los datos ya se guardan, falta la vista.
 
 ### Asistencia regular (tier mensual)
 

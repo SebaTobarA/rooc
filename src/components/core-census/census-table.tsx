@@ -14,6 +14,8 @@ export interface CensusTableRow {
   avatarUrl: string | null;
   characterName: string;
   job: string | null;
+  /** Job que quiere jugar, si dijo que no está cómod@ con el actual; "" si quiere cambiar sin definir cuál. */
+  desiredJob: string | null;
   /** false = ex miembro: ya no tiene el rol, se conserva su hoja de vida. */
   inCore: boolean;
   /** Una celda por requisito, en el orden de SHEET_REQUIREMENTS. */
@@ -169,6 +171,11 @@ export function CensusTable({ rows, requirementLabels, basePath }: CensusTablePr
                           @{row.username}
                           {row.job ? ` · ${row.job}` : ""}
                         </span>
+                        {row.desiredJob !== null && (
+                          <span className="block text-xs text-amber-400">
+                            Quiere cambiar de job{row.desiredJob ? `: ${row.desiredJob}` : ""}
+                          </span>
+                        )}
                         {!row.inCore && <span className="block text-xs text-rose-400">Ex miembro</span>}
                       </span>
                     </Link>

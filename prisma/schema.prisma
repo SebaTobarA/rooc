@@ -926,6 +926,11 @@ model CoreCharacterSheet {
 
   notes String @default("")
 
+  // "¿Se siente cómod@ con el job que juega?" null = no se le preguntó.
+  comfortableWithJob Boolean?
+  // Job que le gustaría jugar; solo tiene sentido si respondió que no.
+  desiredJob         String?
+
   // Última revisión de equipo hecha por un oficial (updatedAt no sirve para
   // esto: también lo mueve el sync de datos de Discord).
   reviewedAt        DateTime?
@@ -992,6 +997,14 @@ model CoreEventRecord {
   kills   Int?
   deaths  Int?
   assists Int?
+
+  // Con qué job y en qué party jugó, copiados al guardar el reporte: el job
+  // sale del Party Builder del evento si hay plantilla, si no del rol de
+  // Discord; la party, de esa misma plantilla (PartyTemplate.eventId). Son
+  // la base de los gráficos de rendimiento de la hoja de vida, y solo existen
+  // para los reportes guardados desde que se agregaron.
+  jobName   String?
+  partyName String?
 
   // Falta avisada con anticipación: no cuenta para el tier. Exige nota.
   justified Boolean @default(false)

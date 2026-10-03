@@ -14,6 +14,8 @@ import { getSession } from "@/lib/auth";
 import { getCoreGuildRoster } from "@/lib/core-guild/sync";
 import { findMembersInEventVoice } from "@/lib/core-census/voice";
 import { SHEET_REQUIREMENTS } from "@/lib/core-census/requirements";
+import { JOB_ROLE_NAMES } from "@/lib/discord-job-roles";
+import { readSnapshot } from "@/lib/party/template-snapshot";
 import { EVALUATION_START } from "@/lib/core-census/tier";
 
 const EVALUATION_PATH = "/admin/evaluacion-core";
@@ -56,6 +58,12 @@ const sheetSchema = z.object({
   s2Orange: optionalBoolean,
   skillTreePvp: optionalBoolean,
   notes: z.string().trim().max(1000),
+  comfortableWithJob: optionalBoolean,
+  // Vacío o un job que no existe = sin definir.
+  desiredJob: z.preprocess(
+    (value) => ((JOB_ROLE_NAMES as readonly unknown[]).includes(value) ? value : null),
+    z.string().nullable()
+  ),
 });
 
 /**
@@ -77,9 +85,17 @@ export async function saveCharacterSheet(discordId: string, formData: FormData):
     s2Orange: formData.get("s2Orange"),
     skillTreePvp: formData.get("skillTreePvp"),
     notes: formData.get("notes") ?? "",
+    comfortableWithJob: formData.get("comfortableWithJob"),
+    desiredJob: formData.get("desiredJob"),
   });
 
-  const { characterName, ...evaluation } = data;
+  // El job deseado solo se guarda si dijo que no está cómodo con el actual.
+  const { characterName, comfortableWithJob, desiredJob, ...evaluation } = data;
+  const profile = {
+    characterName,
+    comfortableWithJob,
+    desiredJob: comfortableWithJob === false ? desiredJob : null,
+  };
   const previous = await prisma.coreCharacterSheet.findUnique({ where: { discordId } });
   const evaluationChanged =
     !previous?.reviewedAt ||
@@ -90,8 +106,8 @@ export async function saveCharacterSheet(discordId: string, formData: FormData):
   await prisma.$transaction([
     prisma.coreCharacterSheet.upsert({
       where: { discordId },
-      create: { discordId, ...data, reviewedAt, updatedByUsername },
-      update: { characterName, ...(evaluationChanged ? { ...evaluation, reviewedAt, updatedByUsername } : {}) },
+      create: { discordId, ...profile, ...evaluation, reviewedAt, updatedByUsername },
+      update: { ...profile, ...(evaluationChanged ? { ...evaluation, reviewedAt, updatedByUsername } : {}) },
     }),
     ...(evaluationChanged
       ? [
@@ -154,10 +170,28 @@ export async function saveEventCensus(eventId: string, rows: CensusRowInput[]): 
   if (event.startsAt < EVALUATION_START) return { error: "Este evento es anterior al inicio de la evaluación." };
   const surveyById = new Map(event.signups.map((signup) => [signup.discordId, signup.status]));
 
+  // Job y party de cada jugador en este evento, para medir rendimiento más
+  // adelante: del Party Builder si se armó una plantilla para el evento (la
+  // última guardada), y si no, el job de la ficha.
+  const [sheets, template] = await Promise.all([
+    prisma.coreCharacterSheet.findMany({
+      where: { discordId: { in: parsed.data.map((row) => row.discordId) } },
+      select: { discordId: true, jobName: true },
+    }),
+    prisma.partyTemplate.findFirst({ where: { eventId }, orderBy: { updatedAt: "desc" } }),
+  ]);
+  const sheetJobById = new Map(sheets.map((sheet) => [sheet.discordId, sheet.jobName]));
+  const snapshot = template ? readSnapshot(template.data) : null;
+  const partyNameById = new Map(snapshot?.parties.map((party) => [party.id, party.name]) ?? []);
+  const builderById = new Map(snapshot?.players.map((player) => [player.id, player]) ?? []);
+
   await prisma.$transaction([
     ...parsed.data.map((row) => {
+      const builder = builderById.get(row.discordId);
       // Sin rendimiento si no jugó, y sin justificación si no hubo falta.
       const data = {
+        jobName: row.inGame ? builder?.clase || sheetJobById.get(row.discordId) || null : null,
+        partyName: row.inGame && builder?.partyId ? (partyNameById.get(builder.partyId) ?? null) : null,
         displayName: row.displayName,
         inGame: row.inGame,
         inDiscord: row.inDiscord,
