@@ -2,7 +2,9 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getGuildChannelsCached } from "@/lib/discord-bot";
 import { EVENT_CATEGORY_LABEL } from "@/lib/labels";
-import { loadCensusMembers, type CensusMember } from "@/lib/core-census/data";
+import { loadCorePlayers } from "@/lib/core-census/data";
+import { surveyAnswer } from "@/lib/core-census/survey";
+import { EVALUATION_START } from "@/lib/core-census/tier";
 import { CENSUS_VOICE_CHANNELS } from "@/lib/core-census/voice";
 import { BackLink } from "@/components/back-link";
 import { BotErrorNotice } from "@/components/admin/bot-error-notice";
@@ -14,7 +16,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export const metadata = {
-  title: "Censo de evento",
+  title: "Reporte de evento",
 };
 
 const DATE_FORMATTER = new Intl.DateTimeFormat("es-CL", {
@@ -27,40 +29,40 @@ const DATE_FORMATTER = new Intl.DateTimeFormat("es-CL", {
   timeZone: "America/Santiago",
 });
 
-export default async function CoreEventCensusPage({ params }: { params: Promise<{ eventId: string }> }) {
+export default async function CoreEventReportPage({ params }: { params: Promise<{ eventId: string }> }) {
   const { eventId } = await params;
 
   const event = await prisma.event.findUnique({
     where: { id: eventId },
     include: { template: { select: { icon: true } }, signups: true, coreRecords: true },
   });
-  if (!event) notFound();
+  // Los eventos anteriores al inicio de la evaluación no se reportan.
+  if (!event || event.startsAt < EVALUATION_START) notFound();
 
-  let members: CensusMember[] = [];
+  const { players, syncError } = await loadCorePlayers({ sync: true });
   let channelNameById = new Map<string, string>();
-  let botError: string | null = null;
   try {
-    const [loadedMembers, channels] = await Promise.all([loadCensusMembers(), getGuildChannelsCached()]);
-    members = loadedMembers;
+    const channels = await getGuildChannelsCached();
     channelNameById = new Map(channels.map((channel) => [channel.id, channel.name]));
-  } catch (err) {
-    botError = err instanceof Error ? err.message : "Error desconocido";
+  } catch {
+    // Solo afecta al texto de ayuda: se muestran los IDs de canal.
   }
-  if (botError) return <BotErrorNotice message={botError} />;
 
   const recordById = new Map(event.coreRecords.map((record) => [record.discordId, record]));
   const signupById = new Map(event.signups.map((signup) => [signup.discordId, signup.status]));
 
-  const initialRows: EventCensusRow[] = members
-    .map((member) => {
-      const record = recordById.get(member.discordId);
-      const signup = signupById.get(member.discordId);
+  // El reporte es de quienes hoy están en el core, más quien ya tenía registro
+  // en este evento aunque después haya perdido el rol.
+  const initialRows: EventCensusRow[] = players
+    .filter((player) => player.inCore || recordById.has(player.discordId))
+    .map((player) => {
+      const record = recordById.get(player.discordId);
       return {
-        discordId: member.discordId,
-        displayName: member.displayName,
-        characterName: member.characterName,
-        job: member.job,
-        notice: signup === "NOT_ATTENDING" || signup === "LATE" ? signup : null,
+        discordId: player.discordId,
+        displayName: player.displayName,
+        characterName: player.characterName,
+        job: player.job,
+        survey: surveyAnswer(signupById.get(player.discordId) ?? null, event.attendanceMode),
         inGame: record?.inGame ?? false,
         inDiscord: record?.inDiscord ?? false,
         points: record?.points ?? null,
@@ -70,8 +72,7 @@ export default async function CoreEventCensusPage({ params }: { params: Promise<
         justified: record?.justified ?? false,
         note: record?.note ?? "",
       };
-    })
-    .sort((a, b) => a.characterName.localeCompare(b.characterName));
+    });
 
   const voiceChannelNames = CENSUS_VOICE_CHANNELS[event.category].map(
     (channelId) => channelNameById.get(channelId) ?? `canal ${channelId}`
@@ -79,13 +80,19 @@ export default async function CoreEventCensusPage({ params }: { params: Promise<
 
   return (
     <div>
-      <BackLink href="/admin/core-guild/censo" label="Censo" />
+      <BackLink href="/admin/evaluacion-core" label="Evaluación de CORE" />
+
+      {syncError && (
+        <div className="mb-4">
+          <BotErrorNotice message={`No se pudo actualizar contra Discord, se muestra lo último guardado. ${syncError}`} />
+        </div>
+      )}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold text-foreground">
             {event.template.icon ? `${event.template.icon} ` : ""}
-            {EVENT_CATEGORY_LABEL[event.category]}
+            Reporte de {EVENT_CATEGORY_LABEL[event.category]}
           </h1>
           <p className="text-sm capitalize text-muted">{DATE_FORMATTER.format(event.startsAt)}</p>
         </div>
@@ -94,7 +101,7 @@ export default async function CoreEventCensusPage({ params }: { params: Promise<
             event.coreCensusAt ? "border-emerald-500/40 text-emerald-400" : "border-amber-500/40 text-amber-400"
           }`}
         >
-          {event.coreCensusAt ? "Censado — puedes corregirlo y volver a guardar" : "Pendiente de censo"}
+          {event.coreCensusAt ? "Reportado — puedes corregirlo y volver a guardar" : "Reporte pendiente"}
         </span>
       </div>
 

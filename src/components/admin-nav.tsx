@@ -16,6 +16,7 @@ const FULL_ADMIN_LINKS = [
   { href: "/admin/members", label: "Miembros" },
   { href: "/admin/registro", label: "Registro" },
   { href: "/admin/core-guild", label: "Core Guild" },
+  { href: "/admin/evaluacion-core", label: "Evaluación de CORE" },
   { href: "/admin/recruitment", label: "Reclutamiento" },
   { href: "/admin/build-pvp", label: "Build PVP" },
   { href: "/admin/roles", label: "Roles y permisos" },

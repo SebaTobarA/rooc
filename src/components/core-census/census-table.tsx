@@ -14,12 +14,21 @@ export interface CensusTableRow {
   avatarUrl: string | null;
   characterName: string;
   job: string | null;
+  /** false = ex miembro: ya no tiene el rol, se conserva su hoja de vida. */
+  inCore: boolean;
   /** Una celda por requisito, en el orden de SHEET_REQUIREMENTS. */
   requirements: { value: string; status: RequirementStatus }[];
   summary: MemberMonthSummary | null;
 }
 
 type TierFilter = "ALL" | CensusTier | "NONE";
+type StatusFilter = "ACTIVE" | "FORMER" | "ALL";
+
+const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
+  { value: "ACTIVE", label: "Activos" },
+  { value: "FORMER", label: "Ex miembros" },
+  { value: "ALL", label: "Todos" },
+];
 
 const TIER_FILTERS: { value: TierFilter; label: string }[] = [
   { value: "ALL", label: "Todos" },
@@ -42,15 +51,19 @@ const POINTS_FORMATTER = new Intl.NumberFormat("es-CL", { maximumFractionDigits:
 interface CensusTableProps {
   rows: CensusTableRow[];
   requirementLabels: string[];
+  /** Ruta del módulo, para enlazar a la hoja de vida de cada jugador. */
+  basePath: string;
 }
 
-export function CensusTable({ rows, requirementLabels }: CensusTableProps) {
+export function CensusTable({ rows, requirementLabels, basePath }: CensusTableProps) {
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("ACTIVE");
   const [tierFilter, setTierFilter] = useState<TierFilter>("ALL");
 
   const visibleRows = useMemo(() => {
     const query = normalize(search);
     return rows.filter((row) => {
+      if (statusFilter !== "ALL" && row.inCore !== (statusFilter === "ACTIVE")) return false;
       const tier = row.summary?.tier ?? null;
       if (tierFilter === "NONE" ? tier !== null : tierFilter !== "ALL" && tier !== tierFilter) return false;
       if (!query) return true;
@@ -58,7 +71,7 @@ export function CensusTable({ rows, requirementLabels }: CensusTableProps) {
         normalize(text).includes(query)
       );
     });
-  }, [rows, search, tierFilter]);
+  }, [rows, search, tierFilter, statusFilter]);
 
   return (
     <div>
@@ -73,6 +86,20 @@ export function CensusTable({ rows, requirementLabels }: CensusTableProps) {
             className="w-full rounded-[10px] border border-border bg-surface py-2 pl-8 pr-3 text-sm text-foreground"
           />
         </div>
+        <label className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted">
+          Estado
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+            className="rounded-[10px] border border-border bg-surface px-2 py-2 text-sm normal-case text-foreground"
+          >
+            {STATUS_FILTERS.map((filter) => (
+              <option key={filter.value} value={filter.value}>
+                {filter.label}
+              </option>
+            ))}
+          </select>
+        </label>
         <div className="flex flex-wrap gap-1">
           {TIER_FILTERS.map((filter) => (
             <button
@@ -95,13 +122,13 @@ export function CensusTable({ rows, requirementLabels }: CensusTableProps) {
         <table className="w-full whitespace-nowrap text-left text-sm">
           <thead className="bg-surface text-muted">
             <tr>
-              <th className="px-3 py-2 font-medium">Miembro</th>
+              <th className="px-3 py-2 font-medium">Jugador</th>
               {requirementLabels.map((label) => (
                 <th key={label} className="px-3 py-2 font-medium">
                   {label}
                 </th>
               ))}
-              <th className="px-3 py-2 font-medium" title="Eventos a los que asistió (juego + Discord) / eventos censados">
+              <th className="px-3 py-2 font-medium" title="Eventos a los que asistió (juego + Discord) / eventos con reporte">
                 Asistencia
               </th>
               <th className="px-3 py-2 font-medium" title="Eventos en los que estuvo en la voz de Discord">
@@ -126,7 +153,7 @@ export function CensusTable({ rows, requirementLabels }: CensusTableProps) {
                 <tr key={row.discordId} className="hover:bg-surface/60">
                   <td className="px-3 py-2">
                     <Link
-                      href={`/admin/core-guild/censo/miembro/${row.discordId}`}
+                      href={`${basePath}/jugador/${row.discordId}`}
                       className="flex items-center gap-2 hover:text-accent"
                     >
                       {row.avatarUrl ? (
@@ -142,6 +169,7 @@ export function CensusTable({ rows, requirementLabels }: CensusTableProps) {
                           @{row.username}
                           {row.job ? ` · ${row.job}` : ""}
                         </span>
+                        {!row.inCore && <span className="block text-xs text-rose-400">Ex miembro</span>}
                       </span>
                     </Link>
                   </td>
@@ -186,7 +214,7 @@ export function CensusTable({ rows, requirementLabels }: CensusTableProps) {
             {visibleRows.length === 0 && (
               <tr>
                 <td colSpan={requirementLabels.length + 7} className="px-3 py-6 text-center text-sm text-muted">
-                  {rows.length === 0 ? "Nadie tiene el rol [SD] Core todavía." : "Ningún miembro coincide con el filtro."}
+                  {rows.length === 0 ? "Nadie tiene el rol [SD] Core todavía." : "Ningún jugador coincide con el filtro."}
                 </td>
               </tr>
             )}

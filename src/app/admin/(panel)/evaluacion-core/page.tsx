@@ -2,10 +2,15 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { discordAvatarUrl } from "@/lib/discord-avatar";
 import { EVENT_CATEGORY_LABEL } from "@/lib/labels";
-import { CORE_GUILD_ROLE_ID } from "@/lib/core-guild/sync";
-import { loadCensusMembers, loadMonthEvents, loadMonthSummaries, type CensusMember } from "@/lib/core-census/data";
+import { loadCorePlayers, loadMonthEvents, loadMonthSummaries } from "@/lib/core-census/data";
 import { SHEET_REQUIREMENTS, formatRequirementValue, requirementStatus } from "@/lib/core-census/requirements";
-import { monthLabel, parseMonthKey, shiftMonthKey, type CensusTier } from "@/lib/core-census/tier";
+import {
+  EVALUATION_START_MONTH,
+  monthLabel,
+  parseMonthKey,
+  shiftMonthKey,
+  type CensusTier,
+} from "@/lib/core-census/tier";
 import { BotErrorNotice } from "@/components/admin/bot-error-notice";
 import { CensusTable, type CensusTableRow } from "@/components/core-census/census-table";
 import { TIER_HINT, TierBadge } from "@/components/core-census/census-badges";
@@ -13,11 +18,12 @@ import { TIER_HINT, TierBadge } from "@/components/core-census/census-badges";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Censo Core",
+  title: "Evaluación de CORE",
 };
 
 // Máximo acordado de miembros con el rol [SD] Core.
 const CORE_MEMBER_CAP = 78;
+const BASE_PATH = "/admin/evaluacion-core";
 
 const EVENT_DATE_FORMATTER = new Intl.DateTimeFormat("es-CL", {
   weekday: "short",
@@ -30,63 +36,72 @@ const EVENT_DATE_FORMATTER = new Intl.DateTimeFormat("es-CL", {
 
 const TIERS: CensusTier[] = ["S", "A", "B"];
 
-export default async function CoreCensusPage({ searchParams }: { searchParams: Promise<{ mes?: string }> }) {
+export default async function CoreEvaluationPage({ searchParams }: { searchParams: Promise<{ mes?: string }> }) {
   const monthKey = parseMonthKey((await searchParams).mes);
 
-  let members: CensusMember[] = [];
-  let botError: string | null = null;
-  try {
-    members = await loadCensusMembers();
-  } catch (err) {
-    botError = err instanceof Error ? err.message : "Error desconocido";
-  }
-  if (botError) return <BotErrorNotice message={botError} />;
-
+  // Abrir el módulo es lo que pone las fichas al día con el rol de Discord:
+  // crea las de quienes lo recibieron y marca como ex miembros a quienes lo
+  // perdieron (ver syncCorePlayers).
+  const { players, syncError } = await loadCorePlayers({ sync: true });
   const [events, summaries] = await Promise.all([loadMonthEvents(monthKey), loadMonthSummaries(monthKey)]);
 
-  const rows: CensusTableRow[] = members.map((member) => ({
-    discordId: member.discordId,
-    displayName: member.displayName,
-    username: member.username,
-    avatarUrl: discordAvatarUrl(member.discordId, member.avatarHash, 32),
-    characterName: member.characterName,
-    job: member.job,
+  const rows: CensusTableRow[] = players.map((player) => ({
+    discordId: player.discordId,
+    displayName: player.displayName,
+    username: player.username,
+    avatarUrl: discordAvatarUrl(player.discordId, player.avatarHash, 32),
+    characterName: player.characterName,
+    job: player.job,
+    inCore: player.inCore,
     requirements: SHEET_REQUIREMENTS.map((requirement) => ({
-      value: formatRequirementValue(requirement, member.sheet),
-      status: requirementStatus(requirement, member.sheet),
+      value: formatRequirementValue(requirement, player.sheet),
+      status: requirementStatus(requirement, player.sheet),
     })),
-    summary: summaries.get(member.discordId) ?? null,
+    summary: summaries.get(player.discordId) ?? null,
   }));
 
+  const activeCount = players.filter((player) => player.inCore).length;
   const tierCounts = { S: 0, A: 0, B: 0 };
   for (const row of rows) {
-    if (row.summary?.tier) tierCounts[row.summary.tier] += 1;
+    if (row.inCore && row.summary?.tier) tierCounts[row.summary.tier] += 1;
   }
-  const censusedEvents = events.filter((event) => event.coreCensusAt).length;
+  const reportedEvents = events.filter((event) => event.coreCensusAt).length;
 
   return (
     <div>
+      {syncError && (
+        <div className="mb-4">
+          <BotErrorNotice message={`No se pudo actualizar contra Discord, se muestra lo último guardado. ${syncError}`} />
+        </div>
+      )}
+
       <p className="max-w-3xl text-sm text-muted">
-        {members.length} de {CORE_MEMBER_CAP} miembro(s) con el rol <code className="text-accent">[SD] Core</code>{" "}
-        (ID <code className="text-accent">{CORE_GUILD_ROLE_ID}</code>). La ficha de equipo se compara contra los
-        mínimos del core y la asistencia regular se evalúa mes a mes, contando juego y Discord.
-        {members.length > CORE_MEMBER_CAP && (
+        Hoja de vida de cada jugador que tiene o tuvo el rol <code className="text-accent">[SD] Core</code>:{" "}
+        {activeCount} de {CORE_MEMBER_CAP} activo(s) y {players.length - activeCount} ex miembro(s). La ficha se crea
+        sola al recibir el rol y se conserva si lo pierde. El equipo se revisa a mano cuando corresponda; después de
+        cada evento solo se carga su reporte.
+        {activeCount > CORE_MEMBER_CAP && (
           <span className="ml-1 text-rose-400">Hay más miembros Core que el máximo acordado.</span>
         )}
       </p>
 
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <Link
-            href={`/admin/core-guild/censo?mes=${shiftMonthKey(monthKey, -1)}`}
-            aria-label="Mes anterior"
-            className="flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted hover:text-foreground"
-          >
-            <ChevronLeft size={16} />
-          </Link>
+          {monthKey > EVALUATION_START_MONTH ? (
+            <Link
+              href={`${BASE_PATH}?mes=${shiftMonthKey(monthKey, -1)}`}
+              aria-label="Mes anterior"
+              className="flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted hover:text-foreground"
+            >
+              <ChevronLeft size={16} />
+            </Link>
+          ) : (
+            // La evaluación no tiene meses anteriores a su inicio.
+            <span className="h-8 w-8" />
+          )}
           <h2 className="min-w-[150px] text-center text-lg font-semibold text-foreground">{monthLabel(monthKey)}</h2>
           <Link
-            href={`/admin/core-guild/censo?mes=${shiftMonthKey(monthKey, 1)}`}
+            href={`${BASE_PATH}?mes=${shiftMonthKey(monthKey, 1)}`}
             aria-label="Mes siguiente"
             className="flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted hover:text-foreground"
           >
@@ -106,15 +121,16 @@ export default async function CoreCensusPage({ searchParams }: { searchParams: P
 
       <section className="mt-5 rounded-xl border border-border bg-surface p-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h3 className="font-semibold text-foreground">Eventos del mes</h3>
+          <h3 className="font-semibold text-foreground">Reportes post evento</h3>
           <p className="text-xs text-muted">
-            {censusedEvents} de {events.length} censado(s). Solo los censados cuentan para el tier.
+            {reportedEvents} de {events.length} con reporte. Solo esos cuentan para la asistencia regular.
           </p>
         </div>
 
         {events.length === 0 ? (
           <p className="mt-3 text-sm text-muted">
-            No hay eventos creados para este mes. Se crean desde{" "}
+            No hay eventos creados para este mes desde el inicio de la evaluación (domingo 4 de octubre de 2026). Se
+            crean desde{" "}
             <Link href="/panel/eventos/nueva-semana" className="text-accent hover:underline">
               Eventos → Semana de asistencia
             </Link>
@@ -125,7 +141,7 @@ export default async function CoreCensusPage({ searchParams }: { searchParams: P
             {events.map((event) => (
               <li key={event.id}>
                 <Link
-                  href={`/admin/core-guild/censo/evento/${event.id}`}
+                  href={`${BASE_PATH}/evento/${event.id}`}
                   className="flex items-center justify-between gap-3 rounded-[10px] border border-border bg-background-elevated p-3 hover:border-accent"
                 >
                   <span className="min-w-0">
@@ -142,7 +158,7 @@ export default async function CoreCensusPage({ searchParams }: { searchParams: P
                         : "border-amber-500/40 text-amber-400"
                     }`}
                   >
-                    {event.coreCensusAt ? "Censado" : "Pendiente"}
+                    {event.coreCensusAt ? "Reportado" : "Pendiente"}
                   </span>
                 </Link>
               </li>
@@ -152,12 +168,16 @@ export default async function CoreCensusPage({ searchParams }: { searchParams: P
       </section>
 
       <div className="mt-5">
-        <CensusTable rows={rows} requirementLabels={SHEET_REQUIREMENTS.map((requirement) => requirement.label)} />
+        <CensusTable
+          rows={rows}
+          basePath={BASE_PATH}
+          requirementLabels={SHEET_REQUIREMENTS.map((requirement) => requirement.label)}
+        />
       </div>
 
       <p className="mt-3 text-xs text-muted">
-        Mínimos: {SHEET_REQUIREMENTS.map((requirement) => requirement.hint).join(" · ")}. En verde lo que cumple, en
-        rojo lo que no, y «—» lo que todavía no se evaluó. Toca un miembro para completar su ficha.
+        Mínimos de equipo: {SHEET_REQUIREMENTS.map((requirement) => requirement.hint).join(" · ")}. En verde lo que
+        cumple, en rojo lo que no, y «—» lo que todavía no se revisó. Toca un jugador para abrir su hoja de vida.
       </p>
     </div>
   );

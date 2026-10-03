@@ -9,9 +9,9 @@ import { currentMonthKey, monthLabel } from "@/lib/core-census/tier";
 import { REQUIREMENT_STATUS_CLASS, TIER_HINT, TierBadge } from "@/components/core-census/census-badges";
 
 /**
- * Lo que un miembro [SD] Core ve de su propio censo en /panel/perfil: su
- * ficha de equipo contra los mínimos y su asistencia del mes. Solo lectura —
- * la completan los oficiales desde /admin/core-guild/censo.
+ * Lo que un miembro [SD] Core ve de su propia evaluación en /panel/perfil: la
+ * última revisión de equipo contra los mínimos y su asistencia del mes. Solo
+ * lectura — la completan los oficiales desde /admin/evaluacion-core.
  */
 export async function CoreSheetCard({ discordId }: { discordId: string }) {
   const monthKey = currentMonthKey();
@@ -52,7 +52,7 @@ export async function CoreSheetCard({ discordId }: { discordId: string }) {
             {summary.justified > 0 ? ` y ${summary.justified} justificada(s)` : ""}. {TIER_HINT[summary.tier]}.
           </span>
         ) : (
-          <span>Todavía no hay eventos censados en {monthLabel(monthKey)}.</span>
+          <span>Todavía no hay eventos reportados en {monthLabel(monthKey)}.</span>
         )}
       </div>
     </section>

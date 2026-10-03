@@ -1,9 +1,9 @@
 "use server";
 
 /**
- * Server actions del censo Core (/admin/core-guild/censo): ficha de equipo de
- * cada miembro, carga de la participación por evento y la lista de voz que
- * toma Boo.
+ * Server actions de Evaluación de CORE (/admin/evaluacion-core): revisión de
+ * equipo en la hoja de vida de cada jugador, reporte post evento y la lista
+ * de voz que toma Boo.
  */
 
 import { revalidatePath } from "next/cache";
@@ -13,21 +13,23 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { getCoreGuildRoster } from "@/lib/core-guild/sync";
 import { findMembersInEventVoice } from "@/lib/core-census/voice";
+import { SHEET_REQUIREMENTS } from "@/lib/core-census/requirements";
+import { EVALUATION_START } from "@/lib/core-census/tier";
 
-const CENSUS_PATH = "/admin/core-guild/censo";
+const EVALUATION_PATH = "/admin/evaluacion-core";
 
 // /admin ya está detrás del gate de src/proxy.ts; se revalida acá igual
 // porque de esto depende que alguien siga o no en el core.
 async function requireAdmin(): Promise<string | null> {
   const session = await getSession();
-  if (!session?.isAdmin) throw new Error("Solo un admin puede modificar el censo Core.");
+  if (!session?.isAdmin) throw new Error("Solo un admin puede modificar la Evaluación de CORE.");
   if (!session.discordId) return session.username ?? null;
   const user = await prisma.user.findUnique({ where: { discordId: session.discordId } });
   return user?.globalName ?? user?.username ?? null;
 }
 
 // ---------------------------------------------------------------------------
-// Ficha de equipo
+// Revisión de equipo
 // ---------------------------------------------------------------------------
 
 // Campo numérico opcional de un formulario: vacío = sin evaluar (null).
@@ -56,6 +58,11 @@ const sheetSchema = z.object({
   notes: z.string().trim().max(1000),
 });
 
+/**
+ * Guarda la revisión de equipo de un jugador. La ficha queda con los valores
+ * nuevos y, si cambió algo de lo evaluado, se agrega una foto al historial de
+ * revisiones: así se ve cómo fue avanzando durante su permanencia.
+ */
 export async function saveCharacterSheet(discordId: string, formData: FormData): Promise<void> {
   const updatedByUsername = await requireAdmin();
 
@@ -72,18 +79,35 @@ export async function saveCharacterSheet(discordId: string, formData: FormData):
     notes: formData.get("notes") ?? "",
   });
 
-  await prisma.coreCharacterSheet.upsert({
-    where: { discordId },
-    create: { discordId, ...data, updatedByUsername },
-    update: { ...data, updatedByUsername },
-  });
+  const { characterName, ...evaluation } = data;
+  const previous = await prisma.coreCharacterSheet.findUnique({ where: { discordId } });
+  const evaluationChanged =
+    !previous?.reviewedAt ||
+    previous.notes !== evaluation.notes ||
+    SHEET_REQUIREMENTS.some((requirement) => previous[requirement.field] !== evaluation[requirement.field]);
 
-  revalidatePath(CENSUS_PATH);
-  redirect(`${CENSUS_PATH}/miembro/${discordId}?guardado=1`);
+  const reviewedAt = new Date();
+  await prisma.$transaction([
+    prisma.coreCharacterSheet.upsert({
+      where: { discordId },
+      create: { discordId, ...data, reviewedAt, updatedByUsername },
+      update: { characterName, ...(evaluationChanged ? { ...evaluation, reviewedAt, updatedByUsername } : {}) },
+    }),
+    ...(evaluationChanged
+      ? [
+          prisma.coreSheetRevision.create({
+            data: { discordId, ...evaluation, reviewedByUsername: updatedByUsername },
+          }),
+        ]
+      : []),
+  ]);
+
+  revalidatePath(EVALUATION_PATH);
+  redirect(`${EVALUATION_PATH}/jugador/${discordId}?guardado=1`);
 }
 
 // ---------------------------------------------------------------------------
-// Participación por evento
+// Reporte post evento
 // ---------------------------------------------------------------------------
 
 const stat = z.number().int().min(0).max(10_000_000).nullable();
@@ -104,9 +128,10 @@ const censusRowSchema = z.object({
 export type CensusRowInput = z.infer<typeof censusRowSchema>;
 
 /**
- * Guarda la participación de todos los miembros en un evento y lo da por
- * censado: a partir de acá cuenta para el tier del mes. Se puede volver a
- * guardar para corregir.
+ * Guarda el reporte post evento de todos los miembros y lo da por cerrado: a
+ * partir de acá cuenta para el tier del mes y aparece en la hoja de vida de
+ * cada uno. Se puede volver a guardar para corregir. La respuesta a la
+ * encuesta de asistencia no viene del formulario: se copia de EventSignup.
  */
 export async function saveEventCensus(eventId: string, rows: CensusRowInput[]): Promise<{ error?: string }> {
   await requireAdmin();
@@ -121,8 +146,13 @@ export async function saveEventCensus(eventId: string, rows: CensusRowInput[]): 
     }
   }
 
-  const event = await prisma.event.findUnique({ where: { id: eventId }, select: { id: true } });
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+    select: { id: true, startsAt: true, signups: { select: { discordId: true, status: true } } },
+  });
   if (!event) return { error: "Este evento ya no existe." };
+  if (event.startsAt < EVALUATION_START) return { error: "Este evento es anterior al inicio de la evaluación." };
+  const surveyById = new Map(event.signups.map((signup) => [signup.discordId, signup.status]));
 
   await prisma.$transaction([
     ...parsed.data.map((row) => {
@@ -131,6 +161,7 @@ export async function saveEventCensus(eventId: string, rows: CensusRowInput[]): 
         displayName: row.displayName,
         inGame: row.inGame,
         inDiscord: row.inDiscord,
+        surveyStatus: surveyById.get(row.discordId) ?? null,
         points: row.inGame ? row.points : null,
         kills: row.inGame ? row.kills : null,
         deaths: row.inGame ? row.deaths : null,
@@ -147,7 +178,7 @@ export async function saveEventCensus(eventId: string, rows: CensusRowInput[]): 
     prisma.event.update({ where: { id: eventId }, data: { coreCensusAt: new Date() } }),
   ]);
 
-  revalidatePath(CENSUS_PATH);
+  revalidatePath(EVALUATION_PATH);
   return {};
 }
 
@@ -155,7 +186,7 @@ export async function saveEventCensus(eventId: string, rows: CensusRowInput[]): 
  * Boo revisa, uno por uno, quiénes del rol Core están ahora mismo en los
  * canales de voz del evento y les marca "Discord". Solo suma: quien ya quedó
  * marcado en una pasada anterior no se desmarca por haberse desconectado
- * después. Se guarda al toque (no espera a "Guardar censo") para poder tomar
+ * después. Se guarda al toque (no espera a "Guardar reporte") para poder tomar
  * lista durante el evento y cargar el resto cuando termina.
  */
 export async function takeVoiceAttendance(

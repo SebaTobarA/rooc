@@ -583,7 +583,7 @@ model Event {
   // siempre).
   weekGroupId String?
 
-  // Cuándo un oficial guardó el censo Core de este evento (ver
+  // Cuándo un oficial guardó el reporte Core de este evento (ver
   // saveEventCensus). Recién ahí el evento cuenta para el tier mensual:
   // tomar la lista de voz con Boo durante el evento crea filas en
   // CoreEventRecord, pero no lo da por cerrado.
@@ -879,21 +879,34 @@ model RegistrationSettings {
 }
 
 // ---------------------------------------------------------------------------
-// Censo Core: control de los miembros con el rol "[SD] Core" para decidir si
-// siguen en el core de la guild. Dos piezas, las dos cargadas por oficiales
-// desde /admin/core-guild/censo:
-//  - CoreCharacterSheet: ficha de equipo, se compara contra los mínimos de
-//    src/lib/core-census/requirements.ts.
-//  - CoreEventRecord: participación de cada miembro en cada evento de guild
-//    (juego + voz de Discord + rendimiento), de donde sale el tier mensual
-//    (ver src/lib/core-census/tier.ts).
+// Evaluación de CORE (/admin/evaluacion-core): hoja de vida de cada jugador
+// que tiene o tuvo el rol "[SD] Core", al estilo de una ficha de recursos
+// humanos. La ficha se crea sola la primera vez que se ve a alguien con el
+// rol (ver syncCorePlayers en src/lib/core-census/data.ts), no se borra si lo
+// pierde y se reactiva si vuelve.
+//  - CoreCharacterSheet: la ficha general, con la última revisión de equipo
+//    contra los mínimos de src/lib/core-census/requirements.ts.
+//  - CoreSheetRevision: cada revisión de equipo guardada, para ver el avance.
+//  - CoreMembershipPeriod: cada paso de la persona por el core.
+//  - CoreEventRecord: el reporte post evento (voz de Discord, encuesta,
+//    rendimiento), de donde sale el tier mensual (src/lib/core-census/tier.ts).
 // ---------------------------------------------------------------------------
 
-// Todos los campos de evaluación son opcionales: null = todavía sin evaluar,
-// que no es lo mismo que "no cumple".
+// Los campos de equipo son opcionales: null = todavía sin revisar, que no es
+// lo mismo que "no cumple".
 model CoreCharacterSheet {
   id        String @id @default(cuid())
   discordId String @unique
+
+  // Datos de Discord denormalizados (igual que LeadershipMember), refrescados
+  // en cada sync mientras tenga el rol: son lo único que queda para mostrar
+  // de alguien que ya se fue del server.
+  username    String  @default("")
+  displayName String  @default("")
+  avatarHash  String?
+  jobName     String?
+  // false = ya no tiene el rol [SD] Core; la ficha se conserva.
+  inCore      Boolean @default(true)
 
   // Nombre del personaje in-game. Vacío = se muestra el nick del registro
   // (MemberRegistration) o el apodo del server.
@@ -913,9 +926,45 @@ model CoreCharacterSheet {
 
   notes String @default("")
 
+  // Última revisión de equipo hecha por un oficial (updatedAt no sirve para
+  // esto: también lo mueve el sync de datos de Discord).
+  reviewedAt        DateTime?
   updatedByUsername String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+// Foto de la ficha en cada revisión de equipo que cambió algo.
+model CoreSheetRevision {
+  id        String @id @default(cuid())
+  discordId String
+
+  refine       Int?
+  medals       Int?
+  mr           Int?
+  feathers     Int?
+  enchants     Int?
+  cardsPvp     Boolean?
+  s2Orange     Boolean?
+  skillTreePvp Boolean?
+  notes        String   @default("")
+
+  reviewedByUsername String?
+  createdAt          DateTime @default(now())
+
+  @@index([discordId, createdAt])
+}
+
+// Un paso por el core. Las fechas son las del sync que detectó el cambio de
+// rol (Discord no informa cuándo se asignó un rol), no el momento exacto.
+model CoreMembershipPeriod {
+  id        String    @id @default(cuid())
+  discordId String
+  startedAt DateTime  @default(now())
+  // null = sigue en el core.
+  endedAt   DateTime?
+
+  @@index([discordId])
 }
 
 model CoreEventRecord {
@@ -934,6 +983,10 @@ model CoreEventRecord {
   inDiscord   Boolean   @default(false)
   // Última vez que Boo lo vio en voz al tomar lista; null si se marcó a mano.
   voiceSeenAt DateTime?
+
+  // Qué respondió en la encuesta de asistencia de Discord (EventSignup),
+  // copiado al guardar el reporte. null = no respondió.
+  surveyStatus EventSignupStatus?
 
   points  Int?
   kills   Int?

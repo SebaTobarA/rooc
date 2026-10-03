@@ -3,12 +3,13 @@
 import { useMemo, useState, useTransition } from "react";
 import { Mic, Search } from "lucide-react";
 import { saveEventCensus, takeVoiceAttendance, type CensusRowInput } from "@/lib/actions/core-census";
+import { SURVEY_TONE_CLASS, type SurveyTone } from "@/lib/core-census/survey";
 
 export interface EventCensusRow extends CensusRowInput {
   characterName: string;
   job: string | null;
-  /** Lo que avisó en la encuesta de asistencia de Discord antes del evento. */
-  notice: "NOT_ATTENDING" | "LATE" | null;
+  /** Qué respondió en la encuesta de asistencia de Discord (ver surveyAnswer). */
+  survey: { label: string; tone: SurveyTone };
 }
 
 type StatField = "points" | "kills" | "deaths" | "assists";
@@ -19,8 +20,6 @@ const STAT_COLUMNS: { field: StatField; label: string }[] = [
   { field: "deaths", label: "D" },
   { field: "assists", label: "A" },
 ];
-
-const NOTICE_LABEL = { NOT_ATTENDING: "Avisó que no va", LATE: "Avisó que llega tarde" } as const;
 
 function normalize(value: string): string {
   return value
@@ -93,7 +92,10 @@ export function EventCensusForm({ eventId, initialRows, voiceChannelNames }: Eve
         return;
       }
       setDirty(false);
-      setMessage({ kind: "ok", text: "Censo guardado. Este evento ya cuenta para el tier del mes." });
+      setMessage({
+        kind: "ok",
+        text: "Reporte guardado. Ya cuenta para la asistencia regular del mes y quedó en la hoja de vida de cada jugador.",
+      });
     });
   }
 
@@ -132,7 +134,7 @@ export function EventCensusForm({ eventId, initialRows, voiceChannelNames }: Eve
           disabled={busy}
           className="rounded-[10px] border border-border px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-surface-hover disabled:opacity-50"
         >
-          Marcar a todos en juego
+          Marcar que todos jugaron
         </button>
         <div className="relative min-w-[200px] flex-1">
           <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
@@ -148,7 +150,8 @@ export function EventCensusForm({ eventId, initialRows, voiceChannelNames }: Eve
 
       <p className="mt-3 text-xs text-muted">
         Boo revisa a cada miembro Core en {voiceChannelNames.join(" y ")} en el momento en que tocas el botón: úsalo
-        durante el evento (puedes repetirlo, solo suma gente). Lo demás se marca a mano.
+        durante el evento (puedes repetirlo, solo suma gente). La encuesta se lee sola desde Discord; el resto se marca a
+        mano al terminar.
       </p>
 
       {message && (
@@ -169,8 +172,15 @@ export function EventCensusForm({ eventId, initialRows, voiceChannelNames }: Eve
           <thead className="whitespace-nowrap bg-surface text-muted">
             <tr>
               <th className="px-3 py-2 font-medium">Personaje</th>
-              <th className="px-3 py-2 text-center font-medium">Juego</th>
-              <th className="px-3 py-2 text-center font-medium">Discord</th>
+              <th className="px-3 py-2 text-center font-medium" title="Estuvo conectado en la voz del evento">
+                Discord
+              </th>
+              <th className="px-3 py-2 font-medium" title="Respuesta a la encuesta de asistencia de Discord">
+                Encuesta
+              </th>
+              <th className="px-3 py-2 text-center font-medium" title="Participó del evento en el juego">
+                Jugó
+              </th>
               {STAT_COLUMNS.map((column) => (
                 <th key={column.field} className="px-2 py-2 font-medium">
                   {column.label}
@@ -193,16 +203,6 @@ export function EventCensusForm({ eventId, initialRows, voiceChannelNames }: Eve
                       {row.displayName !== row.characterName ? `${row.displayName} · ` : ""}
                       {row.job ?? "Sin job"}
                     </span>
-                    {row.notice && <span className="block text-xs text-sky-400">{NOTICE_LABEL[row.notice]}</span>}
-                  </td>
-                  <td className="px-3 py-2 text-center">
-                    <input
-                      type="checkbox"
-                      checked={row.inGame}
-                      onChange={(e) => patchRow(row.discordId, { inGame: e.target.checked })}
-                      aria-label={`${row.characterName} estuvo en el juego`}
-                      className="h-4 w-4 accent-[var(--accent)]"
-                    />
                   </td>
                   <td className="px-3 py-2 text-center">
                     <input
@@ -210,6 +210,18 @@ export function EventCensusForm({ eventId, initialRows, voiceChannelNames }: Eve
                       checked={row.inDiscord}
                       onChange={(e) => patchRow(row.discordId, { inDiscord: e.target.checked })}
                       aria-label={`${row.characterName} estuvo en Discord`}
+                      className="h-4 w-4 accent-[var(--accent)]"
+                    />
+                  </td>
+                  <td className={`whitespace-nowrap px-3 py-2 text-xs ${SURVEY_TONE_CLASS[row.survey.tone]}`}>
+                    {row.survey.label}
+                  </td>
+                  <td className="px-3 py-2 text-center">
+                    <input
+                      type="checkbox"
+                      checked={row.inGame}
+                      onChange={(e) => patchRow(row.discordId, { inGame: e.target.checked })}
+                      aria-label={`${row.characterName} jugó el evento`}
                       className="h-4 w-4 accent-[var(--accent)]"
                     />
                   </td>
@@ -256,8 +268,8 @@ export function EventCensusForm({ eventId, initialRows, voiceChannelNames }: Eve
             })}
             {visibleRows.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-3 py-6 text-center text-sm text-muted">
-                  Ningún miembro coincide con la búsqueda.
+                <td colSpan={10} className="px-3 py-6 text-center text-sm text-muted">
+                  Ningún jugador coincide con la búsqueda.
                 </td>
               </tr>
             )}
@@ -267,11 +279,11 @@ export function EventCensusForm({ eventId, initialRows, voiceChannelNames }: Eve
 
       <div className="sticky bottom-0 mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-background-elevated px-4 py-3">
         <p className="text-sm text-muted">
-          {inGameCount} en juego · {inDiscordCount} en Discord · {faultCount} falta(s) de {rows.length}
+          {inDiscordCount} en Discord · {inGameCount} jugaron · {faultCount} falta(s) de {rows.length}
           {dirty && <span className="ml-2 text-amber-400">Cambios sin guardar</span>}
         </p>
         <button type="button" onClick={handleSave} disabled={busy} className="btn-brand px-4 py-2 text-sm disabled:opacity-50">
-          {isSaving ? "Guardando…" : "Guardar censo"}
+          {isSaving ? "Guardando…" : "Guardar reporte"}
         </button>
       </div>
     </div>

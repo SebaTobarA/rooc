@@ -120,6 +120,14 @@ export function summarizeMonth(records: CensusRecordLike[]): MemberMonthSummary 
 // Meses: siempre en hora de Chile, igual que los horarios de los eventos.
 // ---------------------------------------------------------------------------
 
+/**
+ * Desde cuándo rige la evaluación: domingo 4 de octubre de 2026 (hora de
+ * Chile). Los eventos anteriores no se reportan ni cuentan para nada, aunque
+ * existan en /panel/eventos.
+ */
+export const EVALUATION_START = chileWallTimeToUtc(2026, 10, 4, 0, 0);
+export const EVALUATION_START_MONTH = "2026-10";
+
 const MONTH_KEY_PATTERN = /^(\d{4})-(0[1-9]|1[0-2])$/;
 
 /** "YYYY-MM" del mes en curso en Santiago. */
@@ -134,9 +142,10 @@ export function currentMonthKey(now: Date = new Date()): string {
   return `${year}-${month}`;
 }
 
-/** Valida un "YYYY-MM" que viene de la URL; cae al mes en curso si no sirve. */
+/** Valida un "YYYY-MM" que viene de la URL; cae al mes en curso si no sirve, y nunca antes del inicio de la evaluación. */
 export function parseMonthKey(value: string | undefined): string {
-  return value && MONTH_KEY_PATTERN.test(value) ? value : currentMonthKey();
+  const monthKey = value && MONTH_KEY_PATTERN.test(value) ? value : currentMonthKey();
+  return monthKey < EVALUATION_START_MONTH ? EVALUATION_START_MONTH : monthKey;
 }
 
 export function shiftMonthKey(monthKey: string, delta: number): string {
@@ -145,12 +154,16 @@ export function shiftMonthKey(monthKey: string, delta: number): string {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
-/** Rango [start, end) en UTC del mes, medido de medianoche a medianoche de Chile. */
+/**
+ * Rango [start, end) en UTC del mes, medido de medianoche a medianoche de
+ * Chile y recortado al inicio de la evaluación.
+ */
 export function monthRange(monthKey: string): { start: Date; end: Date } {
   const [year, month] = monthKey.split("-").map(Number);
   const [nextYear, nextMonth] = shiftMonthKey(monthKey, 1).split("-").map(Number);
+  const start = chileWallTimeToUtc(year, month, 1, 0, 0);
   return {
-    start: chileWallTimeToUtc(year, month, 1, 0, 0),
+    start: start < EVALUATION_START ? EVALUATION_START : start,
     end: chileWallTimeToUtc(nextYear, nextMonth, 1, 0, 0),
   };
 }
