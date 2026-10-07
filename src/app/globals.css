@@ -236,3 +236,48 @@ body {
     animation: none !important;
   }
 }
+
+/* ---------- Roster de próximos eventos: casillero del propio jugador ----------
+   El color solo no alcanza para encontrarse de un vistazo: el casillero
+   además late con un halo y lo recorre un brillo. */
+@keyframes roster-me-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 70%, transparent), 0 0 14px 0 color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 0%, transparent), 0 0 22px 4px color-mix(in srgb, var(--accent) 60%, transparent);
+  }
+}
+@keyframes roster-me-sheen {
+  0%,
+  55% {
+    transform: translateX(-130%) skewX(-20deg);
+  }
+  100% {
+    transform: translateX(330%) skewX(-20deg);
+  }
+}
+.roster-me {
+  position: relative;
+  overflow: hidden;
+  animation: roster-me-pulse 2s ease-in-out infinite;
+}
+.roster-me::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  animation: roster-me-sheen 3.2s ease-in-out infinite;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .roster-me {
+    animation: none;
+    box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--accent);
+  }
+  .roster-me::after {
+    display: none;
+  }
+}

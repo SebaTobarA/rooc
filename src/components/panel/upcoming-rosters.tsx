@@ -55,7 +55,9 @@ function PartyColumn({ party, members, discordId }: { party: Party; members: Pla
   const slots = Math.max(party.capacity, members.length);
 
   return (
-    <div className="flex w-32 shrink-0 flex-col gap-1.5">
+    // En vertical (teléfono, tablet de pie) solo queda la party del jugador;
+    // en horizontal o en PC se ven todas las de su raid.
+    <div className={`flex min-w-0 flex-col gap-1.5 ${isMine ? "" : "max-lg:portrait:hidden"}`}>
       <div
         className={`flex items-baseline justify-between gap-2 border-b pb-1 text-xs ${
           isMine ? "border-accent text-accent" : "border-border text-muted"
@@ -77,7 +79,7 @@ function PartyColumn({ party, members, discordId }: { party: Party; members: Pla
             key={member.id}
             className={`flex h-12 flex-col justify-center rounded-lg border px-2 ${
               isMe
-                ? "border-accent bg-accent text-accent-foreground shadow-lg shadow-accent/30"
+                ? "roster-me border-accent bg-accent text-accent-foreground"
                 : "border-border bg-background-elevated"
             }`}
           >
@@ -166,7 +168,9 @@ export async function UpcomingRosters({ discordId }: { discordId: string }) {
                 {group.label && (
                   <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">{group.label}</p>
                 )}
-                <div className="flex gap-2 overflow-x-auto pb-2">
+                {/* Sin scroll lateral: las columnas se reparten el ancho y, si
+                    no caben, bajan a otra fila. */}
+                <div className="grid grid-cols-[repeat(auto-fit,minmax(6.25rem,1fr))] gap-x-2 gap-y-4 p-1.5">
                   {group.parties.map((party) => (
                     <PartyColumn
                       key={party.id}
