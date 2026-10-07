@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Sword, Gem, Skull, Map as MapIcon, BellRing } from "lucide-react";
+import { Sword, Gem, Skull, Map as MapIcon, BellRing, CheckCircle2 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { siteConfig } from "@/config/site";
 import { getSidebarSession } from "@/lib/sidebar-session";
@@ -9,6 +9,7 @@ import { getPendingEventsForDiscordId } from "@/lib/events";
 import { EVENT_CATEGORY_LABEL } from "@/lib/labels";
 import { BuildClassTabs } from "@/components/panel/build-class-tabs";
 import { ProfileSection } from "@/components/panel/profile-section";
+import { UpcomingRosters } from "@/components/panel/upcoming-rosters";
 
 // Los contadores deben reflejar siempre el estado actual de la base, así
 // que evitamos el prerenderizado estático de esta página.
@@ -27,8 +28,9 @@ const EVENT_DATE_FORMATTER = new Intl.DateTimeFormat("es-CL", {
 });
 
 /**
- * Inicio del panel y perfil del jugador en una sola pantalla: quién es y su
- * clase, su ficha Core, los eventos que le falta responder y la build de su
+ * Inicio del panel y perfil del jugador en una sola pantalla: arriba, en dos
+ * bloques, quién es (con su clase) y los eventos que le falta responder;
+ * después su ficha Core, el roster de los próximos eventos y la build de su
  * clase. La navegación al resto (base de datos, administración) vive en el
  * menú lateral, no acá.
  */
@@ -59,36 +61,23 @@ export default async function HomePage() {
     { href: "/panel/maps", title: "Mapas", count: mapCount, icon: MapIcon },
   ];
 
-  return (
-    <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-12">
-      {/* ============ PERFIL + FICHA CORE ============ */}
-      {session?.discordId ? (
-        <ProfileSection discordId={session.discordId} />
-      ) : (
-        // Sesión de usuario/contraseña del admin: no hay cuenta de Discord
-        // de la que mostrar un perfil.
-        <section className="rounded-2xl border border-border bg-surface p-6 sm:p-8">
-          <h1 className="heading-gradient text-2xl font-extrabold sm:text-3xl">
-            {sidebarSession?.label ?? siteConfig.name}
-          </h1>
-          <p className="mt-2 text-sm text-muted">
-            Inicia sesión con Discord para ver tu perfil de jugador y tu ficha.
-          </p>
-        </section>
-      )}
-
-      {/* ============ EVENTOS SIN RESPONDER ============ */}
-      {pendingEvents.length > 0 && (
-        <section className="mt-8 rounded-2xl border border-accent/40 bg-accent/5 p-5 sm:p-6">
+  // Bloque derecho del encabezado: recordatorio de eventos sin responder.
+  const reminders = (
+    <section
+      className={`rounded-2xl border p-6 ${
+        pendingEvents.length > 0 ? "border-accent/40 bg-accent/5" : "border-border bg-surface"
+      }`}
+    >
+      {pendingEvents.length > 0 ? (
+        <>
           <div className="flex items-center gap-2">
-            <BellRing className="h-5 w-5 text-accent" strokeWidth={2.2} />
+            <BellRing className="h-5 w-5 shrink-0 text-accent" strokeWidth={2.2} />
             <h2 className="font-semibold text-foreground">
               Tienes {pendingEvents.length} evento{pendingEvents.length === 1 ? "" : "s"} sin responder
             </h2>
           </div>
           <p className="mt-1 text-sm text-muted">
-            Todavía no marcaste tu asistencia en el canal de Discord para estos eventos — las
-            inscripciones siguen abiertas.
+            Todavía no marcaste tu asistencia en Discord. Las inscripciones siguen abiertas.
           </p>
           <div className="mt-4 flex flex-col gap-2">
             {pendingEvents.map((event) => (
@@ -96,7 +85,7 @@ export default async function HomePage() {
                 key={event.id}
                 className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-surface px-4 py-3"
               >
-                <div>
+                <div className="min-w-0">
                   <p className="font-medium text-foreground">
                     {event.icon ? `${event.icon} ` : ""}
                     {event.title}
@@ -110,7 +99,7 @@ export default async function HomePage() {
                     href={event.discordUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="btn-brand px-3 py-1.5 text-xs"
+                    className="btn-brand shrink-0 px-3 py-1.5 text-xs"
                   >
                     Responder en Discord
                   </a>
@@ -118,6 +107,35 @@ export default async function HomePage() {
               </div>
             ))}
           </div>
+        </>
+      ) : (
+        <div className="flex h-full flex-col items-center justify-center gap-2 py-6 text-center">
+          <CheckCircle2 className="h-7 w-7 text-accent" strokeWidth={2} />
+          <h2 className="font-semibold text-foreground">Estás al día con los eventos</h2>
+          <p className="text-sm text-muted">No tienes encuestas de asistencia pendientes en Discord.</p>
+        </div>
+      )}
+    </section>
+  );
+
+  return (
+    <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-12">
+      {/* ============ PERFIL + FICHA CORE ============ */}
+      {session?.discordId ? (
+        <>
+          <ProfileSection discordId={session.discordId} aside={reminders} />
+          <UpcomingRosters discordId={session.discordId} />
+        </>
+      ) : (
+        // Sesión de usuario/contraseña del admin: no hay cuenta de Discord
+        // de la que mostrar un perfil.
+        <section className="rounded-2xl border border-border bg-surface p-6 sm:p-8">
+          <h1 className="heading-gradient text-2xl font-extrabold sm:text-3xl">
+            {sidebarSession?.label ?? siteConfig.name}
+          </h1>
+          <p className="mt-2 text-sm text-muted">
+            Inicia sesión con Discord para ver tu perfil de jugador y tu ficha.
+          </p>
         </section>
       )}
 

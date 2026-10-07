@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { prisma } from "@/lib/prisma";
 import { getGuildMember, getGuildRoles } from "@/lib/discord-bot";
 import { listJobGuildRoles, resolveJobFromRoles } from "@/lib/discord-job-roles";
@@ -9,11 +10,12 @@ import { ClassEditor } from "@/components/panel/class-editor";
 import { CoreSheetCard } from "@/components/panel/core-sheet-card";
 
 /**
- * El perfil del jugador dentro del inicio del panel (/panel): quién es, su
- * clase editable y, si tiene el rol [SD] Core, su ficha. Antes era una
- * pantalla aparte (/panel/perfil).
+ * El perfil del jugador dentro del inicio del panel (/panel), en dos bloques:
+ * a la izquierda quién es, con su clase editable debajo; a la derecha lo que
+ * reciba en `aside` (el recordatorio de eventos). Debajo, si tiene el rol
+ * [SD] Core, su ficha. Antes era una pantalla aparte (/panel/perfil).
  */
-export async function ProfileSection({ discordId }: { discordId: string }) {
+export async function ProfileSection({ discordId, aside }: { discordId: string; aside: ReactNode }) {
   const user = await prisma.user.findUnique({ where: { discordId } });
 
   let guildRoles: Awaited<ReturnType<typeof getGuildRoles>> = [];
@@ -59,8 +61,8 @@ export async function ProfileSection({ discordId }: { discordId: string }) {
 
   return (
     <>
-      <section className="rounded-2xl border border-border bg-surface p-6 sm:p-8">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+      <div className="grid gap-4 lg:grid-cols-2">
+        <section className="rounded-2xl border border-border bg-surface p-6">
           <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:text-left">
             <div className="profile-card__avatar">
               <span className="profile-card__avatar-glow" />
@@ -91,15 +93,17 @@ export async function ProfileSection({ discordId }: { discordId: string }) {
             </div>
           </div>
 
-          <div className="lg:max-w-sm">
+          <div className="mt-5 border-t border-border pt-5">
             {jobRoles.length > 0 ? (
               <ClassEditor jobRoles={jobRoles} currentRoleId={currentRoleId} />
             ) : (
               <p className="text-sm text-muted">Todavía no hay roles de clase configurados en el server de Discord.</p>
             )}
           </div>
-        </div>
-      </section>
+        </section>
+
+        {aside}
+      </div>
 
       {isCore && <CoreSheetCard discordId={member.user.id} />}
     </>
