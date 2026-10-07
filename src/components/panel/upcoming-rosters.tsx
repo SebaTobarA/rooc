@@ -94,9 +94,10 @@ function PartyColumn({ party, members, discordId }: { party: Party; members: Pla
 }
 
 /**
- * "Roster próximos eventos" del inicio del panel: las parties que se armaron
- * en el Party Builder (/panel/party) para los eventos que vienen, con el
- * lugar del jugador resaltado. Sale de la plantilla enlazada a cada evento
+ * "Roster próximos eventos" del inicio del panel: de las parties que se
+ * armaron en el Party Builder (/panel/party) para los eventos que vienen,
+ * la raid (o el campo, en Guild League) donde va el jugador, con su lugar
+ * resaltado. Sale de la plantilla enlazada a cada evento
  * (PartyTemplate.eventId): la que se comunicó a Discord si hay alguna, y si
  * no la última guardada.
  */
@@ -121,7 +122,7 @@ export async function UpcomingRosters({ discordId }: { discordId: string }) {
     <section className="mt-8 rounded-xl border border-border bg-surface p-5">
       <h2 className="font-semibold text-foreground">Roster próximos eventos</h2>
       <p className="mt-1 text-sm text-muted">
-        Las parties armadas en el Party Builder para los eventos que vienen. Tu lugar aparece resaltado.
+        La raid en la que vas en los eventos que vienen, según el Party Builder. Tu lugar aparece resaltado.
       </p>
 
       {rosters.length === 0 && (
@@ -140,10 +141,12 @@ export async function UpcomingRosters({ discordId }: { discordId: string }) {
         }
         const me = snapshot.players.find((player) => player.id === discordId);
         const myParty = me?.partyId ? snapshot.parties.find((party) => party.id === me.partyId) : undefined;
+        // Solo la raid (o el campo) donde va el jugador: no necesita ver el
+        // resto del evento. Si todavía no lo asignaron, no se muestra ninguna.
         const groups = groupParties(
           snapshot.parties,
           new Map(snapshot.raids.map((raid) => [raid.id, raid.name]))
-        );
+        ).filter((group) => group.parties.some((party) => party.id === myParty?.id));
 
         return (
           <div key={event.id} className="mt-5 border-t border-border pt-4 first:mt-4">
