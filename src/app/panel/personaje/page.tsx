@@ -126,7 +126,7 @@ export default async function MyCharacterPage() {
             )}
           </>
         ) : (
-          <p className="mt-2 text-sm text-muted">Los oficiales todavía no han dejado observaciones en tu ficha.</p>
+          <p className="mt-2 text-sm text-muted">Sin observaciones.</p>
         )}
       </section>
 

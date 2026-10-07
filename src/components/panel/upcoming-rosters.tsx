@@ -33,8 +33,12 @@ function groupParties(parties: Party[], raidNameById: Map<string, string>): Rost
   const groups = new Map<string, RosterGroup>();
   for (const party of parties) {
     const key = party.raidId ? `raid:${party.raidId}` : party.campo ? `campo:${party.campo}` : "none";
-    const label = party.raidId
-      ? (raidNameById.get(party.raidId) ?? "Raid")
+    // En Guild League un raid vive dentro de un campo: se nombran los dos.
+    const raidName = party.raidId ? (raidNameById.get(party.raidId) ?? "Raid") : null;
+    const label = raidName
+      ? party.campo
+        ? `${CAMPO_LABEL[party.campo]} · ${raidName}`
+        : raidName
       : party.campo
         ? CAMPO_LABEL[party.campo]
         : null;

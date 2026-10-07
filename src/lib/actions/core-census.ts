@@ -68,6 +68,7 @@ const sheetSchema = z.object({
   characterName: z.string().trim().max(60),
   ...sheetValuesShape,
   notes: z.string().trim().max(1000),
+  staffNotes: z.string().trim().max(2000),
   comfortableWithJob: optionalBoolean,
   // Vacío o un job que no existe = sin definir.
   desiredJob: z.preprocess(
@@ -88,14 +89,16 @@ export async function saveCharacterSheet(discordId: string, formData: FormData):
     characterName: formData.get("characterName") ?? "",
     ...readSheetValues(formData),
     notes: formData.get("notes") ?? "",
+    staffNotes: formData.get("staffNotes") ?? "",
     comfortableWithJob: formData.get("comfortableWithJob"),
     desiredJob: formData.get("desiredJob"),
   });
 
   // El job deseado solo se guarda si dijo que no está cómodo con el actual.
-  const { characterName, comfortableWithJob, desiredJob, ...evaluation } = data;
+  const { characterName, comfortableWithJob, desiredJob, staffNotes, ...evaluation } = data;
   const profile = {
     characterName,
+    staffNotes,
     comfortableWithJob,
     desiredJob: comfortableWithJob === false ? desiredJob : null,
   };

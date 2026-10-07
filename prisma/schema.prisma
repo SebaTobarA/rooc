@@ -926,7 +926,11 @@ model CoreCharacterSheet {
   // Árbol de skills PVP: true = sí, false = "mejorar".
   skillTreePvp Boolean?
 
-  notes String @default("")
+  // Observaciones para el jugador: las lee en /panel/personaje. Vacío se
+  // muestra como "Sin observaciones".
+  notes      String @default("")
+  // Observaciones internas: solo las ve el staff en la hoja de vida.
+  staffNotes String @default("")
 
   // "¿Se siente cómod@ con el job que juega?" null = no se le preguntó.
   comfortableWithJob Boolean?

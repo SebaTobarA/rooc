@@ -72,8 +72,9 @@ interface FillResult {
 // de emergencia, máx. 1 músico + 1 healer por party) — usado tanto por
 // organizeParties (todo el pool, reemplaza todas las parties) como por
 // organizeRaid (solo el pool sin asignar, agrega parties nuevas a un raid
-// puntual). No toca estado de React, solo calcula.
-function fillPartiesFromPool(
+// puntual), y por el planificador nuevo (party-planner.tsx). No toca estado
+// de React, solo calcula.
+export function fillPartiesFromPool(
   pool: Player[],
   comps: SlotLabel[][],
   maxNewParties: number | undefined,

@@ -39,6 +39,10 @@ export interface Raid {
   id: string;
   name: string;
   compositions: SlotLabel[][];
+  // En Guild League, a qué campo pertenece el raid (sus parties llevan el
+  // mismo campo). Ausente en Emperium Overrun y en plantillas guardadas
+  // antes de que Guild League pudiera tener raids.
+  campo?: CampoSide | null;
 }
 
 export interface ImportResult {

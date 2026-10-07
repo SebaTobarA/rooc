@@ -291,10 +291,33 @@ export default async function CorePlayerPage({
             jobs={JOB_ROLE_NAMES}
           />
 
-          <label className="mt-4 block text-xs text-muted">
-            Observaciones
-            <textarea name="notes" rows={3} maxLength={1000} defaultValue={sheet.notes} className={FIELD_CLASS} />
-          </label>
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <label className="block text-xs text-muted">
+              Observaciones para el jugador
+              <textarea
+                name="notes"
+                rows={3}
+                maxLength={1000}
+                defaultValue={sheet.notes}
+                placeholder="Sin observaciones"
+                className={FIELD_CLASS}
+              />
+              <span className="mt-1 block">
+                El jugador las lee en «Mi personaje». Si queda vacío, ve «Sin observaciones».
+              </span>
+            </label>
+            <label className="block text-xs text-muted">
+              Observaciones internas (solo staff)
+              <textarea
+                name="staffNotes"
+                rows={3}
+                maxLength={2000}
+                defaultValue={sheet.staffNotes}
+                className={FIELD_CLASS}
+              />
+              <span className="mt-1 block">Nunca se le muestran al jugador.</span>
+            </label>
+          </div>
 
           <button type="submit" className="btn-brand mt-4 px-4 py-2 text-sm">
             Guardar revisión
@@ -316,7 +339,7 @@ export default async function CorePlayerPage({
                       </th>
                     ))}
                     <th className="px-3 py-2 font-medium">Validó</th>
-                    <th className="px-3 py-2 font-medium">Observaciones</th>
+                    <th className="px-3 py-2 font-medium">Observaciones al jugador</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
