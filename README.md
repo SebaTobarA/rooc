@@ -302,11 +302,15 @@ acordado: 78), al estilo de una ficha de recursos humanos. Vive en
 | Listado: equipo, asistencia, rendimiento y tier de cada jugador | `/admin/evaluacion-core?mes=AAAA-MM` |
 | Hoja de vida: permanencia, revisiones de equipo e historial de eventos | `/admin/evaluacion-core/jugador/[discordId]` |
 | Reporte post evento: Discord, encuesta, rendimiento | `/admin/evaluacion-core/evento/[eventId]` |
-| Lo que ve el propio jugador (solo lectura) | `/panel/perfil`, sección "Mi ficha Core" |
+| Lo que ve el propio jugador (solo lectura) | `/panel`, sección "Mi ficha Core" |
 
 Rige **desde el domingo 4 de octubre de 2026** (`EVALUATION_START` en
 `src/lib/core-census/tier.ts`): los eventos anteriores no se reportan ni
 cuentan, aunque existan en `/panel/eventos`.
+
+El jugador ve su propia ficha (poder, equipo contra los mínimos y tier del
+mes) en el inicio del panel, `/panel`, que además es su perfil: no hay una
+pantalla de perfil aparte.
 
 ### Cuándo se crea una ficha
 

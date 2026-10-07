@@ -912,6 +912,8 @@ model CoreCharacterSheet {
   // (MemberRegistration) o el apodo del server.
   characterName String @default("")
 
+  // Poder de jugador. Se anota en cada revisión pero no tiene mínimo.
+  power        Int?
   refine       Int?
   medals       Int?
   mr           Int?
@@ -944,6 +946,7 @@ model CoreSheetRevision {
   id        String @id @default(cuid())
   discordId String
 
+  power        Int?
   refine       Int?
   medals       Int?
   mr           Int?

@@ -1,49 +1,30 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { siteConfig } from "@/config/site";
 
-const FULL_ADMIN_LINKS = [
-  { href: "/admin", label: "Resumen", exact: true },
-  { href: "/admin/items", label: "Equipamiento" },
-  { href: "/admin/cards", label: "Cartas" },
-  { href: "/admin/sets", label: "Sets" },
-  { href: "/admin/monsters", label: "Monstruos" },
-  { href: "/admin/maps", label: "Mapas" },
-  { href: "/admin/drops", label: "Drops" },
-  { href: "/admin/import", label: "Importar CSV/JSON" },
-  { href: "/admin/leadership", label: "Liderazgo" },
-  { href: "/admin/members", label: "Miembros" },
-  { href: "/admin/registro", label: "Registro" },
-  { href: "/admin/core-guild", label: "Core Guild" },
-  { href: "/admin/evaluacion-core", label: "Evaluación de CORE" },
-  { href: "/admin/recruitment", label: "Reclutamiento" },
-  { href: "/admin/build-pvp", label: "Build PVP" },
-  { href: "/admin/roles", label: "Roles y permisos" },
-];
-
-const RECRUITMENT_ONLY_LINKS = [{ href: "/admin/recruitment", label: "Reclutamiento", exact: true }];
-
-export function AdminNav({ fullAdmin }: { fullAdmin: boolean }) {
+/**
+ * Título de la sección de admin en la que se está. Reemplaza a la barra de
+ * links que había arriba de cada página de /admin: la navegación ahora vive
+ * solo en el menú lateral (siteConfig.navGroups), y de ahí mismo sale el
+ * nombre de cada sección.
+ */
+export function AdminHeading() {
   const pathname = usePathname();
-  const links = fullAdmin ? FULL_ADMIN_LINKS : RECRUITMENT_ONLY_LINKS;
+
+  // La entrada más específica que contenga la ruta actual (ej. "/admin/items"
+  // le gana a "/admin" estando en /admin/items/123/edit).
+  const match = siteConfig.navGroups
+    .flatMap((group) => group.items.map((item) => ({ ...item, group: group.label })))
+    .filter((item) => pathname === item.href || pathname.startsWith(`${item.href}/`))
+    .sort((a, b) => b.href.length - a.href.length)[0];
+
+  if (!match) return null;
 
   return (
-    <nav className="flex flex-wrap gap-1 border-b border-border pb-4">
-      {links.map((link) => {
-        const active = link.exact ? pathname === link.href : pathname.startsWith(link.href);
-        return (
-          <Link
-            key={link.href}
-            href={link.href}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium ${
-              active ? "bg-accent text-accent-foreground" : "text-muted hover:bg-surface hover:text-foreground"
-            }`}
-          >
-            {link.label}
-          </Link>
-        );
-      })}
-    </nav>
+    <header className="border-b border-border pb-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted">{match.group}</p>
+      <h1 className="mt-1 text-xl font-bold text-foreground">{match.label}</h1>
+    </header>
   );
 }

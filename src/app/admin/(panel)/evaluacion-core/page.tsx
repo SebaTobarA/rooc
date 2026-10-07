@@ -34,6 +34,8 @@ const EVENT_DATE_FORMATTER = new Intl.DateTimeFormat("es-CL", {
   timeZone: "America/Santiago",
 });
 
+const POWER_FORMATTER = new Intl.NumberFormat("es-CL");
+
 const TIERS: CensusTier[] = ["S", "A", "B"];
 
 export default async function CoreEvaluationPage({ searchParams }: { searchParams: Promise<{ mes?: string }> }) {
@@ -54,10 +56,17 @@ export default async function CoreEvaluationPage({ searchParams }: { searchParam
     job: player.job,
     desiredJob: player.sheet.comfortableWithJob === false ? (player.sheet.desiredJob ?? "") : null,
     inCore: player.inCore,
-    requirements: SHEET_REQUIREMENTS.map((requirement) => ({
-      value: formatRequirementValue(requirement, player.sheet),
-      status: requirementStatus(requirement, player.sheet),
-    })),
+    // El poder va primero y sin color: no tiene mínimo que cumplir.
+    requirements: [
+      {
+        value: player.sheet.power != null ? POWER_FORMATTER.format(player.sheet.power) : "—",
+        status: "neutral" as const,
+      },
+      ...SHEET_REQUIREMENTS.map((requirement) => ({
+        value: formatRequirementValue(requirement, player.sheet),
+        status: requirementStatus(requirement, player.sheet),
+      })),
+    ],
     summary: summaries.get(player.discordId) ?? null,
   }));
 
@@ -172,7 +181,7 @@ export default async function CoreEvaluationPage({ searchParams }: { searchParam
         <CensusTable
           rows={rows}
           basePath={BASE_PATH}
-          requirementLabels={SHEET_REQUIREMENTS.map((requirement) => requirement.label)}
+          requirementLabels={["Poder", ...SHEET_REQUIREMENTS.map((requirement) => requirement.label)]}
         />
       </div>
 

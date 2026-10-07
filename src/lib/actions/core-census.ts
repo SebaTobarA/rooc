@@ -49,6 +49,7 @@ const optionalBoolean = z.preprocess(
 
 const sheetSchema = z.object({
   characterName: z.string().trim().max(60),
+  power: optionalInt(2_000_000_000),
   refine: optionalInt(99),
   medals: optionalInt(100_000_000),
   mr: optionalInt(999),
@@ -76,6 +77,7 @@ export async function saveCharacterSheet(discordId: string, formData: FormData):
 
   const data = sheetSchema.parse({
     characterName: formData.get("characterName") ?? "",
+    power: formData.get("power"),
     refine: formData.get("refine"),
     medals: formData.get("medals"),
     mr: formData.get("mr"),
@@ -100,6 +102,7 @@ export async function saveCharacterSheet(discordId: string, formData: FormData):
   const evaluationChanged =
     !previous?.reviewedAt ||
     previous.notes !== evaluation.notes ||
+    previous.power !== evaluation.power ||
     SHEET_REQUIREMENTS.some((requirement) => previous[requirement.field] !== evaluation[requirement.field]);
 
   const reviewedAt = new Date();

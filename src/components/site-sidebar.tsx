@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { siteConfig } from "@/config/site";
+import { siteConfig, type NavGroup, type NavItem } from "@/config/site";
 
 function Brand() {
   return (
@@ -26,14 +26,16 @@ function NavItemLink({
   pathname,
   onNavigate,
   badge,
+  exact,
 }: {
   href: string;
   label: string;
   pathname: string;
   onNavigate?: () => void;
   badge?: number;
+  exact?: boolean;
 }) {
-  const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
+  const active = isActive({ href, exact }, pathname);
   return (
     <Link
       href={href}
@@ -52,16 +54,20 @@ function NavItemLink({
   );
 }
 
+function isActive(item: Pick<NavItem, "href" | "exact">, pathname: string): boolean {
+  return item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(`${item.href}/`);
+}
+
 function NavAccordionGroup({
   group,
   pathname,
   onNavigate,
 }: {
-  group: { label: string; items: { href: string; label: string }[] };
+  group: NavGroup;
   pathname: string;
   onNavigate?: () => void;
 }) {
-  const hasActiveItem = group.items.some((item) => pathname.startsWith(item.href));
+  const hasActiveItem = group.items.some((item) => isActive(item, pathname));
   const [open, setOpen] = useState(hasActiveItem);
 
   return (
@@ -86,7 +92,14 @@ function NavAccordionGroup({
       {open && (
         <div className="flex flex-col gap-1">
           {group.items.map((item) => (
-            <NavItemLink key={item.href} {...item} pathname={pathname} onNavigate={onNavigate} />
+            <NavItemLink
+              key={item.href}
+              href={item.href}
+              label={item.label}
+              exact={item.exact}
+              pathname={pathname}
+              onNavigate={onNavigate}
+            />
           ))}
         </div>
       )}
@@ -94,25 +107,14 @@ function NavAccordionGroup({
   );
 }
 
-// Qué permiso habilita cada link de siteConfig.navGroups — un item sin
-// entrada acá se muestra siempre que el grupo sea visible.
-const NAV_ITEM_PERMISSION: Record<string, keyof SidebarSession> = {
-  "/panel/party": "canViewParty",
-  "/panel/eventos": "canManageParty",
-  "/panel/build-pvp": "canViewParty",
-};
-
 function NavLinks({ session, onNavigate }: { session?: SidebarSession | null; onNavigate?: () => void }) {
   const pathname = usePathname();
 
   const navGroups = siteConfig.navGroups
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) => {
-        const requiredPermission = NAV_ITEM_PERMISSION[item.href];
-        if (!requiredPermission) return true;
-        return Boolean(session?.[requiredPermission]);
-      }),
+      // Cada link declara qué permiso lo habilita (ver siteConfig.navGroups).
+      items: group.items.filter((item) => !item.requires || Boolean(session?.[item.requires])),
     }))
     .filter((group) => group.items.length > 0);
 
@@ -122,7 +124,9 @@ function NavLinks({ session, onNavigate }: { session?: SidebarSession | null; on
         {siteConfig.nav.map((item) => (
           <NavItemLink
             key={item.href}
-            {...item}
+            href={item.href}
+            label={item.label}
+            exact={item.exact}
             pathname={pathname}
             onNavigate={onNavigate}
             badge={item.href === "/panel" ? session?.pendingEventsCount : undefined}
@@ -153,7 +157,7 @@ export type SidebarSession = {
 function ProfileCard({ session }: { session: SidebarSession }) {
   return (
     <Link
-      href="/panel/perfil"
+      href="/panel"
       className="profile-card group flex items-center gap-3 rounded-[10px] border border-border bg-surface p-3"
     >
       <span className="profile-card__sparkle" style={{ top: "2px", left: "10px", color: "var(--secondary)" }}>
@@ -173,7 +177,7 @@ function ProfileCard({ session }: { session: SidebarSession }) {
         </svg>
       </span>
       <span className="pointer-events-none absolute -top-9 right-0 z-10 whitespace-nowrap rounded-md border border-border bg-background-elevated px-2 py-1 text-[11px] font-medium text-foreground opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
-        Ver detalles
+        Mi perfil
         <span className="absolute -bottom-1 right-3 h-2 w-2 rotate-45 border-b border-r border-border bg-background-elevated" />
       </span>
 
@@ -211,34 +215,9 @@ function ProfileCard({ session }: { session: SidebarSession }) {
   );
 }
 
-function AccountBlock({ session }: { session: SidebarSession }) {
+function AccountBlock() {
   return (
     <div className="mt-auto flex flex-col gap-2 border-t border-border pt-4 text-sm">
-      {session.isAdmin ? (
-        <>
-          <Link
-            href="/admin"
-            className="rounded-[10px] px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-accent hover:bg-surface"
-          >
-            Panel de Admin
-          </Link>
-          <Link
-            href="/admin/core-guild"
-            className="rounded-[10px] px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-accent hover:bg-surface"
-          >
-            Core Guild
-          </Link>
-        </>
-      ) : (
-        session.canManageRecruitment && (
-          <Link
-            href="/admin/recruitment"
-            className="rounded-[10px] px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-accent hover:bg-surface"
-          >
-            Reclutamiento
-          </Link>
-        )
-      )}
       <form action="/api/auth/logout" method="POST">
         <button
           type="submit"
@@ -275,7 +254,7 @@ export function SiteSidebar({ session }: { session?: SidebarSession | null }) {
   return (
     <>
       {/* --- Sidebar fijo, solo desktop --- */}
-      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col gap-6 border-r border-border bg-background p-5 sm:flex">
+      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col gap-6 overflow-y-auto border-r border-border bg-background p-5 sm:flex">
         <Brand />
         {session && <ProfileCard session={session} />}
         {session?.isApplicantOnly ? (
@@ -283,7 +262,7 @@ export function SiteSidebar({ session }: { session?: SidebarSession | null }) {
         ) : (
           <NavLinks session={session} />
         )}
-        {session && <AccountBlock session={session} />}
+        {session && <AccountBlock />}
       </aside>
 
       {/* --- Barra superior + botón hamburguesa, solo mobile --- */}
@@ -311,7 +290,7 @@ export function SiteSidebar({ session }: { session?: SidebarSession | null }) {
             onClick={() => setDrawerOpen(false)}
             className="absolute inset-0 bg-black/60"
           />
-          <div className="relative flex h-full w-64 flex-col gap-6 border-r border-border bg-background p-5 shadow-xl">
+          <div className="relative flex h-full w-64 flex-col gap-6 overflow-y-auto border-r border-border bg-background p-5 shadow-xl">
             <div className="flex items-center justify-between">
               <Brand />
               <button
@@ -331,7 +310,7 @@ export function SiteSidebar({ session }: { session?: SidebarSession | null }) {
             ) : (
               <NavLinks session={session} onNavigate={() => setDrawerOpen(false)} />
             )}
-            {session && <AccountBlock session={session} />}
+            {session && <AccountBlock />}
           </div>
         </div>
       )}

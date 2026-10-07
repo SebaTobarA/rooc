@@ -1,9 +1,7 @@
-import Link from "next/link";
-import { AdminNav } from "@/components/admin-nav";
+import { AdminHeading } from "@/components/admin-nav";
 import { SiteSidebar } from "@/components/site-sidebar";
 import { SiteFooter } from "@/components/site-footer";
 import { getSidebarSession } from "@/lib/sidebar-session";
-import { getSession } from "@/lib/auth";
 
 export const metadata = {
   title: {
@@ -13,7 +11,7 @@ export const metadata = {
 };
 
 export default async function AdminPanelLayout({ children }: { children: React.ReactNode }) {
-  const [sidebarSession, session] = await Promise.all([getSidebarSession(), getSession()]);
+  const sidebarSession = await getSidebarSession();
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -22,10 +20,7 @@ export default async function AdminPanelLayout({ children }: { children: React.R
         <div className="flex min-w-0 flex-1 flex-col">
           <main className="flex-1">
             <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-              <Link href="/panel" className="mb-4 inline-block text-xs text-muted hover:text-foreground">
-                ← Volver al panel
-              </Link>
-              <AdminNav fullAdmin={Boolean(session?.isAdmin)} />
+              <AdminHeading />
               <div className="mt-6">{children}</div>
             </div>
           </main>

@@ -18,8 +18,8 @@ export interface CensusTableRow {
   desiredJob: string | null;
   /** false = ex miembro: ya no tiene el rol, se conserva su hoja de vida. */
   inCore: boolean;
-  /** Una celda por requisito, en el orden de SHEET_REQUIREMENTS. */
-  requirements: { value: string; status: RequirementStatus }[];
+  /** Una celda por columna de la ficha (poder + requisitos), en el orden de requirementLabels. */
+  requirements: { value: string; status: RequirementStatus | "neutral" }[];
   summary: MemberMonthSummary | null;
 }
 
@@ -181,7 +181,7 @@ export function CensusTable({ rows, requirementLabels, basePath }: CensusTablePr
                     </Link>
                   </td>
                   {row.requirements.map((cell, index) => (
-                    <td key={index} className={`px-3 py-2 ${REQUIREMENT_STATUS_CLASS[cell.status]}`}>
+                    <td key={index} className={`px-3 py-2 ${cell.status === "neutral" ? "text-foreground" : REQUIREMENT_STATUS_CLASS[cell.status]}`}>
                       {cell.value}
                     </td>
                   ))}

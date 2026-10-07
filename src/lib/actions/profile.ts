@@ -28,7 +28,6 @@ export async function updateMyJobClass(roleId: string): Promise<{ error?: string
     data: { roles: result.roleIds },
   });
 
-  revalidatePath("/panel/perfil");
   revalidatePath("/panel");
   return {};
 }

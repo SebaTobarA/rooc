@@ -256,6 +256,12 @@ export default async function CorePlayerPage({
             />
           </label>
 
+          <label className="mt-4 block max-w-sm text-xs text-muted">
+            Poder de jugador
+            <input type="number" name="power" min={0} defaultValue={sheet.power ?? ""} className={FIELD_CLASS} />
+            <span className="mt-1 block">Sin mínimo: se anota para ver cómo avanza.</span>
+          </label>
+
           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {SHEET_REQUIREMENTS.map((requirement) => {
               const status = requirementStatus(requirement, sheet);
@@ -316,6 +322,7 @@ export default async function CorePlayerPage({
                 <thead className="bg-background-elevated text-muted">
                   <tr>
                     <th className="px-3 py-2 font-medium">Fecha</th>
+                    <th className="px-3 py-2 font-medium">Poder</th>
                     {SHEET_REQUIREMENTS.map((requirement) => (
                       <th key={requirement.field} className="px-3 py-2 font-medium">
                         {requirement.label}
@@ -329,6 +336,9 @@ export default async function CorePlayerPage({
                   {revisions.map((revision) => (
                     <tr key={revision.id}>
                       <td className="px-3 py-2 text-foreground">{DATE_FORMATTER.format(revision.createdAt)}</td>
+                      <td className="px-3 py-2 text-foreground">
+                        {revision.power != null ? POINTS_FORMATTER.format(revision.power) : "—"}
+                      </td>
                       {SHEET_REQUIREMENTS.map((requirement) => (
                         <td
                           key={requirement.field}
