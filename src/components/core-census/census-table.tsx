@@ -18,8 +18,10 @@ export interface CensusTableRow {
   desiredJob: string | null;
   /** false = ex miembro: ya no tiene el rol, se conserva su hoja de vida. */
   inCore: boolean;
-  /** Una celda por columna de la ficha (poder + requisitos), en el orden de requirementLabels. */
-  requirements: { value: string; status: RequirementStatus | "neutral" }[];
+  /** Una celda por aspecto de la ficha, en el orden de requirementLabels. */
+  requirements: { value: string; status: RequirementStatus }[];
+  /** true = el jugador reportó una actualización de su ficha que falta validar. */
+  hasPendingUpdate: boolean;
   summary: MemberMonthSummary | null;
 }
 
@@ -60,11 +62,14 @@ interface CensusTableProps {
 export function CensusTable({ rows, requirementLabels, basePath }: CensusTableProps) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ACTIVE");
+  const [onlyPending, setOnlyPending] = useState(false);
+  const pendingCount = rows.filter((row) => row.hasPendingUpdate).length;
   const [tierFilter, setTierFilter] = useState<TierFilter>("ALL");
 
   const visibleRows = useMemo(() => {
     const query = normalize(search);
     return rows.filter((row) => {
+      if (onlyPending && !row.hasPendingUpdate) return false;
       if (statusFilter !== "ALL" && row.inCore !== (statusFilter === "ACTIVE")) return false;
       const tier = row.summary?.tier ?? null;
       if (tierFilter === "NONE" ? tier !== null : tierFilter !== "ALL" && tier !== tierFilter) return false;
@@ -73,7 +78,7 @@ export function CensusTable({ rows, requirementLabels, basePath }: CensusTablePr
         normalize(text).includes(query)
       );
     });
-  }, [rows, search, tierFilter, statusFilter]);
+  }, [rows, search, tierFilter, statusFilter, onlyPending]);
 
   return (
     <div>
@@ -88,6 +93,20 @@ export function CensusTable({ rows, requirementLabels, basePath }: CensusTablePr
             className="w-full rounded-[10px] border border-border bg-surface py-2 pl-8 pr-3 text-sm text-foreground"
           />
         </div>
+        {pendingCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setOnlyPending((prev) => !prev)}
+            aria-pressed={onlyPending}
+            className={`rounded-md border px-3 py-1.5 text-xs font-medium ${
+              onlyPending
+                ? "border-amber-400 bg-amber-400/15 text-amber-300"
+                : "border-amber-500/40 text-amber-400 hover:bg-amber-400/10"
+            }`}
+          >
+            {pendingCount} por validar
+          </button>
+        )}
         <label className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted">
           Estado
           <select
@@ -125,6 +144,9 @@ export function CensusTable({ rows, requirementLabels, basePath }: CensusTablePr
           <thead className="bg-surface text-muted">
             <tr>
               <th className="px-3 py-2 font-medium">Jugador</th>
+              <th className="px-3 py-2 font-medium" title="Actualizaciones de ficha reportadas por el jugador">
+                Validación
+              </th>
               {requirementLabels.map((label) => (
                 <th key={label} className="px-3 py-2 font-medium">
                   {label}
@@ -180,8 +202,20 @@ export function CensusTable({ rows, requirementLabels, basePath }: CensusTablePr
                       </span>
                     </Link>
                   </td>
+                  <td className="px-3 py-2">
+                    {row.hasPendingUpdate ? (
+                      <Link
+                        href={`${basePath}/jugador/${row.discordId}#validar`}
+                        className="btn-brand inline-block px-3 py-1 text-xs"
+                      >
+                        Validar
+                      </Link>
+                    ) : (
+                      <span className="text-xs text-muted">Al día</span>
+                    )}
+                  </td>
                   {row.requirements.map((cell, index) => (
-                    <td key={index} className={`px-3 py-2 ${cell.status === "neutral" ? "text-foreground" : REQUIREMENT_STATUS_CLASS[cell.status]}`}>
+                    <td key={index} className={`px-3 py-2 ${REQUIREMENT_STATUS_CLASS[cell.status]}`}>
                       {cell.value}
                     </td>
                   ))}
@@ -220,7 +254,7 @@ export function CensusTable({ rows, requirementLabels, basePath }: CensusTablePr
             })}
             {visibleRows.length === 0 && (
               <tr>
-                <td colSpan={requirementLabels.length + 7} className="px-3 py-6 text-center text-sm text-muted">
+                <td colSpan={requirementLabels.length + 8} className="px-3 py-6 text-center text-sm text-muted">
                   {rows.length === 0 ? "Nadie tiene el rol [SD] Core todavía." : "Ningún jugador coincide con el filtro."}
                 </td>
               </tr>

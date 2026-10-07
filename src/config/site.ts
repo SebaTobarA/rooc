@@ -41,6 +41,7 @@ const navGroups: NavGroup[] = [
       { href: "/panel/build-pvp", label: "Build PVP", requires: "canViewParty" },
       { href: "/panel/eventos", label: "Eventos", requires: "canManageParty" },
       { href: "/admin/evaluacion-core", label: "Evaluación de CORE", requires: "isAdmin" },
+      { href: "/admin/requisitos-core", label: "Configuración de requisitos", requires: "isAdmin" },
       { href: "/admin/core-guild", label: "Organización Core", requires: "isAdmin" },
       { href: "/admin/recruitment", label: "Reclutamiento", requires: "canManageRecruitment" },
       { href: "/admin/members", label: "Miembros", requires: "isAdmin" },

@@ -337,6 +337,23 @@ juega?"**; si es "No", se elige de una lista el job que desea jugar. No es un
 mínimo ni entra en el historial de revisiones: es un dato de la persona, y en
 el listado aparece como "Quiere cambiar de job".
 
+### Mínimos configurables, actualización del jugador y validación
+
+- **Configuración de requisitos** (`/admin/requisitos-core`): los oficiales
+  fijan el mínimo de cada aspecto (`CoreRequirementSettings`). Un mínimo en 0
+  o un aspecto sí/no sin marcar como exigido se anota pero no se evalúa.
+  `requirements.ts` conserva los valores por defecto y la lista de aspectos;
+  `loadSheetRequirements` devuelve los vigentes.
+- **Actualizar** (`/panel/ficha`): el jugador reporta sus datos. No cambian su
+  ficha: quedan como `CoreSheetSubmission` pendiente (una por jugador;
+  reportar de nuevo la reemplaza).
+- **Validar**: en el listado de Evaluación de CORE, quien tiene un reporte
+  pendiente muestra el botón, que lleva a su hoja de vida con la comparación
+  ficha vs. reportado. Al aceptar, los valores pasan a la ficha y queda una
+  revisión marcada como reportada por el jugador; al rechazar, la ficha no
+  cambia. El historial de lo reportado y su resultado lo ven el jugador y los
+  oficiales.
+
 ### Reporte post evento
 
 Los eventos son los mismos de `/panel/eventos` (martes y jueves Guild League,

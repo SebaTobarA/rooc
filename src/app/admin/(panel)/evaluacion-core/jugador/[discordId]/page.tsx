@@ -3,14 +3,10 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { discordAvatarUrl } from "@/lib/discord-avatar";
 import { EVENT_CATEGORY_LABEL } from "@/lib/labels";
-import { saveCharacterSheet } from "@/lib/actions/core-census";
+import { reviewSheetSubmission, saveCharacterSheet } from "@/lib/actions/core-census";
 import { loadCorePlayers, loadMonthSummaries } from "@/lib/core-census/data";
-import {
-  SHEET_REQUIREMENTS,
-  countRequirements,
-  formatRequirementValue,
-  requirementStatus,
-} from "@/lib/core-census/requirements";
+import { countRequirements, formatRequirementValue, requirementStatus } from "@/lib/core-census/requirements";
+import { loadSheetRequirements } from "@/lib/core-census/requirements-config";
 import { SURVEY_TONE_CLASS, surveyAnswer } from "@/lib/core-census/survey";
 import {
   EVALUATION_START,
@@ -22,6 +18,8 @@ import {
 import { JOB_ROLE_NAMES } from "@/lib/discord-job-roles";
 import { BackLink } from "@/components/back-link";
 import { JobComfortField } from "@/components/core-census/job-comfort-field";
+import { SheetFields } from "@/components/core-census/sheet-fields";
+import { SubmissionHistory } from "@/components/core-census/submission-history";
 import { PerformanceChart, type PerformancePoint } from "@/components/core-census/performance-chart";
 import { OutcomeBadge, REQUIREMENT_STATUS_CLASS, TierBadge } from "@/components/core-census/census-badges";
 
@@ -64,10 +62,10 @@ export default async function CorePlayerPage({
   searchParams,
 }: {
   params: Promise<{ discordId: string }>;
-  searchParams: Promise<{ guardado?: string }>;
+  searchParams: Promise<{ guardado?: string; validado?: string }>;
 }) {
   const { discordId } = await params;
-  const { guardado } = await searchParams;
+  const { guardado, validado } = await searchParams;
 
   // Sin sync: la hoja de vida de un ex miembro tiene que abrir aunque ya no
   // esté en el server (ni Discord responda).
@@ -76,7 +74,7 @@ export default async function CorePlayerPage({
   if (!player) notFound();
 
   const monthKey = currentMonthKey();
-  const [history, revisions, periods, summaries] = await Promise.all([
+  const [history, revisions, periods, summaries, requirements, submissions] = await Promise.all([
     prisma.coreEventRecord.findMany({
       where: { discordId, event: { coreCensusAt: { not: null }, startsAt: { gte: EVALUATION_START } } },
       include: { event: { select: { id: true, category: true, startsAt: true, attendanceMode: true } } },
@@ -85,7 +83,10 @@ export default async function CorePlayerPage({
     prisma.coreSheetRevision.findMany({ where: { discordId }, orderBy: { createdAt: "desc" } }),
     prisma.coreMembershipPeriod.findMany({ where: { discordId }, orderBy: { startedAt: "asc" } }),
     loadMonthSummaries(monthKey),
+    loadSheetRequirements(),
+    prisma.coreSheetSubmission.findMany({ where: { discordId }, orderBy: { createdAt: "desc" } }),
   ]);
+  const pendingSubmission = submissions.find((submission) => submission.status === "PENDING") ?? null;
   const monthSummary = summaries.get(discordId) ?? null;
   // El mismo resumen del mes, sobre toda su permanencia.
   const career = summarizeMonth(history);
@@ -129,7 +130,7 @@ export default async function CorePlayerPage({
   const eventsWithParty = history.filter((record) => record.partyName).length;
 
   const sheet = player.sheet;
-  const requirementCount = countRequirements(sheet);
+  const requirementCount = countRequirements(requirements, sheet);
   const avatarUrl = discordAvatarUrl(player.discordId, player.avatarHash, 64);
 
   const careerStats = [
@@ -192,6 +193,76 @@ export default async function CorePlayerPage({
         </div>
       </div>
 
+      {validado && (
+        <p className="mt-4 rounded-[10px] border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-400">
+          Actualización {validado === "aceptada" ? "aceptada: ya está en la ficha" : "rechazada: la ficha no cambió"}.
+        </p>
+      )}
+
+      {pendingSubmission && (
+        <section id="validar" className="mt-5 scroll-mt-6 rounded-xl border border-amber-500/40 bg-amber-500/5 p-5">
+          <h2 className="font-semibold text-foreground">Actualización por validar</h2>
+          <p className="mt-1 text-sm text-muted">
+            El jugador reportó estos datos el {DATE_FORMATTER.format(pendingSubmission.createdAt)}. Revisa que sean
+            correctos: al aceptar pasan a su ficha; al rechazar, la ficha queda como está.
+            {pendingSubmission.note ? ` Comentario del jugador: «${pendingSubmission.note}»` : ""}
+          </p>
+
+          <div className="mt-3 overflow-x-auto rounded-xl border border-border">
+            <table className="w-full whitespace-nowrap text-left text-sm">
+              <thead className="bg-background-elevated text-muted">
+                <tr>
+                  <th className="px-3 py-2 font-medium">Aspecto</th>
+                  <th className="px-3 py-2 font-medium">En la ficha</th>
+                  <th className="px-3 py-2 font-medium">Reportado</th>
+                  <th className="px-3 py-2 font-medium">Cambio</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {requirements.map((requirement) => {
+                  const changed = sheet[requirement.field] !== pendingSubmission[requirement.field];
+                  return (
+                    <tr key={requirement.field}>
+                      <td className="px-3 py-2 text-foreground">{requirement.label}</td>
+                      <td className="px-3 py-2 text-muted">{formatRequirementValue(requirement, sheet)}</td>
+                      <td
+                        className={`px-3 py-2 font-semibold ${REQUIREMENT_STATUS_CLASS[requirementStatus(requirement, pendingSubmission)]}`}
+                      >
+                        {formatRequirementValue(requirement, pendingSubmission)}
+                      </td>
+                      <td className="px-3 py-2 text-xs text-muted">{changed ? "Cambia" : "Igual"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-end gap-3">
+            <form action={reviewSheetSubmission.bind(null, pendingSubmission.id, "accept")}>
+              <button type="submit" className="btn-brand px-4 py-2 text-sm">
+                Validar y aplicar a la ficha
+              </button>
+            </form>
+            <form
+              action={reviewSheetSubmission.bind(null, pendingSubmission.id, "reject")}
+              className="flex flex-1 flex-wrap items-end gap-2"
+            >
+              <label className="min-w-[200px] flex-1 text-xs text-muted">
+                Motivo del rechazo (lo ve el jugador)
+                <input type="text" name="reviewNote" maxLength={300} className={FIELD_CLASS} />
+              </label>
+              <button
+                type="submit"
+                className="rounded-[10px] border border-rose-500/50 px-4 py-2 text-sm font-semibold text-rose-400 transition-colors hover:bg-rose-500/10"
+              >
+                Rechazar
+              </button>
+            </form>
+          </div>
+        </section>
+      )}
+
       {guardado && (
         <p className="mt-4 rounded-[10px] border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-400">
           Revisión guardada.
@@ -231,16 +302,16 @@ export default async function CorePlayerPage({
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="font-semibold text-foreground">Revisión de equipo</h2>
           <p className="text-xs text-muted">
-            Cumple {requirementCount.ok} de {SHEET_REQUIREMENTS.length}
-            {requirementCount.pending > 0 ? ` · ${requirementCount.pending} sin revisar` : ""}
+            Cumple {requirementCount.ok} de {requirementCount.required} exigidos
+            {requirementCount.pending > 0 ? ` · ${requirementCount.pending} sin dato` : ""}
             {sheet.reviewedAt
               ? ` · Última revisión ${DATE_FORMATTER.format(sheet.reviewedAt)}${sheet.updatedByUsername ? ` por ${sheet.updatedByUsername}` : ""}`
               : " · Nunca revisado"}
           </p>
         </div>
         <p className="mt-1 text-xs text-muted">
-          Se actualiza cuando los oficiales revisan al jugador, no en cada evento. Cada revisión que cambia algo queda
-          en el historial de abajo.
+          Se actualiza cuando un oficial la edita acá o cuando valida lo que reportó el jugador, no en cada evento.
+          Cada cambio queda en el historial de abajo.
         </p>
 
         <form action={saveCharacterSheet.bind(null, discordId)} className="mt-4">
@@ -256,46 +327,8 @@ export default async function CorePlayerPage({
             />
           </label>
 
-          <label className="mt-4 block max-w-sm text-xs text-muted">
-            Poder de jugador
-            <input type="number" name="power" min={0} defaultValue={sheet.power ?? ""} className={FIELD_CLASS} />
-            <span className="mt-1 block">Sin mínimo: se anota para ver cómo avanza.</span>
-          </label>
-
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {SHEET_REQUIREMENTS.map((requirement) => {
-              const status = requirementStatus(requirement, sheet);
-              return (
-                <label key={requirement.field} className="block text-xs text-muted">
-                  <span className="flex items-baseline justify-between gap-2">
-                    {requirement.label}
-                    <span className={REQUIREMENT_STATUS_CLASS[status]}>
-                      {status === "ok" ? "Cumple" : status === "fail" ? "No cumple" : "Sin revisar"}
-                    </span>
-                  </span>
-                  {requirement.kind === "number" ? (
-                    <input
-                      type="number"
-                      name={requirement.field}
-                      min={0}
-                      defaultValue={sheet[requirement.field] ?? ""}
-                      className={FIELD_CLASS}
-                    />
-                  ) : (
-                    <select
-                      name={requirement.field}
-                      defaultValue={sheet[requirement.field] == null ? "" : sheet[requirement.field] ? "yes" : "no"}
-                      className={FIELD_CLASS}
-                    >
-                      <option value="">Sin revisar</option>
-                      <option value="yes">{requirement.yes}</option>
-                      <option value="no">{requirement.no}</option>
-                    </select>
-                  )}
-                  <span className="mt-1 block">{requirement.hint}</span>
-                </label>
-              );
-            })}
+          <div className="mt-4">
+            <SheetFields requirements={requirements} values={sheet} />
           </div>
 
           <JobComfortField
@@ -322,13 +355,13 @@ export default async function CorePlayerPage({
                 <thead className="bg-background-elevated text-muted">
                   <tr>
                     <th className="px-3 py-2 font-medium">Fecha</th>
-                    <th className="px-3 py-2 font-medium">Poder</th>
-                    {SHEET_REQUIREMENTS.map((requirement) => (
+                    <th className="px-3 py-2 font-medium">Origen</th>
+                    {requirements.map((requirement) => (
                       <th key={requirement.field} className="px-3 py-2 font-medium">
                         {requirement.label}
                       </th>
                     ))}
-                    <th className="px-3 py-2 font-medium">Revisó</th>
+                    <th className="px-3 py-2 font-medium">Validó</th>
                     <th className="px-3 py-2 font-medium">Observaciones</th>
                   </tr>
                 </thead>
@@ -336,10 +369,10 @@ export default async function CorePlayerPage({
                   {revisions.map((revision) => (
                     <tr key={revision.id}>
                       <td className="px-3 py-2 text-foreground">{DATE_FORMATTER.format(revision.createdAt)}</td>
-                      <td className="px-3 py-2 text-foreground">
-                        {revision.power != null ? POINTS_FORMATTER.format(revision.power) : "—"}
+                      <td className="px-3 py-2 text-muted">
+                        {revision.reportedByPlayer ? "Reportó el jugador" : "Cargó un oficial"}
                       </td>
-                      {SHEET_REQUIREMENTS.map((requirement) => (
+                      {requirements.map((requirement) => (
                         <td
                           key={requirement.field}
                           className={`px-3 py-2 ${REQUIREMENT_STATUS_CLASS[requirementStatus(requirement, revision)]}`}
@@ -356,6 +389,14 @@ export default async function CorePlayerPage({
             </div>
           </div>
         )}
+      </section>
+
+      <section className="mt-5 rounded-xl border border-border bg-surface p-5">
+        <h2 className="font-semibold text-foreground">Actualizaciones reportadas por el jugador</h2>
+        <p className="mb-3 mt-1 text-xs text-muted">
+          Todo lo que informó desde su panel, con el resultado de cada validación.
+        </p>
+        <SubmissionHistory submissions={submissions} requirements={requirements} />
       </section>
 
       <section className="mt-5 rounded-xl border border-border bg-surface p-5">

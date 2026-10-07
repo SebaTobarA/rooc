@@ -13,7 +13,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { getCoreGuildRoster } from "@/lib/core-guild/sync";
 import { findMembersInEventVoice } from "@/lib/core-census/voice";
-import { SHEET_REQUIREMENTS } from "@/lib/core-census/requirements";
+import { SHEET_REQUIREMENTS, pickSheetValues, type RequirementOverrides } from "@/lib/core-census/requirements";
 import { JOB_ROLE_NAMES } from "@/lib/discord-job-roles";
 import { readSnapshot } from "@/lib/party/template-snapshot";
 import { EVALUATION_START } from "@/lib/core-census/tier";
@@ -47,8 +47,8 @@ const optionalBoolean = z.preprocess(
   z.boolean().nullable()
 );
 
-const sheetSchema = z.object({
-  characterName: z.string().trim().max(60),
+// Los aspectos de la ficha, tal como llegan de un formulario (ver SheetFields).
+const sheetValuesShape = {
   power: optionalInt(2_000_000_000),
   refine: optionalInt(99),
   medals: optionalInt(100_000_000),
@@ -58,6 +58,15 @@ const sheetSchema = z.object({
   cardsPvp: optionalBoolean,
   s2Orange: optionalBoolean,
   skillTreePvp: optionalBoolean,
+};
+
+function readSheetValues(formData: FormData) {
+  return Object.fromEntries(SHEET_REQUIREMENTS.map((requirement) => [requirement.field, formData.get(requirement.field)]));
+}
+
+const sheetSchema = z.object({
+  characterName: z.string().trim().max(60),
+  ...sheetValuesShape,
   notes: z.string().trim().max(1000),
   comfortableWithJob: optionalBoolean,
   // Vacío o un job que no existe = sin definir.
@@ -77,15 +86,7 @@ export async function saveCharacterSheet(discordId: string, formData: FormData):
 
   const data = sheetSchema.parse({
     characterName: formData.get("characterName") ?? "",
-    power: formData.get("power"),
-    refine: formData.get("refine"),
-    medals: formData.get("medals"),
-    mr: formData.get("mr"),
-    feathers: formData.get("feathers"),
-    enchants: formData.get("enchants"),
-    cardsPvp: formData.get("cardsPvp"),
-    s2Orange: formData.get("s2Orange"),
-    skillTreePvp: formData.get("skillTreePvp"),
+    ...readSheetValues(formData),
     notes: formData.get("notes") ?? "",
     comfortableWithJob: formData.get("comfortableWithJob"),
     desiredJob: formData.get("desiredJob"),
@@ -102,7 +103,6 @@ export async function saveCharacterSheet(discordId: string, formData: FormData):
   const evaluationChanged =
     !previous?.reviewedAt ||
     previous.notes !== evaluation.notes ||
-    previous.power !== evaluation.power ||
     SHEET_REQUIREMENTS.some((requirement) => previous[requirement.field] !== evaluation[requirement.field]);
 
   const reviewedAt = new Date();
@@ -123,6 +123,113 @@ export async function saveCharacterSheet(discordId: string, formData: FormData):
 
   revalidatePath(EVALUATION_PATH);
   redirect(`${EVALUATION_PATH}/jugador/${discordId}?guardado=1`);
+}
+
+// ---------------------------------------------------------------------------
+// Configuración de requisitos
+// ---------------------------------------------------------------------------
+
+/** Guarda los mínimos de cada aspecto de la ficha (/admin/requisitos-core). */
+export async function saveRequirementSettings(formData: FormData): Promise<void> {
+  const updatedByUsername = await requireAdmin();
+
+  const mins: RequirementOverrides = {};
+  for (const requirement of SHEET_REQUIREMENTS) {
+    if (requirement.kind === "number") {
+      const value = Math.floor(Number(formData.get(`min_${requirement.field}`) ?? 0));
+      mins[requirement.field] = Number.isFinite(value) && value > 0 ? Math.min(value, 2_000_000_000) : 0;
+    } else {
+      mins[requirement.field] = formData.get(`required_${requirement.field}`) === "on";
+    }
+  }
+
+  const existing = await prisma.coreRequirementSettings.findFirst();
+  if (existing) {
+    await prisma.coreRequirementSettings.update({ where: { id: existing.id }, data: { mins, updatedByUsername } });
+  } else {
+    await prisma.coreRequirementSettings.create({ data: { mins, updatedByUsername } });
+  }
+
+  revalidatePath(EVALUATION_PATH);
+  revalidatePath("/panel");
+  redirect("/admin/requisitos-core?guardado=1");
+}
+
+// ---------------------------------------------------------------------------
+// Actualización reportada por el jugador y su validación
+// ---------------------------------------------------------------------------
+
+const submissionSchema = z.object({ ...sheetValuesShape, note: z.string().trim().max(300) });
+
+/**
+ * El propio jugador reporta los datos de su personaje desde /panel/ficha. No
+ * toca su ficha: queda PENDING hasta que un moderador la valide. Si ya tenía
+ * una pendiente, se reemplaza.
+ */
+export async function submitMySheetUpdate(formData: FormData): Promise<void> {
+  const session = await getSession();
+  if (!session?.discordId) throw new Error("Necesitas haber iniciado sesión con Discord.");
+  const discordId = session.discordId;
+
+  const sheet = await prisma.coreCharacterSheet.findUnique({ where: { discordId } });
+  if (!sheet?.inCore) throw new Error("Solo los miembros [SD] Core pueden actualizar su ficha.");
+
+  const data = submissionSchema.parse({ ...readSheetValues(formData), note: formData.get("note") ?? "" });
+
+  const pending = await prisma.coreSheetSubmission.findFirst({ where: { discordId, status: "PENDING" } });
+  if (pending) {
+    await prisma.coreSheetSubmission.update({ where: { id: pending.id }, data: { ...data, createdAt: new Date() } });
+  } else {
+    await prisma.coreSheetSubmission.create({ data: { discordId, ...data } });
+  }
+
+  revalidatePath("/panel");
+  revalidatePath(EVALUATION_PATH);
+  redirect("/panel/ficha?enviado=1");
+}
+
+/**
+ * Un moderador valida lo que reportó el jugador. Al aceptar, los valores
+ * reportados pasan a la ficha y queda una revisión marcada como reportada por
+ * el jugador; al rechazar, la ficha no cambia. En los dos casos el reporte
+ * queda en el historial con quién lo revisó.
+ */
+export async function reviewSheetSubmission(
+  submissionId: string,
+  decision: "accept" | "reject",
+  formData: FormData
+): Promise<void> {
+  const reviewedByUsername = await requireAdmin();
+
+  const submission = await prisma.coreSheetSubmission.findUnique({ where: { id: submissionId } });
+  if (!submission || submission.status !== "PENDING") {
+    throw new Error("Esta actualización ya fue revisada.");
+  }
+
+  const reviewNote = String(formData.get("reviewNote") ?? "").trim().slice(0, 300);
+  const reviewedAt = new Date();
+  const review = { reviewNote, reviewedByUsername, reviewedAt };
+  const { discordId } = submission;
+
+  if (decision === "accept") {
+    const values = pickSheetValues(submission);
+    await prisma.$transaction([
+      prisma.coreCharacterSheet.update({
+        where: { discordId },
+        data: { ...values, reviewedAt, updatedByUsername: reviewedByUsername },
+      }),
+      prisma.coreSheetRevision.create({
+        data: { discordId, ...values, notes: submission.note, reviewedByUsername, reportedByPlayer: true },
+      }),
+      prisma.coreSheetSubmission.update({ where: { id: submissionId }, data: { status: "ACCEPTED", ...review } }),
+    ]);
+  } else {
+    await prisma.coreSheetSubmission.update({ where: { id: submissionId }, data: { status: "REJECTED", ...review } });
+  }
+
+  revalidatePath(EVALUATION_PATH);
+  revalidatePath("/panel");
+  redirect(`${EVALUATION_PATH}/jugador/${discordId}?validado=${decision === "accept" ? "aceptada" : "rechazada"}`);
 }
 
 // ---------------------------------------------------------------------------

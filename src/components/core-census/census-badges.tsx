@@ -30,6 +30,7 @@ export const REQUIREMENT_STATUS_CLASS: Record<RequirementStatus, string> = {
   ok: "text-emerald-400",
   fail: "text-rose-400",
   pending: "text-muted",
+  neutral: "text-foreground",
 };
 
 const OUTCOME_CLASS: Record<RecordOutcome, string> = {

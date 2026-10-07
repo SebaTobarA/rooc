@@ -3,7 +3,9 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { discordAvatarUrl } from "@/lib/discord-avatar";
 import { EVENT_CATEGORY_LABEL } from "@/lib/labels";
 import { loadCorePlayers, loadMonthEvents, loadMonthSummaries } from "@/lib/core-census/data";
-import { SHEET_REQUIREMENTS, formatRequirementValue, requirementStatus } from "@/lib/core-census/requirements";
+import { formatRequirementValue, requirementHint, requirementStatus } from "@/lib/core-census/requirements";
+import { loadSheetRequirements } from "@/lib/core-census/requirements-config";
+import { prisma } from "@/lib/prisma";
 import {
   EVALUATION_START_MONTH,
   monthLabel,
@@ -34,8 +36,6 @@ const EVENT_DATE_FORMATTER = new Intl.DateTimeFormat("es-CL", {
   timeZone: "America/Santiago",
 });
 
-const POWER_FORMATTER = new Intl.NumberFormat("es-CL");
-
 const TIERS: CensusTier[] = ["S", "A", "B"];
 
 export default async function CoreEvaluationPage({ searchParams }: { searchParams: Promise<{ mes?: string }> }) {
@@ -45,7 +45,13 @@ export default async function CoreEvaluationPage({ searchParams }: { searchParam
   // crea las de quienes lo recibieron y marca como ex miembros a quienes lo
   // perdieron (ver syncCorePlayers).
   const { players, syncError } = await loadCorePlayers({ sync: true });
-  const [events, summaries] = await Promise.all([loadMonthEvents(monthKey), loadMonthSummaries(monthKey)]);
+  const [events, summaries, requirements, pendingUpdates] = await Promise.all([
+    loadMonthEvents(monthKey),
+    loadMonthSummaries(monthKey),
+    loadSheetRequirements(),
+    prisma.coreSheetSubmission.findMany({ where: { status: "PENDING" }, select: { discordId: true } }),
+  ]);
+  const pendingIds = new Set(pendingUpdates.map((update) => update.discordId));
 
   const rows: CensusTableRow[] = players.map((player) => ({
     discordId: player.discordId,
@@ -56,17 +62,11 @@ export default async function CoreEvaluationPage({ searchParams }: { searchParam
     job: player.job,
     desiredJob: player.sheet.comfortableWithJob === false ? (player.sheet.desiredJob ?? "") : null,
     inCore: player.inCore,
-    // El poder va primero y sin color: no tiene mínimo que cumplir.
-    requirements: [
-      {
-        value: player.sheet.power != null ? POWER_FORMATTER.format(player.sheet.power) : "—",
-        status: "neutral" as const,
-      },
-      ...SHEET_REQUIREMENTS.map((requirement) => ({
-        value: formatRequirementValue(requirement, player.sheet),
-        status: requirementStatus(requirement, player.sheet),
-      })),
-    ],
+    hasPendingUpdate: pendingIds.has(player.discordId),
+    requirements: requirements.map((requirement) => ({
+      value: formatRequirementValue(requirement, player.sheet),
+      status: requirementStatus(requirement, player.sheet),
+    })),
     summary: summaries.get(player.discordId) ?? null,
   }));
 
@@ -177,17 +177,32 @@ export default async function CoreEvaluationPage({ searchParams }: { searchParam
         )}
       </section>
 
-      <div className="mt-5">
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+        <h3 className="font-semibold text-foreground">Jugadores</h3>
+        <Link
+          href="/admin/requisitos-core"
+          className="rounded-[10px] border border-border px-4 py-2 text-xs font-semibold uppercase tracking-wide text-foreground transition-colors hover:bg-surface-hover"
+        >
+          Configuración de requisitos
+        </Link>
+      </div>
+
+      <div className="mt-3">
         <CensusTable
           rows={rows}
           basePath={BASE_PATH}
-          requirementLabels={["Poder", ...SHEET_REQUIREMENTS.map((requirement) => requirement.label)]}
+          requirementLabels={requirements.map((requirement) => requirement.label)}
         />
       </div>
 
       <p className="mt-3 text-xs text-muted">
-        Mínimos de equipo: {SHEET_REQUIREMENTS.map((requirement) => requirement.hint).join(" · ")}. En verde lo que
-        cumple, en rojo lo que no, y «—» lo que todavía no se revisó. Toca un jugador para abrir su hoja de vida.
+        Mínimos vigentes:{" "}
+        {requirements.map((requirement) => `${requirement.label}: ${requirementHint(requirement).toLowerCase()}`).join(" · ")}.
+        En verde lo que cumple, en rojo lo que no, y «—» lo que todavía no tiene dato. Se cambian en{" "}
+        <Link href="/admin/requisitos-core" className="text-accent hover:underline">
+          Configuración de requisitos
+        </Link>
+        .
       </p>
     </div>
   );
