@@ -14,26 +14,28 @@ export type NavItem = {
   requires?: NavPermission;
   /** El link solo se marca activo en su ruta exacta, no en las que cuelgan de ella. */
   exact?: boolean;
+  /** Otras rutas que también lo marcan activo (secciones que cuelgan de este menú sin compartir su URL). */
+  alsoActiveOn?: string[];
 };
 
 export type NavGroup = { label: string; items: NavItem[] };
 
-const nav: NavItem[] = [{ href: "/panel", label: "Inicio", exact: true }];
-
-// Único menú del panel: no hay un "panel de admin" aparte con su propia
-// barra. Cada grupo se muestra solo si a la persona le queda algún link
-// visible, así que un jugador normal ve "Base de datos" y, como mucho, lo
-// que su rol le habilite de la guild.
-const navGroups: NavGroup[] = [
+// Los tres menús que ve cualquier jugador. "Base de datos" y "Mi personaje"
+// son portadas: desde ahí se entra a sus secciones.
+const nav: NavItem[] = [
+  { href: "/panel", label: "Inicio", exact: true },
   {
+    href: "/panel/base-de-datos",
     label: "Base de datos",
-    items: [
-      { href: "/panel/items", label: "Ítems" },
-      { href: "/panel/cards", label: "Cartas" },
-      { href: "/panel/monsters", label: "Monstruos" },
-      { href: "/panel/maps", label: "Mapas" },
-    ],
+    alsoActiveOn: ["/panel/items", "/panel/cards", "/panel/monsters", "/panel/maps"],
   },
+  { href: "/panel/personaje", label: "Mi personaje", alsoActiveOn: ["/panel/ficha"] },
+];
+
+// Menús del staff, debajo de los tres de arriba: no hay un "panel de admin"
+// aparte con su propia barra. Cada grupo se muestra solo si a la persona le
+// queda algún link visible, así que un jugador sin permisos no ve ninguno.
+const navGroups: NavGroup[] = [
   {
     label: "Administración de la guild",
     items: [

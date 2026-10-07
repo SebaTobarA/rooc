@@ -970,10 +970,13 @@ model CoreSheetRevision {
 // /admin/requisitos-core. `mins` solo guarda lo que difiere de los valores
 // por defecto de src/lib/core-census/requirements.ts (ver RequirementOverrides).
 model CoreRequirementSettings {
-  id                String   @id @default(cuid())
-  mins              Json
-  updatedByUsername String?
-  updatedAt         DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  mins               Json
+  // Cada cuántos días se le pide al jugador actualizar su ficha (aviso en el
+  // inicio del panel, ver update-reminder.ts). 0 = no avisar.
+  updateIntervalDays Int      @default(0)
+  updatedByUsername  String?
+  updatedAt          DateTime @updatedAt
 }
 
 enum CoreSubmissionStatus {

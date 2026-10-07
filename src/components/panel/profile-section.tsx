@@ -7,13 +7,12 @@ import { CORE_GUILD_ROLE_ID } from "@/lib/core-guild/sync";
 import { siteConfig } from "@/config/site";
 import { BotErrorNotice } from "@/components/admin/bot-error-notice";
 import { ClassEditor } from "@/components/panel/class-editor";
-import { CoreSheetCard } from "@/components/panel/core-sheet-card";
 
 /**
  * El perfil del jugador dentro del inicio del panel (/panel), en dos bloques:
  * a la izquierda quién es, con su clase editable debajo; a la derecha lo que
- * reciba en `aside` (el recordatorio de eventos). Debajo, si tiene el rol
- * [SD] Core, su ficha. Antes era una pantalla aparte (/panel/perfil).
+ * reciba en `aside` (sus notificaciones). Su ficha Core vive en
+ * /panel/personaje.
  */
 export async function ProfileSection({ discordId, aside }: { discordId: string; aside: ReactNode }) {
   const user = await prisma.user.findUnique({ where: { discordId } });
@@ -105,7 +104,6 @@ export async function ProfileSection({ discordId, aside }: { discordId: string; 
         {aside}
       </div>
 
-      {isCore && <CoreSheetCard discordId={member.user.id} />}
     </>
   );
 }

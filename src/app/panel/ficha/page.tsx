@@ -27,7 +27,7 @@ export default async function UpdateMySheetPage({ searchParams }: { searchParams
   if (!session?.discordId || !sheet?.inCore) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
-        <BackLink href="/panel" label="Inicio" />
+        <BackLink href="/panel/personaje" label="Mi personaje" />
         <div className="rounded-xl border border-dashed border-border p-6 text-center">
           <p className="font-semibold text-foreground">Esta ficha es para miembros [SD] Core</p>
           <p className="mt-1 text-sm text-muted">
@@ -50,7 +50,7 @@ export default async function UpdateMySheetPage({ searchParams }: { searchParams
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
-      <BackLink href="/panel" label="Inicio" />
+      <BackLink href="/panel/personaje" label="Mi personaje" />
       <h1 className="text-xl font-bold text-foreground">Actualizar mi ficha Core</h1>
       <p className="mt-1 text-sm text-muted">
         Carga los datos actuales de tu personaje. No se aplican al instante: un moderador los revisa y, cuando los

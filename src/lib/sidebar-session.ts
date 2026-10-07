@@ -5,6 +5,7 @@ import { resolveJobFromRoles } from "@/lib/discord-job-roles";
 import { discordAvatarUrl } from "@/lib/discord-avatar";
 import { getEffectivePermissions } from "@/lib/permissions";
 import { getPendingEventsForDiscordId } from "@/lib/events";
+import { getSheetUpdateReminder } from "@/lib/core-census/update-reminder";
 import type { SidebarSession } from "@/components/site-sidebar";
 
 /**
@@ -38,9 +39,13 @@ export async function getSidebarSession(): Promise<SidebarSession | null> {
   // Cuántos eventos con inscripciones todavía abiertas no tienen respuesta
   // de este jugador — solo aplica a quien puede ver el Party Builder (los
   // eventos son para eso). Se muestra como badge en el nav de "Inicio".
-  const pendingEventsCount = permissions.canViewParty
-    ? (await getPendingEventsForDiscordId(session.discordId)).length
-    : 0;
+  const [pendingEvents, sheetReminder] = await Promise.all([
+    permissions.canViewParty ? getPendingEventsForDiscordId(session.discordId) : Promise.resolve([]),
+    session.discordId ? getSheetUpdateReminder(session.discordId) : Promise.resolve(null),
+  ]);
+  // Mismo número que muestra el bloque de notificaciones del inicio: eventos
+  // sin responder más el aviso de actualizar la ficha.
+  const pendingEventsCount = pendingEvents.length + (sheetReminder ? 1 : 0);
 
   return {
     label: user?.globalName ?? user?.username ?? session.username ?? "Cuenta",

@@ -20,7 +20,7 @@ import { BackLink } from "@/components/back-link";
 import { JobComfortField } from "@/components/core-census/job-comfort-field";
 import { SheetFields } from "@/components/core-census/sheet-fields";
 import { SubmissionHistory } from "@/components/core-census/submission-history";
-import { PerformanceChart, type PerformancePoint } from "@/components/core-census/performance-chart";
+import { PlayerPerformance } from "@/components/core-census/player-performance";
 import { OutcomeBadge, REQUIREMENT_STATUS_CLASS, TierBadge } from "@/components/core-census/census-badges";
 
 export const dynamic = "force-dynamic";
@@ -45,14 +45,6 @@ const EVENT_DATE_FORMATTER = new Intl.DateTimeFormat("es-CL", {
 });
 
 const POINTS_FORMATTER = new Intl.NumberFormat("es-CL", { maximumFractionDigits: 0 });
-
-const SHORT_DATE_FORMATTER = new Intl.DateTimeFormat("es-CL", {
-  day: "2-digit",
-  month: "2-digit",
-  timeZone: "America/Santiago",
-});
-
-const EVENT_CATEGORIES = ["GUILD_LEAGUE", "EMPERIUM_OVERRUN"] as const;
 
 const FIELD_CLASS =
   "mt-1 block w-full rounded-[10px] border border-border bg-background-elevated px-3 py-2 text-sm text-foreground";
@@ -90,44 +82,6 @@ export default async function CorePlayerPage({
   const monthSummary = summaries.get(discordId) ?? null;
   // El mismo resumen del mes, sobre toda su permanencia.
   const career = summarizeMonth(history);
-
-  // Rendimiento por tipo de evento: Guild League y Emperium Overrun no
-  // comparten escala de puntos, así que nunca se mezclan.
-  const performance = EVENT_CATEGORIES.map((category) => {
-    const records = history.filter((record) => record.event.category === category);
-    const points: PerformancePoint[] = records
-      .filter((record) => record.inGame && record.points !== null)
-      .map((record) => ({
-        id: record.id,
-        label: SHORT_DATE_FORMATTER.format(record.event.startsAt),
-        value: record.points ?? 0,
-        detail: [
-          record.kills !== null || record.deaths !== null || record.assists !== null
-            ? `K/D/A ${record.kills ?? 0}/${record.deaths ?? 0}/${record.assists ?? 0}`
-            : "",
-          record.jobName ?? "",
-          record.partyName ?? "",
-        ]
-          .filter(Boolean)
-          .join(" · "),
-      }))
-      .reverse();
-    return { category, summary: summarizeMonth(records), points };
-  });
-
-  // Cuántas veces jugó cada job, por tipo de evento.
-  const jobCounts = new Map<string, Record<(typeof EVENT_CATEGORIES)[number], number>>();
-  for (const record of history) {
-    if (!record.inGame || !record.jobName) continue;
-    const counts = jobCounts.get(record.jobName) ?? { GUILD_LEAGUE: 0, EMPERIUM_OVERRUN: 0 };
-    counts[record.event.category] += 1;
-    jobCounts.set(record.jobName, counts);
-  }
-  const jobRows = [...jobCounts]
-    .map(([job, counts]) => ({ job, ...counts, total: counts.GUILD_LEAGUE + counts.EMPERIUM_OVERRUN }))
-    .sort((a, b) => b.total - a.total);
-  const maxJobTotal = Math.max(1, ...jobRows.map((row) => row.total));
-  const eventsWithParty = history.filter((record) => record.partyName).length;
 
   const sheet = player.sheet;
   const requirementCount = countRequirements(requirements, sheet);
@@ -401,85 +355,10 @@ export default async function CorePlayerPage({
 
       <section className="mt-5 rounded-xl border border-border bg-surface p-5">
         <h2 className="font-semibold text-foreground">Rendimiento</h2>
-        <p className="mt-1 text-xs text-muted">
+        <p className="mb-4 mt-1 text-xs text-muted">
           Sale de los reportes post evento. Cada tipo de evento va por separado: sus puntajes no son comparables.
         </p>
-
-        <div className="mt-4 grid gap-4 lg:grid-cols-2">
-          {performance.map(({ category, summary, points }) => (
-            <div key={category}>
-              <PerformanceChart title={`Puntos por evento · ${EVENT_CATEGORY_LABEL[category]}`} points={points} />
-              <dl className="mt-2 grid grid-cols-4 gap-2 text-center">
-                {[
-                  { label: "Asistió", value: summary.events > 0 ? `${summary.attended}/${summary.events}` : "—" },
-                  { label: "Jugó", value: summary.events > 0 ? String(summary.inGame) : "—" },
-                  {
-                    label: "Pts prom.",
-                    value: summary.avgPoints != null ? POINTS_FORMATTER.format(summary.avgPoints) : "—",
-                  },
-                  { label: "KDA", value: summary.kda != null ? summary.kda.toFixed(1) : "—" },
-                ].map((stat) => (
-                  <div key={stat.label} className="rounded-[10px] border border-border bg-background-elevated p-2">
-                    <dt className="text-[10px] uppercase tracking-wide text-muted">{stat.label}</dt>
-                    <dd className="text-sm font-semibold text-foreground">{stat.value}</dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-6 grid gap-4 lg:grid-cols-2">
-          <div>
-            <h3 className="text-sm font-semibold text-foreground">Jobs jugados</h3>
-            {jobRows.length === 0 ? (
-              <p className="mt-2 text-sm text-muted">
-                Todavía sin datos: el job de cada evento se registra al guardar su reporte.
-              </p>
-            ) : (
-              <table className="mt-2 w-full text-left text-sm">
-                <thead className="text-xs text-muted">
-                  <tr>
-                    <th className="py-1 font-medium">Job</th>
-                    <th className="py-1 font-medium">Veces</th>
-                    <th className="px-2 py-1 text-right font-medium">Guild League</th>
-                    <th className="px-2 py-1 text-right font-medium">Emperium</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {jobRows.map((row) => (
-                    <tr key={row.job}>
-                      <td className="py-1.5 pr-3 text-foreground">{row.job}</td>
-                      <td className="w-1/2 py-1.5">
-                        <span className="flex items-center gap-2">
-                          <span
-                            className="h-2 rounded-r-[4px] bg-accent"
-                            style={{ width: `${(row.total / maxJobTotal) * 100}%`, minWidth: 4 }}
-                          />
-                          <span className="text-xs text-muted">{row.total}</span>
-                        </span>
-                      </td>
-                      <td className="px-2 py-1.5 text-right text-muted">{row.GUILD_LEAGUE}</td>
-                      <td className="px-2 py-1.5 text-right text-muted">{row.EMPERIUM_OVERRUN}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-
-          <div>
-            <h3 className="text-sm font-semibold text-foreground">Rendimiento en party</h3>
-            <div className="mt-2 rounded-[10px] border border-dashed border-border p-4 text-center">
-              <p className="font-semibold text-foreground">En construcción</p>
-              <p className="mt-1 text-sm text-muted">
-                Aquí se va a comparar cómo rinde según la party y los compañeros que le asignan en Guild League y
-                Emperium Overrun. Los datos ya se están guardando: cada reporte toma la party del Party Builder de
-                ese evento. Hasta ahora, {eventsWithParty} evento(s) con party registrada.
-              </p>
-            </div>
-          </div>
-        </div>
+        <PlayerPerformance records={history} />
       </section>
 
       <section className="mt-6">

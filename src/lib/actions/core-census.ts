@@ -143,11 +143,16 @@ export async function saveRequirementSettings(formData: FormData): Promise<void>
     }
   }
 
+  // Cada cuántos días se avisa al jugador que actualice su ficha; 0 = sin aviso.
+  const interval = Math.floor(Number(formData.get("updateIntervalDays") ?? 0));
+  const updateIntervalDays = Number.isFinite(interval) && interval > 0 ? Math.min(interval, 365) : 0;
+
+  const data = { mins, updateIntervalDays, updatedByUsername };
   const existing = await prisma.coreRequirementSettings.findFirst();
   if (existing) {
-    await prisma.coreRequirementSettings.update({ where: { id: existing.id }, data: { mins, updatedByUsername } });
+    await prisma.coreRequirementSettings.update({ where: { id: existing.id }, data });
   } else {
-    await prisma.coreRequirementSettings.create({ data: { mins, updatedByUsername } });
+    await prisma.coreRequirementSettings.create({ data });
   }
 
   revalidatePath(EVALUATION_PATH);

@@ -302,15 +302,23 @@ acordado: 78), al estilo de una ficha de recursos humanos. Vive en
 | Listado: equipo, asistencia, rendimiento y tier de cada jugador | `/admin/evaluacion-core?mes=AAAA-MM` |
 | Hoja de vida: permanencia, revisiones de equipo e historial de eventos | `/admin/evaluacion-core/jugador/[discordId]` |
 | Reporte post evento: Discord, encuesta, rendimiento | `/admin/evaluacion-core/evento/[eventId]` |
-| Lo que ve el propio jugador (solo lectura) | `/panel`, sección "Mi ficha Core" |
+| Lo que ve el propio jugador | `/panel/personaje` |
 
 Rige **desde el domingo 4 de octubre de 2026** (`EVALUATION_START` en
 `src/lib/core-census/tier.ts`): los eventos anteriores no se reportan ni
 cuentan, aunque existan en `/panel/eventos`.
 
-El jugador ve su propia ficha (poder, equipo contra los mínimos y tier del
-mes) en el inicio del panel, `/panel`, que además es su perfil: no hay una
-pantalla de perfil aparte.
+El jugador tiene tres menús: **Inicio** (`/panel`: perfil, notificaciones,
+roster y build de su clase), **Base de datos** (`/panel/base-de-datos`) y
+**Mi personaje** (`/panel/personaje`), donde ve su ficha, las observaciones
+del staff, su asistencia, su rendimiento y el resultado de cada evento. Los
+menús del staff van debajo, solo para quien tiene permisos.
+
+En Configuración de requisitos se fija además cada cuántos días se pide
+actualizar la ficha (`CoreRequirementSettings.updateIntervalDays`): pasado
+ese plazo desde la última validación, al jugador le aparece el aviso
+«Actualizar mi ficha» en las notificaciones del inicio
+(`src/lib/core-census/update-reminder.ts`).
 
 ### Cuándo se crea una ficha
 

@@ -19,8 +19,7 @@ const REVIEW_DATE_FORMATTER = new Intl.DateTimeFormat("es-CL", {
 const HISTORY_PREVIEW = 3;
 
 /**
- * Lo que un miembro [SD] Core ve de su propia evaluación en el inicio del
- * panel: su ficha validada contra los mínimos vigentes, su asistencia del mes
+ * Lo que un miembro [SD] Core ve de su propia evaluación en /panel/personaje: su ficha validada contra los mínimos vigentes, su asistencia del mes
  * y las actualizaciones que reportó. Con "Actualizar" carga datos nuevos, que
  * no cambian la ficha hasta que un moderador los valida.
  */

@@ -92,6 +92,25 @@ export default async function CoreRequirementSettingsPage({
           })}
         </div>
 
+        <div className="mt-6 border-t border-border pt-5">
+          <h2 className="text-sm font-semibold text-foreground">Actualización de la ficha</h2>
+          <label className="mt-3 block max-w-sm text-xs text-muted">
+            Pedir a los jugadores que actualicen su ficha cada (días)
+            <input
+              type="number"
+              name="updateIntervalDays"
+              min={0}
+              max={365}
+              defaultValue={settings?.updateIntervalDays ?? 0}
+              className={FIELD_CLASS}
+            />
+            <span className="mt-1 block">
+              Cuando la última validación de un jugador supera ese plazo, le aparece el aviso «Actualizar mi ficha»
+              en el inicio de su panel. 0 = no avisar.
+            </span>
+          </label>
+        </div>
+
         <button type="submit" className="btn-brand mt-5 px-4 py-2 text-sm">
           Guardar requisitos
         </button>

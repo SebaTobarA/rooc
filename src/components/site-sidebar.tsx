@@ -27,6 +27,7 @@ function NavItemLink({
   onNavigate,
   badge,
   exact,
+  alsoActiveOn,
 }: {
   href: string;
   label: string;
@@ -34,8 +35,9 @@ function NavItemLink({
   onNavigate?: () => void;
   badge?: number;
   exact?: boolean;
+  alsoActiveOn?: string[];
 }) {
-  const active = isActive({ href, exact }, pathname);
+  const active = isActive({ href, exact, alsoActiveOn }, pathname);
   return (
     <Link
       href={href}
@@ -54,8 +56,11 @@ function NavItemLink({
   );
 }
 
-function isActive(item: Pick<NavItem, "href" | "exact">, pathname: string): boolean {
-  return item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(`${item.href}/`);
+function isActive(item: Pick<NavItem, "href" | "exact" | "alsoActiveOn">, pathname: string): boolean {
+  if (item.exact) return pathname === item.href;
+  return [item.href, ...(item.alsoActiveOn ?? [])].some(
+    (href) => pathname === href || pathname.startsWith(`${href}/`)
+  );
 }
 
 function NavAccordionGroup({
@@ -127,6 +132,7 @@ function NavLinks({ session, onNavigate }: { session?: SidebarSession | null; on
             href={item.href}
             label={item.label}
             exact={item.exact}
+            alsoActiveOn={item.alsoActiveOn}
             pathname={pathname}
             onNavigate={onNavigate}
             badge={item.href === "/panel" ? session?.pendingEventsCount : undefined}
