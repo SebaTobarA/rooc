@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowDownAZ, Plus, Settings, Sparkles, Trash2, Users, X } from "lucide-react";
+import { ArrowDown, ArrowDownAZ, Plus, Settings, Sparkles, Trash2, Users, X } from "lucide-react";
 import { createPartyTemplate, updatePartyTemplate } from "@/lib/actions/party-templates";
 import { inferRole, normalizeClass } from "@/lib/party/infer-role";
 import type { PartyTemplateSnapshot } from "@/lib/party/template-snapshot";
@@ -29,8 +29,8 @@ export interface PlannerEvent {
 interface Board {
   parties: Party[];
   raids: Raid[];
-  /** discordId -> id de la party donde va. */
-  assign: Record<string, string>;
+  /** id de party -> discordIds de sus jugadores, en el orden en que se ven. */
+  members: Record<string, string[]>;
   eventId: string;
   /** Plantilla de la que salió este tablero: guardar la actualiza en vez de crear otra. */
   template: { id: string; eventId: string } | null;
@@ -47,7 +47,9 @@ const EVENT_DAYS: Record<EventType, string> = {
 const CAMPO_LABEL: Record<CampoSide, string> = { principal: "Campo Primario", secundario: "Campo Secundario" };
 const SLOT_OPTIONS: SlotLabel[] = ["Tanque", "Soporte", "Daño", "Flexible"];
 const DEFAULT_COMPOSITION: SlotLabel[] = ["Tanque", "Soporte", "Daño", "Daño", "Daño"];
+// Igual que en el juego: una party son 5 jugadores y un raid, hasta 8 parties.
 const PARTY_SIZE = 5;
+const MAX_PARTIES_PER_RAID = 8;
 
 // Paleta por defecto de cada job; quien arma la puede cambiar con la rueda
 // de configuración (se guarda en su navegador, no en el servidor).
@@ -71,7 +73,7 @@ const FALLBACK_COLOR = "#7a8794";
 const COLORS_STORAGE_KEY = "sd-party-job-colors";
 
 function emptyBoard(): Board {
-  return { parties: [], raids: [], assign: {}, eventId: "", template: null };
+  return { parties: [], raids: [], members: {}, eventId: "", template: null };
 }
 
 function newId(prefix: string): string {
@@ -79,11 +81,19 @@ function newId(prefix: string): string {
 }
 
 function boardFromSnapshot(snapshot: PartyTemplateSnapshot, template: { id: string; eventId: string }): Board {
-  const assign: Record<string, string> = {};
+  // El orden dentro de cada party es el de la lista de jugadores guardada.
+  const members: Record<string, string[]> = {};
   for (const player of snapshot.players) {
-    if (player.partyId) assign[player.id] = player.partyId;
+    if (player.partyId) (members[player.partyId] ??= []).push(player.id);
   }
-  return { parties: snapshot.parties, raids: snapshot.raids, assign, eventId: template.eventId, template };
+  return { parties: snapshot.parties, raids: snapshot.raids, members, eventId: template.eventId, template };
+}
+
+/** Saca a un jugador de la party en la que esté. */
+function withoutPlayer(members: Record<string, string[]>, playerId: string): Record<string, string[]> {
+  return Object.fromEntries(
+    Object.entries(members).map(([partyId, ids]) => [partyId, ids.filter((id) => id !== playerId)])
+  );
 }
 
 interface PartyPlannerProps {
@@ -119,6 +129,10 @@ export function PartyPlanner({ canManage, members, events, editing }: PartyPlann
   const [suggestRaidId, setSuggestRaidId] = useState("");
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const [isSaving, startSaving] = useTransition();
+  // true mientras la sección de equipos está fuera de pantalla: ahí aparece
+  // el resumen flotante para seguir asignando sin bajar.
+  const [teamsOffscreen, setTeamsOffscreen] = useState(false);
+  const teamsRef = useRef<HTMLElement>(null);
 
   // La paleta personalizada vive en el navegador de quien arma.
   useEffect(() => {
@@ -129,6 +143,16 @@ export function PartyPlanner({ canManage, members, events, editing }: PartyPlann
     } catch {
       // Paleta guardada ilegible: se queda la de por defecto.
     }
+  }, []);
+
+  useEffect(() => {
+    const node = teamsRef.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(([entry]) => setTeamsOffscreen(!entry.isIntersecting), {
+      threshold: 0,
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
   }, []);
 
   function updateColor(job: string, color: string) {
@@ -146,6 +170,15 @@ export function PartyPlanner({ canManage, members, events, editing }: PartyPlann
 
   const board = eventType ? boards[eventType] : null;
 
+  // discordId -> party donde va, derivado del tablero.
+  const partyOf = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const [partyId, ids] of Object.entries(board?.members ?? {})) {
+      for (const id of ids) map.set(id, partyId);
+    }
+    return map;
+  }, [board]);
+
   // El core de hoy más quien figure en la composición cargada aunque ya no
   // tenga el rol, para no perderlo al editar.
   const roster = useMemo(() => {
@@ -161,15 +194,16 @@ export function PartyPlanner({ canManage, members, events, editing }: PartyPlann
     return [...byId.values()];
   }, [members, events, editing]);
   const memberById = useMemo(() => new Map(roster.map((member) => [member.id, member])), [roster]);
+  const coreIds = useMemo(() => new Set(members.map((member) => member.id)), [members]);
 
   const sortedPool = useMemo(() => {
-    const visible = roster.filter((member) => members.some((m) => m.id === member.id) || board?.assign[member.id]);
+    const visible = roster.filter((member) => coreIds.has(member.id) || partyOf.has(member.id));
     return [...visible].sort((a, b) =>
       sortBy === "job"
         ? a.clase.localeCompare(b.clase) || a.nickname.localeCompare(b.nickname)
         : a.nickname.localeCompare(b.nickname)
     );
-  }, [roster, members, board, sortBy]);
+  }, [roster, coreIds, partyOf, sortBy]);
   const jobs = useMemo(() => [...new Set(roster.map((member) => member.clase))].sort(), [roster]);
 
   function patchBoard(update: (current: Board) => Board) {
@@ -183,10 +217,10 @@ export function PartyPlanner({ canManage, members, events, editing }: PartyPlann
   const scopeParties = board?.parties.filter((party) => party.campo === scopeCampo) ?? [];
   const partyById = new Map(board?.parties.map((party) => [party.id, party]) ?? []);
   const membersOf = (partyId: string) =>
-    Object.entries(board?.assign ?? {})
-      .filter(([, assigned]) => assigned === partyId)
-      .map(([playerId]) => memberById.get(playerId))
+    (board?.members[partyId] ?? [])
+      .map((playerId) => memberById.get(playerId))
       .filter((member): member is PlannerMember => Boolean(member));
+  const partiesInRaid = (raidId: string | null) => scopeParties.filter((party) => (party.raidId ?? null) === raidId);
 
   function addRaid() {
     patchBoard((current) => ({
@@ -204,13 +238,18 @@ export function PartyPlanner({ canManage, members, events, editing }: PartyPlann
   }
 
   function addParty(raidId: string | null) {
+    setMessage(null);
+    if (raidId && partiesInRaid(raidId).length >= MAX_PARTIES_PER_RAID) {
+      setMessage({ kind: "error", text: `Un raid admite hasta ${MAX_PARTIES_PER_RAID} parties. Agrega otro raid.` });
+      return;
+    }
     patchBoard((current) => ({
       ...current,
       parties: [
         ...current.parties,
         {
           id: newId("party"),
-          name: `Party ${current.parties.filter((party) => party.campo === scopeCampo).length + 1}`,
+          name: `Party ${current.parties.filter((party) => party.campo === scopeCampo && (party.raidId ?? null) === raidId).length + 1}`,
           capacity: PARTY_SIZE,
           campo: scopeCampo,
           raidId,
@@ -220,11 +259,11 @@ export function PartyPlanner({ canManage, members, events, editing }: PartyPlann
   }
 
   function removeParty(partyId: string) {
-    patchBoard((current) => ({
-      ...current,
-      parties: current.parties.filter((party) => party.id !== partyId),
-      assign: Object.fromEntries(Object.entries(current.assign).filter(([, assigned]) => assigned !== partyId)),
-    }));
+    patchBoard((current) => {
+      const members = { ...current.members };
+      delete members[partyId];
+      return { ...current, parties: current.parties.filter((party) => party.id !== partyId), members };
+    });
   }
 
   function removeRaid(raidId: string) {
@@ -234,41 +273,63 @@ export function PartyPlanner({ canManage, members, events, editing }: PartyPlann
         ...current,
         raids: current.raids.filter((raid) => raid.id !== raidId),
         parties: current.parties.filter((party) => !gone.has(party.id)),
-        assign: Object.fromEntries(Object.entries(current.assign).filter(([, assigned]) => !gone.has(assigned))),
+        members: Object.fromEntries(Object.entries(current.members).filter(([partyId]) => !gone.has(partyId))),
       };
     });
   }
 
-  function assignPlayer(playerId: string, partyId: string | null) {
-    if (!board) return;
+  /**
+   * Mueve a un jugador: a una party (al final, o antes de `beforeId` para
+   * ordenarlo dentro de ella) o, con `partyId` null, de vuelta al pool.
+   */
+  function placePlayer(playerId: string, partyId: string | null, beforeId?: string) {
+    if (!board || playerId === beforeId) return;
     setMessage(null);
     if (partyId) {
       const party = partyById.get(partyId);
-      const occupants = membersOf(partyId).filter((member) => member.id !== playerId).length;
-      if (party && occupants >= party.capacity) {
+      const others = (board.members[partyId] ?? []).filter((id) => id !== playerId).length;
+      if (party && others >= party.capacity) {
         setMessage({ kind: "error", text: `${party.name} ya está completa (${party.capacity}/${party.capacity}).` });
         return;
       }
     }
     patchBoard((current) => {
-      const assign = { ...current.assign };
-      if (partyId) assign[playerId] = partyId;
-      else delete assign[playerId];
-      return { ...current, assign };
+      const members = withoutPlayer(current.members, playerId);
+      if (partyId) {
+        const list = [...(members[partyId] ?? [])];
+        const index = beforeId ? list.indexOf(beforeId) : -1;
+        if (index === -1) list.push(playerId);
+        else list.splice(index, 0, playerId);
+        members[partyId] = list;
+      }
+      return { ...current, members };
     });
     setSelectedId(null);
   }
 
-  function handleDrop(event: React.DragEvent, partyId: string | null) {
+  function handleDrop(event: React.DragEvent, partyId: string | null, beforeId?: string) {
     event.preventDefault();
+    event.stopPropagation();
     const playerId = event.dataTransfer.getData("text/plain");
-    if (playerId) assignPlayer(playerId, partyId);
+    if (playerId) placePlayer(playerId, partyId, beforeId);
   }
 
   function suggestParties() {
     if (!board) return;
+    const raidId = suggestRaidId || null;
+    // Tope del juego: 8 parties por raid (y por el grupo "sin raid").
+    const room = MAX_PARTIES_PER_RAID - partiesInRaid(raidId).length;
+    const where = raidId ? (scopeRaids.find((raid) => raid.id === raidId)?.name ?? "ese raid") : "«Sin raid»";
+    if (room <= 0) {
+      setMessage({
+        kind: "error",
+        text: `${where} ya tiene sus ${MAX_PARTIES_PER_RAID} parties. Agrega otro raid y elígelo en «Crear en».`,
+      });
+      return;
+    }
+
     const pool: Player[] = roster
-      .filter((member) => members.some((m) => m.id === member.id) && !board.assign[member.id])
+      .filter((member) => coreIds.has(member.id) && !partyOf.has(member.id))
       .map((member) => {
         const clase = normalizeClass(member.clase);
         return { id: member.id, nickname: member.nickname, clase, rol: inferRole(clase), partyId: null };
@@ -278,8 +339,7 @@ export function PartyPlanner({ canManage, members, events, editing }: PartyPlann
       return;
     }
 
-    const raidId = suggestRaidId || null;
-    const result = fillPartiesFromPool(pool, compositions, undefined, "Party", scopeParties.length, raidId);
+    const result = fillPartiesFromPool(pool, compositions, room, "Party", partiesInRaid(raidId).length, raidId);
     if (result.parties.length === 0) {
       setMessage({
         kind: "error",
@@ -291,23 +351,35 @@ export function PartyPlanner({ canManage, members, events, editing }: PartyPlann
     // Los ids que genera el algoritmo pueden repetirse con los de una
     // composición cargada: se reemplazan por ids propios.
     const idMap = new Map(result.parties.map((party) => [party.id, newId("party")]));
+    const suggested: Record<string, string[]> = {};
+    for (const player of pool) {
+      const partyId = idMap.get(result.assignments[player.id] ?? "");
+      if (partyId) (suggested[partyId] ??= []).push(player.id);
+    }
     patchBoard((current) => ({
       ...current,
       parties: [
         ...current.parties,
-        ...result.parties.map((party) => ({ ...party, id: idMap.get(party.id) ?? party.id, campo: scopeCampo, raidId })),
+        ...result.parties.map((party) => ({
+          ...party,
+          id: idMap.get(party.id) ?? party.id,
+          capacity: PARTY_SIZE,
+          campo: scopeCampo,
+          raidId,
+        })),
       ],
-      assign: {
-        ...current.assign,
-        ...Object.fromEntries(
-          Object.entries(result.assignments).map(([playerId, partyId]) => [playerId, idMap.get(partyId) ?? partyId])
-        ),
-      },
+      members: { ...current.members, ...suggested },
     }));
+
     const left = pool.length - Object.keys(result.assignments).length;
+    const full = partiesInRaid(raidId).length + result.parties.length >= MAX_PARTIES_PER_RAID;
     setMessage({
       kind: "ok",
-      text: `Se sugirieron ${result.parties.length} party(s).${left > 0 ? ` Quedaron ${left} jugador(es) sin asignar: ubícalos a mano.` : ""}`,
+      text:
+        `Se sugirieron ${result.parties.length} party(s) en ${where}.` +
+        (left > 0
+          ? ` Quedaron ${left} jugador(es) sin asignar${full ? `: ${where} llegó al tope de ${MAX_PARTIES_PER_RAID} parties, agrega otro raid para seguir` : ", ubícalos a mano o cambia la composición"}.`
+          : ""),
     });
   }
 
@@ -326,18 +398,18 @@ export function PartyPlanner({ canManage, members, events, editing }: PartyPlann
       return;
     }
 
-    const players: Player[] = roster
-      .filter((member) => members.some((m) => m.id === member.id) || board.assign[member.id])
-      .map((member) => {
-        const clase = normalizeClass(member.clase);
-        return {
-          id: member.id,
-          nickname: member.nickname,
-          clase,
-          rol: inferRole(clase),
-          partyId: board.assign[member.id] ?? null,
-        };
-      });
+    const toPlayer = (member: PlannerMember, partyId: string | null): Player => {
+      const clase = normalizeClass(member.clase);
+      return { id: member.id, nickname: member.nickname, clase, rol: inferRole(clase), partyId };
+    };
+    // Primero los asignados, party por party y en el orden que se les dio:
+    // el roster del inicio respeta el orden de esta lista.
+    const players: Player[] = [
+      ...board.parties.flatMap((party) => membersOf(party.id).map((member) => toPlayer(member, party.id))),
+      ...roster
+        .filter((member) => coreIds.has(member.id) && !partyOf.has(member.id))
+        .map((member) => toPlayer(member, null)),
+    ];
     const data: PartyTemplateSnapshot = { players, parties: board.parties, raids: board.raids };
     const name = `${EVENT_LABEL[eventType]} — ${event.label}`;
 
@@ -364,33 +436,53 @@ export function PartyPlanner({ canManage, members, events, editing }: PartyPlann
 
   const typeEvents = eventType ? events.filter((event) => event.category === eventType) : [];
   const selectedEvent = board ? typeEvents.find((event) => event.id === board.eventId) : undefined;
-  const assignedCount = board ? Object.keys(board.assign).length : 0;
+  const assignedCount = partyOf.size;
+  const interactive = Boolean(board) && canManage;
 
-  function renderChip(member: PlannerMember, where: "pool" | "party") {
+  function renderChip(member: PlannerMember, inParty: Party | null) {
     const color = colors[member.clase] ?? FALLBACK_COLOR;
-    const assignedTo = where === "pool" && board ? partyById.get(board.assign[member.id] ?? "") : undefined;
+    // En el pool, quien ya tiene party queda atenuado con el nombre de su party.
+    const assignedTo = inParty ? undefined : partyById.get(partyOf.get(member.id) ?? "");
     return (
       <div
         key={member.id}
-        draggable={Boolean(board) && canManage}
+        draggable={interactive}
         onDragStart={(event) => event.dataTransfer.setData("text/plain", member.id)}
+        onDragOver={inParty ? (event) => event.preventDefault() : undefined}
+        onDrop={inParty ? (event) => handleDrop(event, inParty.id, member.id) : undefined}
         onClick={(event) => {
           event.stopPropagation();
-          if (board && canManage) setSelectedId((prev) => (prev === member.id ? null : member.id));
+          if (interactive) setSelectedId((prev) => (prev === member.id ? null : member.id));
         }}
         title={assignedTo ? `Ya va en ${assignedTo.name}` : undefined}
         style={{ borderColor: color, backgroundColor: `color-mix(in srgb, ${color} 18%, transparent)` }}
-        className={`flex min-w-0 flex-col justify-center rounded-lg border-2 px-2 py-1.5 ${
-          board && canManage ? "cursor-grab active:cursor-grabbing" : ""
+        className={`flex min-w-0 items-center gap-1 rounded-lg border-2 px-2 py-1.5 ${
+          interactive ? "cursor-grab active:cursor-grabbing" : ""
         } ${selectedId === member.id ? "ring-2 ring-accent ring-offset-2 ring-offset-background" : ""} ${
           assignedTo ? "opacity-40" : ""
         }`}
       >
-        <span className="truncate text-sm font-semibold text-foreground">{member.nickname}</span>
-        <span className="truncate text-[11px] text-muted">
-          {member.clase}
-          {assignedTo ? ` · ${assignedTo.name}` : ""}
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="truncate text-sm font-semibold text-foreground">{member.nickname}</span>
+          <span className="truncate text-[11px] text-muted">
+            {member.clase}
+            {assignedTo ? ` · ${assignedTo.name}` : ""}
+          </span>
         </span>
+        {inParty && canManage && (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              placePlayer(member.id, null);
+            }}
+            aria-label={`Sacar a ${member.nickname} de ${inParty.name}`}
+            title="Sacar de la party (vuelve al core)"
+            className="shrink-0 rounded text-muted hover:text-rose-400"
+          >
+            <X size={14} />
+          </button>
+        )}
       </div>
     );
   }
@@ -402,7 +494,7 @@ export function PartyPlanner({ canManage, members, events, editing }: PartyPlann
         key={party.id}
         onDragOver={(event) => event.preventDefault()}
         onDrop={(event) => handleDrop(event, party.id)}
-        onClick={() => selectedId && assignPlayer(selectedId, party.id)}
+        onClick={() => selectedId && placePlayer(selectedId, party.id)}
         className={`flex min-w-0 flex-col gap-1.5 rounded-xl border bg-background-elevated p-2 ${
           selectedId ? "cursor-pointer border-accent/60" : "border-border"
         }`}
@@ -432,13 +524,14 @@ export function PartyPlanner({ canManage, members, events, editing }: PartyPlann
                 removeParty(party.id);
               }}
               aria-label={`Eliminar ${party.name}`}
+              title="Eliminar la party (sus jugadores vuelven al core)"
               className="shrink-0 text-muted hover:text-rose-400"
             >
-              <X size={14} />
+              <Trash2 size={13} />
             </button>
           )}
         </div>
-        {occupants.map((member) => renderChip(member, "party"))}
+        {occupants.map((member) => renderChip(member, party))}
         {Array.from({ length: Math.max(0, party.capacity - occupants.length) }, (_, index) => (
           <div key={index} className="h-11 rounded-lg border border-dashed border-border" aria-hidden="true" />
         ))}
@@ -446,14 +539,44 @@ export function PartyPlanner({ canManage, members, events, editing }: PartyPlann
     );
   }
 
+  // Fila compacta de una party en el resumen flotante: sirve de destino para
+  // soltar o tocar sin tener a la vista la sección de equipos.
+  function renderDockParty(party: Party) {
+    const count = (board?.members[party.id] ?? []).length;
+    const isFull = count >= party.capacity;
+    return (
+      <button
+        key={party.id}
+        type="button"
+        onDragOver={(event) => event.preventDefault()}
+        onDrop={(event) => handleDrop(event, party.id)}
+        onClick={() => selectedId && placePlayer(selectedId, party.id)}
+        className={`flex w-full items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-left text-xs ${
+          isFull
+            ? "border-border text-muted"
+            : selectedId
+              ? "border-accent text-foreground hover:bg-accent/10"
+              : "border-border text-foreground hover:border-accent/60"
+        }`}
+      >
+        <span className="truncate font-semibold">{party.name}</span>
+        <span className={`shrink-0 ${isFull ? "text-emerald-400" : "text-muted"}`}>
+          {count}/{party.capacity}
+        </span>
+      </button>
+    );
+  }
+
   const partyGrid = "grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2";
+  const showDock = teamsOffscreen && interactive;
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+    // Con el resumen flotante a la vista se reserva su ancho a la derecha.
+    <div className={`mx-auto max-w-6xl px-4 py-10 sm:px-6 ${showDock ? "lg:pr-64" : ""}`}>
       <h1 className="heading-gradient text-2xl font-extrabold sm:text-3xl">Party Builder</h1>
       <p className="mt-1 text-sm text-muted">
         Arma las raids y parties de cada evento con los miembros del core. Arrastra un jugador a una party, o tócalo
-        y luego toca la party.
+        y luego toca la party. Dentro de una party, arrástralo sobre otro jugador para cambiar el orden.
       </p>
 
       {/* ============ 1. CORE SPECIAL DELIVERY ============ */}
@@ -470,8 +593,8 @@ export function PartyPlanner({ canManage, members, events, editing }: PartyPlann
             </h2>
             <p className="mt-0.5 text-xs text-muted">
               {members.length} jugador(es) con el rol [SD] Core
-              {board ? ` · ${assignedCount} asignado(s) en ${eventType ? EVENT_LABEL[eventType] : ""}` : ""}. Suelta aquí
-              a un jugador para sacarlo de su party.
+              {board && eventType ? ` · ${assignedCount} asignado(s) en ${EVENT_LABEL[eventType]}` : ""}. Suelta aquí a
+              un jugador para sacarlo de su party.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -523,7 +646,7 @@ export function PartyPlanner({ canManage, members, events, editing }: PartyPlann
         )}
 
         <div className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2">
-          {sortedPool.map((member) => renderChip(member, "pool"))}
+          {sortedPool.map((member) => renderChip(member, null))}
         </div>
         {members.length === 0 && (
           <p className="mt-2 text-sm text-muted">No se encontraron miembros con el rol [SD] Core.</p>
@@ -531,7 +654,7 @@ export function PartyPlanner({ canManage, members, events, editing }: PartyPlann
       </section>
 
       {/* ============ 2. CONFIGURACIÓN DE EQUIPOS ============ */}
-      <section className="mt-6 rounded-xl border border-border bg-surface p-5">
+      <section ref={teamsRef} className="mt-6 scroll-mt-6 rounded-xl border border-border bg-surface p-5">
         <h2 className="font-semibold text-foreground">Configuración de equipos</h2>
 
         <div className="mt-3 flex flex-wrap gap-2">
@@ -583,7 +706,7 @@ export function PartyPlanner({ canManage, members, events, editing }: PartyPlann
             )}
 
             {canManage && (
-              <div className="mt-4 flex flex-wrap gap-2">
+              <div className="mt-4 flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   onClick={addRaid}
@@ -600,6 +723,9 @@ export function PartyPlanner({ canManage, members, events, editing }: PartyPlann
                   <Plus size={14} />
                   Agregar party
                 </button>
+                <span className="text-xs text-muted">
+                  Cada raid admite hasta {MAX_PARTIES_PER_RAID} parties de {PARTY_SIZE}.
+                </span>
               </div>
             )}
 
@@ -608,8 +734,9 @@ export function PartyPlanner({ canManage, members, events, editing }: PartyPlann
               <div className="mt-4 rounded-[10px] border border-border bg-background-elevated p-4">
                 <p className="text-sm font-semibold text-foreground">Sugerir parties por composición</p>
                 <p className="mt-0.5 text-xs text-muted">
-                  Define uno o más tipos de party. Se arman con los jugadores sin asignar, alternando los tipos, sin
-                  repetir job dentro de una party y con un máximo de un músico y un healer por party.
+                  Define uno o más tipos de party. Se arman con los jugadores sin asignar hasta completar las{" "}
+                  {MAX_PARTIES_PER_RAID} parties del raid elegido, alternando los tipos, sin repetir job dentro de una
+                  party y con un máximo de un músico y un healer por party.
                 </p>
                 <div className="mt-3 flex flex-col gap-2">
                   {compositions.map((composition, compositionIndex) => (
@@ -669,7 +796,7 @@ export function PartyPlanner({ canManage, members, events, editing }: PartyPlann
                       <option value="">Sin raid</option>
                       {scopeRaids.map((raid) => (
                         <option key={raid.id} value={raid.id}>
-                          {raid.name}
+                          {raid.name} ({partiesInRaid(raid.id).length}/{MAX_PARTIES_PER_RAID})
                         </option>
                       ))}
                     </select>
@@ -697,7 +824,7 @@ export function PartyPlanner({ canManage, members, events, editing }: PartyPlann
 
             {/* ---- Raids y parties ---- */}
             {scopeRaids.map((raid) => {
-              const raidParties = scopeParties.filter((party) => party.raidId === raid.id);
+              const raidParties = partiesInRaid(raid.id);
               return (
                 <div key={raid.id} className="mt-4 rounded-xl border border-border p-3">
                   <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -713,13 +840,16 @@ export function PartyPlanner({ canManage, members, events, editing }: PartyPlann
                       aria-label="Nombre del raid"
                       className="min-w-0 flex-1 bg-transparent font-semibold text-foreground outline-none focus:text-accent"
                     />
-                    <span className="text-xs text-muted">{raidParties.length} party(s)</span>
+                    <span className="text-xs text-muted">
+                      {raidParties.length}/{MAX_PARTIES_PER_RAID} parties
+                    </span>
                     {canManage && (
                       <>
                         <button
                           type="button"
                           onClick={() => addParty(raid.id)}
-                          className="flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs font-semibold text-foreground hover:bg-surface-hover"
+                          disabled={raidParties.length >= MAX_PARTIES_PER_RAID}
+                          className="flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs font-semibold text-foreground hover:bg-surface-hover disabled:opacity-40"
                         >
                           <Plus size={12} />
                           Party
@@ -728,6 +858,7 @@ export function PartyPlanner({ canManage, members, events, editing }: PartyPlann
                           type="button"
                           onClick={() => removeRaid(raid.id)}
                           aria-label={`Eliminar ${raid.name} y sus parties`}
+                          title="Eliminar el raid y sus parties (los jugadores vuelven al core)"
                           className="text-muted hover:text-rose-400"
                         >
                           <Trash2 size={14} />
@@ -744,12 +875,12 @@ export function PartyPlanner({ canManage, members, events, editing }: PartyPlann
               );
             })}
 
-            {scopeParties.some((party) => !party.raidId) && (
+            {partiesInRaid(null).length > 0 && (
               <div className="mt-4">
                 {scopeRaids.length > 0 && (
                   <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Parties sin raid</p>
                 )}
-                <div className={partyGrid}>{scopeParties.filter((party) => !party.raidId).map(renderParty)}</div>
+                <div className={partyGrid}>{partiesInRaid(null).map(renderParty)}</div>
               </div>
             )}
 
@@ -802,6 +933,74 @@ export function PartyPlanner({ canManage, members, events, editing }: PartyPlann
           </>
         )}
       </section>
+
+      {/* ============ RESUMEN FLOTANTE DE EQUIPOS ============ */}
+      {/* Mientras la sección de equipos queda fuera de pantalla (el core es
+          largo), este panel fijo a la derecha deja seguir asignando. */}
+      {showDock && board && eventType && (
+        <aside
+          aria-label="Resumen de la configuración de equipos"
+          // En pantallas angostas pasa a ser una franja abajo, para no tapar el core.
+          className="fixed bottom-4 right-4 top-20 z-30 flex w-56 flex-col rounded-xl border border-accent/40 bg-background-elevated shadow-2xl max-sm:left-4 max-sm:top-auto max-sm:h-64 max-sm:w-auto"
+        >
+          <div className="border-b border-border p-3">
+            <p className="text-sm font-semibold text-foreground">Configuración de equipos</p>
+            <p className="text-xs text-muted">
+              {EVENT_LABEL[eventType]} · {assignedCount} asignado(s)
+            </p>
+            {eventType === "GUILD_LEAGUE" && (
+              <div className="mt-2 flex gap-1">
+                {(Object.keys(CAMPO_LABEL) as CampoSide[]).map((side) => (
+                  <button
+                    key={side}
+                    type="button"
+                    onClick={() => setCampo(side)}
+                    className={`flex-1 rounded-md border px-1 py-1 text-[11px] font-semibold ${
+                      campo === side ? "border-accent text-accent" : "border-border text-muted hover:text-foreground"
+                    }`}
+                  >
+                    {side === "principal" ? "Primario" : "Secundario"}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-3">
+            <p className="mb-2 text-[11px] text-muted">
+              {selectedId
+                ? `Toca la party para ${memberById.get(selectedId)?.nickname ?? "el jugador"}.`
+                : "Arrastra un jugador a su party, o tócalo y luego toca la party."}
+            </p>
+            {scopeRaids.map((raid) => (
+              <div key={raid.id} className="mb-3">
+                <p className="mb-1 truncate text-[11px] font-semibold uppercase tracking-wide text-muted">{raid.name}</p>
+                <div className="flex flex-col gap-1">{partiesInRaid(raid.id).map(renderDockParty)}</div>
+              </div>
+            ))}
+            {partiesInRaid(null).length > 0 && (
+              <div className="mb-3">
+                {scopeRaids.length > 0 && (
+                  <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted">Sin raid</p>
+                )}
+                <div className="flex flex-col gap-1">{partiesInRaid(null).map(renderDockParty)}</div>
+              </div>
+            )}
+            {scopeParties.length === 0 && (
+              <p className="text-xs text-muted">Todavía no hay parties. Baja a crearlas.</p>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => teamsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+            className="flex items-center justify-center gap-2 border-t border-border p-2 text-xs font-semibold text-accent hover:bg-accent/10"
+          >
+            <ArrowDown size={14} />
+            Ir a los equipos
+          </button>
+        </aside>
+      )}
     </div>
   );
 }
