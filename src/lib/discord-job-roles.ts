@@ -26,6 +26,7 @@ export const JOB_ROLE_NAMES = [
   "Whitesmith",
   "Assassin Cross",
   "Sniper",
+  "Gunslinger",
   "Professor",
   "High Wizard",
   "Doram",
@@ -78,7 +79,8 @@ export function jobGuildRoleIds(guildRoles: Pick<DiscordGuildRole, "id" | "name"
 // eventos y composición de parties). Los ids son específicos de ese server;
 // si algún emoji se borra o se sube de nuevo con otro id, hay que actualizar
 // esta lista a mano (la API del bot no expone un lookup por nombre para
-// emojis de servidor).
+// emojis de servidor). Un job sin entrada acá (hoy Gunslinger, que todavía no
+// tiene emoji subido al server) se muestra igual, solo que sin ícono.
 export const JOB_ROLE_EMOJI: Record<string, string> = {
   "Lord Knight": "<:LordKnight:1522043803240763512>",
   "Paladín": "<:Paladin:1522043805040115802>",

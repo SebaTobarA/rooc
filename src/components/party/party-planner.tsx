@@ -65,6 +65,7 @@ const DEFAULT_JOB_COLORS: Record<string, string> = {
   Whitesmith: "#b0bec5",
   "Assassin Cross": "#9b59b6",
   Sniper: "#2ecc71",
+  Gunslinger: "#c0a16b",
   Professor: "#5dade2",
   "High Wizard": "#3d7eff",
   Doram: "#6fe0f5",

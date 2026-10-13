@@ -94,7 +94,7 @@ interface RosterEntry extends RosterMember {
 }
 
 /**
- * Las 14 columnas de clases en el orden canónico (el mismo de
+ * Las columnas de clases (una por job) en el orden canónico (el mismo de
  * JOB_ROLE_NAMES), más una columna extra con quienes todavía no tienen rol
  * de clase en Discord — esos son justamente los que necesitan el botón
  * "Cambiar de job". Los campos van inline: Discord los acomoda de a 3 por
