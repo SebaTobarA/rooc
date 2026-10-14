@@ -9,12 +9,10 @@ import {
   sendEvent,
   deleteEvent,
   resendEvent,
-  updateEventSignupsCloseAt,
   updateEventAllowedRoles,
 } from "@/lib/actions/events";
 import { loadEventChannelOptions } from "@/lib/discord-guild-channels";
 import { loadSurveyRoleOptions, surveyRoleNames } from "@/lib/discord-survey-roles";
-import { toLocalDateValue, toLocalTimeValue } from "@/lib/event-date-format";
 import { BackLink } from "@/components/back-link";
 import { DeleteEventButton } from "@/components/panel/delete-event-button";
 import { EventAudienceFields, SurveyRolesFieldset } from "@/components/panel/event-audience-fields";
@@ -105,10 +103,6 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
             <dt className="text-xs uppercase tracking-wide text-muted">Fin</dt>
             <dd className="text-foreground">{DATE_FORMATTER.format(event.endsAt)}</dd>
           </div>
-          <div>
-            <dt className="text-xs uppercase tracking-wide text-muted">Cierre de inscripciones</dt>
-            <dd className="text-foreground">{DATE_FORMATTER.format(event.signupsCloseAt)}</dd>
-          </div>
           <div className="col-span-2">
             <dt className="text-xs uppercase tracking-wide text-muted">Pueden responder la encuesta</dt>
             <dd className="text-foreground">
@@ -119,38 +113,6 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
         {event.description && (
           <p className="mt-4 whitespace-pre-wrap text-sm text-muted">{event.description}</p>
         )}
-
-        <form
-          action={updateEventSignupsCloseAt.bind(null, event.id)}
-          className="mt-4 flex flex-wrap items-end gap-2 border-t border-border pt-4"
-        >
-          <label className="text-xs text-muted">
-            Nueva fecha de cierre
-            <input
-              type="date"
-              name="signupsCloseAtDate"
-              defaultValue={toLocalDateValue(event.signupsCloseAt)}
-              required
-              className="mt-1 block rounded-[10px] border border-border bg-surface px-3 py-2 text-sm text-foreground"
-            />
-          </label>
-          <label className="text-xs text-muted">
-            Hora
-            <input
-              type="time"
-              name="signupsCloseAtTime"
-              defaultValue={toLocalTimeValue(event.signupsCloseAt)}
-              required
-              className="mt-1 block rounded-[10px] border border-border bg-surface px-3 py-2 text-sm text-foreground"
-            />
-          </label>
-          <button
-            type="submit"
-            className="rounded-[10px] border border-border px-4 py-2 text-sm font-semibold uppercase tracking-wide text-foreground transition-colors hover:bg-surface-hover"
-          >
-            Actualizar cierre
-          </button>
-        </form>
 
         <div className="mt-5 flex flex-wrap gap-3">
           {event.status === "DRAFT" ? (

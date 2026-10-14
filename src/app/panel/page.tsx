@@ -97,8 +97,8 @@ export default async function HomePage() {
                     {event.title}
                   </p>
                   <p className="text-xs text-muted">
-                    Sin responder · {EVENT_CATEGORY_LABEL[event.category]} — cierra el{" "}
-                    {EVENT_DATE_FORMATTER.format(event.signupsCloseAt)}
+                    Sin responder · {EVENT_CATEGORY_LABEL[event.category]} — empieza el{" "}
+                    {EVENT_DATE_FORMATTER.format(event.startsAt)}
                   </p>
                 </div>
                 {event.discordUrl && (

@@ -90,9 +90,8 @@ export function EventForm({
       </div>
 
       <p className="text-xs text-muted">
-        {selectedTemplate?.attendanceMode === "DECLINE"
-          ? "El cierre de inscripciones arranca igual a la fecha/hora de fin — ajústalo después desde la página del evento a la hora límite que quieras (ej. 18:00 hora de Chile de ese día)."
-          : "Las inscripciones quedan abiertas hasta la fecha y hora de fin — el mensaje sigue en Discord hasta que se borre, así que no hace falta un cierre aparte."}
+        Las respuestas no tienen cierre: cada persona puede responder o cambiar su respuesta en cualquier momento,
+        aunque sea tarde o con el evento en curso.
       </p>
 
       <Field label="Descripción" hint="Se muestra tal cual en el mensaje de Discord.">

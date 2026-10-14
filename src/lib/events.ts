@@ -144,13 +144,14 @@ export type PendingEvent = {
   title: string;
   icon: string | null;
   category: EventCategory;
-  signupsCloseAt: Date;
+  startsAt: Date;
   discordUrl: string | null;
 };
 
 /**
- * Eventos PUBLISHED cuyas inscripciones siguen abiertas (signupsCloseAt en
- * el futuro) para los que este discordId todavía no tiene un EventSignup —
+ * Eventos PUBLISHED que todavía no terminaron (la asistencia no tiene
+ * cierre, así que se puede responder hasta el final) para los que este
+ * discordId todavía no tiene un EventSignup —
  * es decir, "pendiente de responder" en el canal de asistencias. La fuente
  * de verdad es la propia tabla EventSignup, que ya queda sincronizada en
  * vivo con cada clic de los botones de Discord (ver
@@ -163,9 +164,9 @@ export async function getPendingEventsForDiscordId(
   if (!discordId) return [];
 
   const openEvents = await prisma.event.findMany({
-    where: { status: "PUBLISHED", signupsCloseAt: { gt: new Date() } },
+    where: { status: "PUBLISHED", endsAt: { gt: new Date() } },
     include: { template: true },
-    orderBy: { signupsCloseAt: "asc" },
+    orderBy: { startsAt: "asc" },
   });
   if (openEvents.length === 0) return [];
 
@@ -183,7 +184,7 @@ export async function getPendingEventsForDiscordId(
       title: event.title,
       icon: event.template.icon,
       category: event.category,
-      signupsCloseAt: event.signupsCloseAt,
+      startsAt: event.startsAt,
       discordUrl:
         event.channelId && event.messageId && guildId
           ? `https://discord.com/channels/${guildId}/${event.channelId}/${event.messageId}`

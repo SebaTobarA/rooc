@@ -31,7 +31,7 @@ export function EmbedPreview({
           {attendanceMode === "DECLINE" && (
             <>
               <br />
-              🔒 Podés cambiar tu respuesta hasta &lt; hora de cierre &gt;
+              🔓 Puedes responder o cambiar tu respuesta en cualquier momento, aunque sea tarde.
             </>
           )}
         </p>

@@ -184,11 +184,7 @@ export function buildEventEmbed(
     description: [
       "**Event Info:**",
       formatEventRange(event.startsAt, event.endsAt),
-      // El cierre de inscripciones se puede correr después de publicado
-      // (ver updateEventSignupsCloseAt), así que se muestra siempre: es el
-      // dato que define hasta cuándo los botones de abajo siguen aceptando
-      // gente, y no tiene por qué coincidir con el fin del evento.
-      `🔒 Inscripciones hasta ${DATE_FORMATTER.format(event.signupsCloseAt)} ${TIME_FORMATTER.format(event.signupsCloseAt)}`,
+      ANSWER_ANYTIME_LINE,
       formatAllowedRolesLine(event.allowedRoleIds),
       "",
       "**Description:**",
@@ -207,9 +203,7 @@ export function buildEventEmbed(
  * Embed del roster para templates en modo DECLINE ("marcar inasistencia"):
  * a diferencia de buildEventEmbed, acá no hay que confirmar nada para
  * participar — solo se lista a quienes avisaron que llegan tarde o que no
- * van. El horario de cierre se muestra con timestamp dinámico de Discord
- * (<t:...>) en vez de una hora fija, para que cada persona lo vea ya
- * convertido a su propia zona horaria.
+ * van. No hay horario de cierre: se puede responder en cualquier momento.
  */
 export function buildDeclineEventEmbed(
   event: Event,
@@ -218,14 +212,13 @@ export function buildDeclineEventEmbed(
 ): DiscordEmbed {
   const late = signups.filter((s) => s.status === "LATE");
   const notAttending = signups.filter((s) => s.status === "NOT_ATTENDING");
-  const closeTimestamp = Math.floor(event.signupsCloseAt.getTime() / 1000);
 
   return {
     title: template.icon ? `${template.icon} ${event.title}` : event.title,
     description: [
       "**Event Info:**",
       formatEventRange(event.startsAt, event.endsAt),
-      `🔒 Podés cambiar tu respuesta hasta <t:${closeTimestamp}:t> (<t:${closeTimestamp}:R>)`,
+      ANSWER_ANYTIME_LINE,
       formatAllowedRolesLine(event.allowedRoleIds),
       "",
       "Por defecto **participan todos**. Si vas a llegar tarde o no vas a poder ir, avisá con los botones de abajo.",
@@ -262,7 +255,6 @@ export function buildDeclineRosterEmbed(
   template: Pick<EventTemplate, "icon" | "embedColor">
 ): DiscordEmbed {
   const byDiscordId = new Map(signups.map((signup) => [signup.discordId, signup]));
-  const closeTimestamp = Math.floor(event.signupsCloseAt.getTime() / 1000);
 
   const attending: RosterEntry[] = [];
   const notAttending: RosterMember[] = [];
@@ -295,7 +287,7 @@ export function buildDeclineRosterEmbed(
     description: [
       "**Event Info:**",
       formatEventRange(event.startsAt, event.endsAt),
-      `🔒 Podés cambiar tu respuesta hasta <t:${closeTimestamp}:t> (<t:${closeTimestamp}:R>)`,
+      ANSWER_ANYTIME_LINE,
       formatAllowedRolesLine(event.allowedRoleIds),
       "",
       "Por defecto **participan todos**. Si no vas a poder ir, avisá con los botones de abajo y salís de la lista.",
@@ -337,9 +329,8 @@ export interface WeeklyAttendanceDay {
  * Un solo embed que agrupa varios eventos DECLINE de la misma semana (ej.
  * Martes/Jueves Guild League + Domingo WoE) — cada uno se muestra como su
  * propio campo con el nombre del día calculado en hora de Chile, no
- * asumido a partir del orden. El horario de cierre de cada día usa
- * timestamp dinámico de Discord, así cada persona lo ve en su propia zona
- * horaria.
+ * asumido a partir del orden. Ningún día tiene cierre: se puede responder
+ * en cualquier momento.
  */
 export function buildWeeklyAttendanceEmbed(
   days: WeeklyAttendanceDay[],
@@ -348,7 +339,6 @@ export function buildWeeklyAttendanceEmbed(
   const fields = days.map(({ event, signups }) => {
     const late = signups.filter((s) => s.status === "LATE");
     const notAttending = signups.filter((s) => s.status === "NOT_ATTENDING");
-    const closeTimestamp = Math.floor(event.signupsCloseAt.getTime() / 1000);
     const dayLabel = capitalize(WEEKDAY_FORMATTER.format(event.startsAt));
     const dateLabel = SHORT_DATE_FORMATTER.format(event.startsAt);
 
@@ -361,7 +351,6 @@ export function buildWeeklyAttendanceEmbed(
         lines.push(`🔴 No van: ${notAttending.map((s) => s.displayName).join(", ")}`);
       }
     }
-    lines.push(`🔒 Cambiás tu respuesta hasta <t:${closeTimestamp}:t> (<t:${closeTimestamp}:R>)`);
 
     return {
       name: `${dayLabel} ${dateLabel} — ${EVENT_CATEGORY_LABEL[event.category]}`,
@@ -431,9 +420,8 @@ export function buildWeeklyRosterEmbed(
   }
 
   const dayLines = days.map(({ event }) => {
-    const closeTimestamp = Math.floor(event.signupsCloseAt.getTime() / 1000);
     const dayLabel = capitalize(WEEKDAY_FORMATTER.format(event.startsAt));
-    return `🗓️ **${dayLabel} ${SHORT_DATE_FORMATTER.format(event.startsAt)}** (${weekdayLetter(event.startsAt)}) — ${EVENT_CATEGORY_LABEL[event.category]} · cierra <t:${closeTimestamp}:t>`;
+    return `🗓️ **${dayLabel} ${SHORT_DATE_FORMATTER.format(event.startsAt)}** (${weekdayLetter(event.startsAt)}) — ${EVENT_CATEGORY_LABEL[event.category]}`;
   });
 
   const fields = buildRosterFields(
@@ -497,6 +485,9 @@ export function buildWeeklyAttendanceComponents(
 function button(label: string, style: DiscordButtonStyle, customId: string): DiscordButton {
   return { type: 2, style, label, custom_id: customId };
 }
+
+/** Reemplaza al antiguo horario de cierre en todos los embeds de asistencia. */
+const ANSWER_ANYTIME_LINE = "🔓 Puedes responder o cambiar tu respuesta en cualquier momento, aunque sea tarde.";
 
 function chunk<T>(items: T[], size: number): T[][] {
   const rows: T[][] = [];

@@ -52,10 +52,10 @@ function actorDisplayName(member: NonNullable<DiscordInteraction["member"]>): st
 
 async function findEventGuard(
   eventId: string
-): Promise<{ signupsCloseAt: Date; allowedRoleIds: string[] } | null> {
+): Promise<{ allowedRoleIds: string[] } | null> {
   return prisma.event.findUnique({
     where: { id: eventId },
-    select: { signupsCloseAt: true, allowedRoleIds: true },
+    select: { allowedRoleIds: true },
   });
 }
 
@@ -150,17 +150,10 @@ async function handleComponent(interaction: Required<DiscordInteraction>) {
       data: { flags: 64, content: "Este evento ya no está disponible." },
     });
   }
-  // El cierre limita las respuestas de asistencia, no el cambio de clase:
-  // corregir el job es arreglar un dato del roster (aparecer en la columna
-  // correcta) y tiene que poder hacerse en cualquier momento, incluso
-  // después del cierre o con el evento ya en curso.
-  const isJobChange = action === "dj" || action === "q";
-  if (!isJobChange && guard.signupsCloseAt.getTime() < Date.now()) {
-    return Response.json({
-      type: 4,
-      data: { flags: 64, content: "Las inscripciones para este evento ya cerraron." },
-    });
-  }
+  // Las respuestas de asistencia no tienen cierre: se puede responder o
+  // cambiar la respuesta en cualquier momento, aunque sea tarde o con el
+  // evento ya en curso. (Event.signupsCloseAt sigue en la base pero ya no se
+  // usa para nada.)
 
   // Único filtro de quién puede responder: los roles elegidos al enviar el
   // evento a Discord (ver sendEvent). Vacío solo en eventos publicados antes
