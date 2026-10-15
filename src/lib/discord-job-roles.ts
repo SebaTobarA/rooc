@@ -1,4 +1,4 @@
-import type { DiscordGuildRole } from "@/lib/discord-bot";
+import type { DiscordGuildEmoji, DiscordGuildRole } from "@/lib/discord-bot";
 
 function normalize(name: string): string {
   return name
@@ -76,24 +76,73 @@ export function jobGuildRoleIds(guildRoles: Pick<DiscordGuildRole, "id" | "name"
 
 // Emojis personalizados del server de Special Delivery, uno por clase — se
 // anteponen al nombre de cada jugador en los embeds de roster (asistencia a
-// eventos y composición de parties). Los ids son específicos de ese server;
-// si algún emoji se borra o se sube de nuevo con otro id, hay que actualizar
-// esta lista a mano (la API del bot no expone un lookup por nombre para
-// emojis de servidor). Un job sin entrada acá (hoy Gunslinger, que todavía no
-// tiene emoji subido al server) se muestra igual, solo que sin ícono.
-export const JOB_ROLE_EMOJI: Record<string, string> = {
-  "Lord Knight": "<:LordKnight:1522043803240763512>",
-  "Paladín": "<:Paladin:1522043805040115802>",
-  Gypsy: "<:Gypsy:1522043823268696178>",
-  Clown: "<:Clown:1522043819707601026>",
-  Stalker: "<:Stalker:1522043812040409098>",
-  Champion: "<:Champion:1522043817639936104>",
-  "High Priest": "<:HighPriest:1522043866478284850>",
-  Creator: "<:Creator:1522043821410615446>",
-  "Assassin Cross": "<:AssassinCross:1522043816398557366>",
-  Sniper: "<:Sniper:1522043809519767582>",
-  Professor: "<:Professor:1522043807091265659>",
-  "High Wizard": "<:HighWizard:1522043801483481160>",
-  Doram: "<:doram:1519150730764619817>",
-  Whitesmith: "<:Whitesmith:1522043814162727103>",
+// eventos y composición de parties) y en el selector de job del registro.
+//
+// Antes los ids estaban escritos a mano acá y, al volver a subir los emojis
+// en Discord (cambian de id), los embeds mostraban ":LordKnight:" en texto.
+// Ahora se resuelven en vivo con la lista de emojis del server, buscando por
+// nombre: "LordKnight", "lord_knight", "LK_LordKnight", etc. sirven para
+// "Lord Knight". Un job sin emoji en el server se muestra sin ícono.
+//
+// JOB_ROLE_EMOJI se rellena con loadJobRoleEmojis() (discord-job-emojis.ts,
+// solo servidor), que hay que esperar
+// en la capa con I/O antes de armar un embed (los builders son puros y lo
+// leen de forma síncrona).
+export const JOB_ROLE_EMOJI: Record<string, string> = {};
+
+/** Nombres alternativos de emoji aceptados por job (comparación normalizada). */
+const JOB_EMOJI_ALIASES: Partial<Record<(typeof JOB_ROLE_NAMES)[number], string[]>> = {
+  "Lord Knight": ["lk"],
+  "Paladín": ["pala"],
+  "High Priest": ["hp"],
+  "High Wizard": ["hw", "hwiz"],
+  "Assassin Cross": ["assasincross", "sinx", "ax"],
+  Whitesmith: ["ws", "mastersmith"],
+  Creator: ["biochemist"],
+  Clown: ["minstrel"],
+  Gypsy: ["wanderer"],
+  Professor: ["scholar"],
+  Gunslinger: ["gs", "rebel"],
+  Doram: ["summoner"],
 };
+
+function emojiKey(name: string): string {
+  return normalize(name).replace(/[^a-z0-9]/g, "");
+}
+
+function emojiMarkup(emoji: DiscordGuildEmoji): string {
+  return `<${emoji.animated ? "a" : ""}:${emoji.name}:${emoji.id}>`;
+}
+
+/**
+ * Empareja cada job con un emoji del server. Prioridad: nombre exacto
+ * (normalizado), luego un alias exacto, y por último un emoji cuyo nombre
+ * contenga el nombre del job (ej. "ro_lordknight"); ante empate gana el
+ * nombre más corto.
+ */
+export function matchJobRoleEmojis(emojis: DiscordGuildEmoji[]): Record<string, string> {
+  const usable = emojis
+    .filter((emoji) => emoji.id && emoji.name && emoji.available !== false)
+    .map((emoji) => ({ emoji, key: emojiKey(emoji.name) }))
+    .sort((a, b) => a.key.length - b.key.length);
+
+  const result: Record<string, string> = {};
+  for (const job of JOB_ROLE_NAMES) {
+    const jobKey = emojiKey(job);
+    const aliases = (JOB_EMOJI_ALIASES[job] ?? []).map(emojiKey);
+    const match =
+      usable.find(({ key }) => key === jobKey) ??
+      usable.find(({ key }) => aliases.includes(key)) ??
+      usable.find(({ key }) => key.includes(jobKey));
+    if (match) result[job] = emojiMarkup(match.emoji);
+  }
+  return result;
+}
+
+/** Emoji de un job por nombre de rol, tolerando tildes y el alias "Assasin Cross". */
+export function jobRoleEmoji(jobName: string): string | undefined {
+  if (JOB_ROLE_EMOJI[jobName]) return JOB_ROLE_EMOJI[jobName];
+  const key = emojiKey(jobName === "Assasin Cross" ? "Assassin Cross" : jobName);
+  const canonical = JOB_ROLE_NAMES.find((job) => emojiKey(job) === key);
+  return canonical ? JOB_ROLE_EMOJI[canonical] : undefined;
+}

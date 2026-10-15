@@ -18,7 +18,8 @@ import {
   setGuildMemberNickname,
   type DiscordModalSubmitComponent,
 } from "@/lib/discord-bot";
-import { JOB_ROLE_EMOJI, jobGuildRoleIds, listJobGuildRoles } from "@/lib/discord-job-roles";
+import { jobGuildRoleIds, jobRoleEmoji, listJobGuildRoles } from "@/lib/discord-job-roles";
+import { loadJobRoleEmojis } from "@/lib/discord-job-emojis";
 import { editInteractionOriginal } from "@/lib/discord-interaction-webhook";
 import {
   PILOT_SUFFIX,
@@ -54,8 +55,10 @@ export async function handleRegistrationComponent({
     return Response.json({ type: 4, data: { flags: 64, content: "Acción no reconocida." } });
   }
 
-  const [guildRoles, registration] = await Promise.all([
+  const [guildRoles, , registration] = await Promise.all([
     getGuildRolesCached(),
+    // Cacheado 5 min: no pone en riesgo el límite de 3 s de la interacción.
+    loadJobRoleEmojis(),
     prisma.memberRegistration.findUnique({
       where: { discordId: member.user.id },
       select: { jobRoleId: true, nickname: true, isPilot: true },
@@ -147,7 +150,9 @@ export async function handleRegistrationModalSubmit({
       const desiredNick = isPilot ? `${nickname}${PILOT_SUFFIX}` : nickname;
       const nickError = member.nick === desiredNick ? null : await setGuildMemberNickname(discordId, desiredNick);
 
-      const emoji = JOB_ROLE_EMOJI[job.name] ? `${JOB_ROLE_EMOJI[job.name]} ` : "";
+      await loadJobRoleEmojis();
+      const jobEmoji = jobRoleEmoji(job.name);
+      const emoji = jobEmoji ? `${jobEmoji} ` : "";
       const lines = [
         isPilot
           ? `Listo ✅ Quedaste registrado como **${desiredNick}**, Pilot/Joki de ${emoji}${job.name}. Tienes acceso a los canales, sin lugar en los rosters.`

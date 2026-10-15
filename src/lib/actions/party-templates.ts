@@ -6,6 +6,7 @@ import { getEffectivePermissions } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { postChannelMessage, editChannelMessage } from "@/lib/discord-bot";
 import { buildPartyRosterEmbed, eventCategoryLabel } from "@/lib/discord-party-embed";
+import { loadJobRoleEmojis } from "@/lib/discord-job-emojis";
 import type { Player, Party } from "@/types/party";
 import { readSnapshot, type PartyTemplateSnapshot } from "@/lib/party/template-snapshot";
 
@@ -144,6 +145,7 @@ export async function communicatePartyTemplate(templateId: string): Promise<void
   }
 
   const eventTitle = template.sourceEvent?.title ?? template.name;
+  await loadJobRoleEmojis();
   const embed = buildPartyRosterEmbed(eventTitle, template.event, snapshot.players, snapshot.parties);
   const content = `<@&${PARTY_COMMS_ROLE_ID}> te comunicamos que el roster para ${eventCategoryLabel(template.event)} será el siguiente:`;
 

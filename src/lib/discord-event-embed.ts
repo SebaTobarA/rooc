@@ -8,7 +8,7 @@
 import type { Event, EventSignup, EventTemplate } from "@prisma/client";
 import type { DiscordActionRow, DiscordButton, DiscordButtonStyle, DiscordEmbed } from "@/lib/discord-bot";
 import type { RosterMember } from "@/lib/event-roster";
-import { JOB_ROLE_NAMES, JOB_ROLE_EMOJI } from "@/lib/discord-job-roles";
+import { JOB_ROLE_NAMES, jobRoleEmoji } from "@/lib/discord-job-roles";
 import { EVENT_CATEGORY_LABEL } from "@/lib/labels";
 
 const CHILE_TIME_ZONE = "America/Santiago";
@@ -106,7 +106,7 @@ function buildJobFields(
 ): { name: string; value: string; inline?: boolean }[] {
   const fields = JOB_ROLE_NAMES.map((jobName) => {
     const list = entries.filter((entry) => entry.job === jobName);
-    const emoji = withEmoji ? JOB_ROLE_EMOJI[jobName] : undefined;
+    const emoji = withEmoji ? jobRoleEmoji(jobName) : undefined;
     const prefix = emoji ? `${emoji} ` : "";
     const lines = list.map((entry) => `${prefix}${entry.displayName}${entry.note ? ` (${entry.note})` : ""}`);
     return { name: `${jobName} (${list.length})`, value: truncateFieldValue(lines), inline: true };
@@ -169,7 +169,7 @@ export function buildEventEmbed(
 
   const fields = JOB_ROLE_NAMES.map((className) => {
     const list = (byClass.get(className) ?? []).sort((a, b) => a.displayName.localeCompare(b.displayName));
-    const emoji = JOB_ROLE_EMOJI[className];
+    const emoji = jobRoleEmoji(className);
     const prefix = emoji ? `${emoji} ` : "";
     const lines = list.map((s) => `${prefix}${s.displayName}${s.status === "LATE" ? " (tarde)" : ""}`);
     return { name: `${className} (${list.length})`, value: truncateFieldValue(lines), inline: true };

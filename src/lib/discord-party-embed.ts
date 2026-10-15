@@ -7,7 +7,7 @@
  */
 
 import type { DiscordEmbed } from "@/lib/discord-bot";
-import { JOB_ROLE_EMOJI } from "@/lib/discord-job-roles";
+import { jobRoleEmoji } from "@/lib/discord-job-roles";
 import type { Player, Party } from "@/types/party";
 
 const FALLBACK_COLOR = 0x6fe0f5;
@@ -20,7 +20,7 @@ const EVENT_LABEL: Record<string, string> = {
 type EmbedField = NonNullable<DiscordEmbed["fields"]>[number];
 
 function formatMember(player: Player): string {
-  const emoji = JOB_ROLE_EMOJI[player.clase];
+  const emoji = jobRoleEmoji(player.clase);
   return `${emoji ? `${emoji} ` : ""}${player.nickname}`;
 }
 

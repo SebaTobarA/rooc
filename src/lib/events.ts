@@ -6,6 +6,7 @@
  * cruda, no un form submit), y ahí ese directive no aplica.
  */
 
+import { loadJobRoleEmojis } from "@/lib/discord-job-emojis";
 import type { EventCategory, EventSignup, EventSignupStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { editChannelMessage, postChannelMessage } from "@/lib/discord-bot";
@@ -67,7 +68,10 @@ export async function renderAndPublishEmbed(eventId: string, targetChannelId?: s
   // alguno de los roles habilitados (ver loadEventRoster). Si viene vacío
   // —evento publicado antes de que se eligieran roles— se cae al embed
   // viejo, que solo lista a quienes avisaron.
-  const roster = isDecline ? await loadEventRoster(event.allowedRoleIds) : [];
+  const [roster] = await Promise.all([
+    isDecline ? loadEventRoster(event.allowedRoleIds) : Promise.resolve([]),
+    loadJobRoleEmojis(),
+  ]);
   const embed = !isDecline
     ? buildEventEmbed(event, signups, event.template)
     : roster.length > 0
@@ -115,7 +119,7 @@ async function renderAndPublishWeeklyGroup(weekGroupId: string, targetChannelId?
 
   // Los 3 días comparten los mismos roles habilitados (ver
   // createAttendanceWeek), así que el roster se arma una sola vez.
-  const roster = await loadEventRoster(events[0].allowedRoleIds);
+  const [roster] = await Promise.all([loadEventRoster(events[0].allowedRoleIds), loadJobRoleEmojis()]);
   const embed =
     roster.length > 0
       ? buildWeeklyRosterEmbed(days, roster, events[0].template)

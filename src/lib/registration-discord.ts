@@ -16,7 +16,7 @@ import {
   type DiscordModal,
   type DiscordModalSubmitComponent,
 } from "@/lib/discord-bot";
-import { JOB_ROLE_EMOJI } from "@/lib/discord-job-roles";
+import { jobRoleEmoji } from "@/lib/discord-job-roles";
 
 /** Pronterian@s: el rol de comunidad que desbloquea los canales públicos. */
 export const REGISTRATION_ACCESS_ROLE_ID = "1519123629638418514";
@@ -101,7 +101,7 @@ export function buildRegistrationModal(
           options: jobRoles.map((role) => ({
             label: role.name,
             value: role.id,
-            emoji: parseCustomEmoji(JOB_ROLE_EMOJI[role.name]),
+            emoji: parseCustomEmoji(jobRoleEmoji(role.name)),
             default: role.id === current.jobRoleId,
           })),
         },

@@ -227,6 +227,30 @@ export const getGuildRolesCached = unstable_cache(getGuildRoles, ["guild-roles"]
   revalidate: 300,
 });
 
+export type DiscordGuildEmoji = {
+  id: string;
+  name: string;
+  animated?: boolean;
+  available?: boolean;
+};
+
+/** Emojis personalizados del server (no requiere permisos especiales del bot). */
+export async function getGuildEmojis(): Promise<DiscordGuildEmoji[]> {
+  const response = await discordBotFetch(`/guilds/${getGuildId()}/emojis`);
+  if (!response.ok) {
+    throw new Error(`No se pudieron obtener los emojis del server (${response.status}).`);
+  }
+  return (await response.json()) as DiscordGuildEmoji[];
+}
+
+/**
+ * Cacheada 5 minutos: si se sube o reemplaza un emoji de clase en Discord,
+ * los embeds lo toman solos en el siguiente redibujado, sin tocar código.
+ */
+export const getGuildEmojisCached = unstable_cache(getGuildEmojis, ["guild-emojis"], {
+  revalidate: 300,
+});
+
 /**
  * Crea un rol nuevo en el server (ej. para identificar a un equipo de
  * amigos en Core Guild) — el rol queda por debajo de la jerarquía del bot,
