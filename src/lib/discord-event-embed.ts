@@ -175,6 +175,24 @@ export function buildEventEmbed(
     return { name: `${className} (${list.length})`, value: truncateFieldValue(lines), inline: true };
   });
 
+  // Quienes marcaron "No alcanzo" no ocupan columna de job: van en su propia
+  // lista al final, a todo el ancho, para que se vea quién avisó que falta.
+  const absent = signups
+    .filter((s) => s.status === "NOT_ATTENDING")
+    .sort((a, b) => a.displayName.localeCompare(b.displayName));
+  if (absent.length > 0) {
+    fields.push({
+      name: `Inasistentes (${absent.length})`,
+      value: truncateFieldValue(
+        absent.map((s) => {
+          const emoji = jobRoleEmoji(s.className);
+          return `${emoji ? `${emoji} ` : ""}${s.displayName}`;
+        })
+      ),
+      inline: false,
+    });
+  }
+
   const confirmed = signups.filter((s) => s.status === "CONFIRMED").length;
   const late = signups.filter((s) => s.status === "LATE").length;
   const cant = signups.filter((s) => s.status === "NOT_ATTENDING").length;
@@ -275,8 +293,13 @@ export function buildDeclineRosterEmbed(
     notAttending.length > 0
       ? [
           {
-            name: `No asisten (${notAttending.length})`,
-            value: truncateFieldValue(notAttending.map((member) => member.displayName)),
+            name: `Inasistentes (${notAttending.length})`,
+            value: truncateFieldValue(
+              notAttending.map((member) => {
+                const emoji = member.job ? jobRoleEmoji(member.job) : undefined;
+                return `${emoji ? `${emoji} ` : ""}${member.displayName}`;
+              })
+            ),
           },
         ]
       : []
