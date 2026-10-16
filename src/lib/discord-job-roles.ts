@@ -102,7 +102,7 @@ const JOB_EMOJI_ALIASES: Partial<Record<(typeof JOB_ROLE_NAMES)[number], string[
   Clown: ["minstrel"],
   Gypsy: ["wanderer"],
   Professor: ["scholar"],
-  Gunslinger: ["gs", "rebel"],
+  Gunslinger: ["gs", "rebel", "rebelion", "rebellion"],
   Doram: ["summoner"],
 };
 
