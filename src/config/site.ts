@@ -64,7 +64,7 @@ const navGroups: NavGroup[] = [
     icon: ShieldCheck,
     items: [
       { href: "/panel/party", label: "Party Builder", requires: "canViewParty", icon: Users },
-      { href: "/panel/build-pvp", label: "Build PVP", requires: "canViewParty", icon: Swords },
+      { href: "/panel/build-pvp", label: "Guías de clase", requires: "isAdmin", icon: Swords },
       { href: "/panel/eventos", label: "Eventos", requires: "canManageParty", icon: CalendarDays },
       { href: "/admin/evaluacion-core", label: "Evaluación de CORE", requires: "isAdmin", icon: ClipboardCheck },
       { href: "/admin/requisitos-core", label: "Configuración de requisitos", requires: "isAdmin", icon: SlidersHorizontal },

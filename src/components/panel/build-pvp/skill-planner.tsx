@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import type { JobWithSkills } from "@/lib/skill-tree";
 import { POINTS_PER_TIER } from "@/lib/skill-tree";
 import { SkillTreeCanvas } from "@/components/panel/build-pvp/skill-tree-canvas";
-import { saveBuild } from "@/lib/actions/build-history";
+import { saveBuild, updateBuildAllocations } from "@/lib/actions/build-history";
 
 const TIER_LABELS = ["1st Job", "2nd Job", "Trans. 2nd"];
 const TOTAL_POINTS = POINTS_PER_TIER * 3;
@@ -13,10 +13,13 @@ export function SkillPlanner({
   chain,
   initialLevels,
   loadedBuildName,
+  editBuildId,
 }: {
   chain: [JobWithSkills, JobWithSkills, JobWithSkills];
   initialLevels?: Record<string, number>;
   loadedBuildName?: string;
+  /** Con esto, "Guardar" actualiza el árbol de ese tipo de build en vez de crear una build nueva. */
+  editBuildId?: string;
 }) {
   const [levels, setLevels] = useState<Record<string, number>>(initialLevels ?? {});
   const [activeTier, setActiveTier] = useState(0);
@@ -96,6 +99,18 @@ export function SkillPlanner({
     setSaveState("idle");
   }
 
+  function handleUpdate() {
+    if (!editBuildId) return;
+    startSaving(async () => {
+      try {
+        await updateBuildAllocations(editBuildId, levels);
+        setSaveState("saved");
+      } catch {
+        setSaveState("error");
+      }
+    });
+  }
+
   function handleSave() {
     if (!buildName.trim()) return;
     startSaving(async () => {
@@ -152,7 +167,7 @@ export function SkillPlanner({
 
       {/* --- Árbol --- */}
       <div className="min-w-0 flex-1 rounded-2xl border border-border bg-surface p-4 sm:p-5">
-        {loadedBuildName && (
+        {loadedBuildName && !editBuildId && (
           <p className="mb-3 rounded-md border border-accent/30 bg-accent/5 px-3 py-2 text-xs text-accent">
             Viendo la build <span className="font-semibold">&quot;{loadedBuildName}&quot;</span>. Puedes
             seguir ajustándola y guardarla con otro nombre.
@@ -217,7 +232,9 @@ export function SkillPlanner({
         <div className="mt-4 border-t border-border pt-4">
           {saveState === "saved" && (
             <p className="mb-3 rounded-md border border-accent/30 bg-accent/5 px-3 py-2 text-xs text-accent">
-              Build guardada. Un oficial la revisa y la envía para que la vean los jugadores de esta clase.
+              {editBuildId
+                ? "Árbol de skills guardado."
+                : "Build guardada. Un oficial la revisa y la envía para que la vean los jugadores de esta clase."}
             </p>
           )}
           {saveState === "error" && (
@@ -226,7 +243,16 @@ export function SkillPlanner({
             </p>
           )}
 
-          {savingOpen ? (
+          {editBuildId ? (
+            <button
+              type="button"
+              onClick={handleUpdate}
+              disabled={isSaving}
+              className="btn-brand px-4 py-2 text-sm disabled:opacity-50"
+            >
+              {isSaving ? "Guardando…" : "Guardar árbol de skills"}
+            </button>
+          ) : savingOpen ? (
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <input
                 autoFocus

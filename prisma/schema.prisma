@@ -848,6 +848,20 @@ model SavedBuild {
   // { [skillId]: nivel } de las 3 clases de la cadena.
   allocations Json
 
+  // --- Guía de clase -----------------------------------------------------
+  // Cada SavedBuild es un tipo de build de su clase (ej. "Magnus Exorcismus"
+  // para High Priest) y su hoja completa: el árbol de skills de arriba más
+  // estas secciones, que escriben los admin según lo que digan los mentores
+  // de clase. Las secciones son listas ordenadas por prioridad de
+  // { name, detail } (ver src/lib/class-guide.ts).
+  description String @default("")
+  accessories Json   @default("[]")
+  enchants    Json   @default("[]")
+  mounts      Json   @default("[]")
+  divineEquip Json   @default("[]")
+  // Orden de la pestaña dentro de la guía de su clase (menor = primero).
+  order       Int    @default(0)
+
   createdByDiscordId String
   createdByUsername  String
 

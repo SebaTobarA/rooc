@@ -7,7 +7,8 @@ import { getActiveBuildsForSession, getJobChain } from "@/lib/skill-tree";
 import { getPendingEventsForDiscordId } from "@/lib/events";
 import { EVENT_CATEGORY_LABEL } from "@/lib/labels";
 import { getSheetUpdateReminder } from "@/lib/core-census/update-reminder";
-import { BuildClassTabs } from "@/components/panel/build-class-tabs";
+import { ClassGuideCard } from "@/components/panel/class-guide-card";
+import { readGuideEntries } from "@/lib/class-guide";
 import { ProfileSection } from "@/components/panel/profile-section";
 import { UpcomingRosters } from "@/components/panel/upcoming-rosters";
 
@@ -38,10 +39,23 @@ export default async function HomePage() {
   const [sidebarSession, session] = await Promise.all([getSidebarSession(), getSession()]);
 
   const { className, builds: activeBuilds } = await getActiveBuildsForSession(session);
-  // La build más reciente enviada para la clase del jugador — es la que se
-  // muestra desglosada en la pestaña "Skills" de Build Class PVP.
-  const primaryBuild = activeBuilds[0] ?? null;
-  const primaryBuildChain = primaryBuild ? await getJobChain(primaryBuild.jobId) : null;
+  // Guía de la clase del jugador: todas las builds publicadas de su clase, en
+  // el orden de sus pestañas (comparten la misma cadena de clases).
+  const guideChain = activeBuilds[0] ? await getJobChain(activeBuilds[0].jobId) : null;
+  const guideBuilds = [...activeBuilds]
+    .sort((a, b) => a.order - b.order || a.createdAt.getTime() - b.createdAt.getTime())
+    .map((build) => ({
+      id: build.id,
+      name: build.name,
+      description: build.description,
+      allocations: build.allocations as Record<string, number>,
+      sections: {
+        accessories: readGuideEntries(build.accessories),
+        enchants: readGuideEntries(build.enchants),
+        mounts: readGuideEntries(build.mounts),
+        divineEquip: readGuideEntries(build.divineEquip),
+      },
+    }));
 
   const [pendingEvents, sheetReminder] = await Promise.all([
     sidebarSession?.canViewParty ? getPendingEventsForDiscordId(session?.discordId) : Promise.resolve([]),
@@ -144,9 +158,9 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* ============ BUILD CLASS PVP ============ */}
+      {/* ============ GUÍA DE CLASE ============ */}
       <div className="mt-8">
-        <BuildClassTabs className={className} chain={primaryBuildChain} build={primaryBuild} />
+        <ClassGuideCard className={className} chain={guideChain} builds={guideBuilds} />
       </div>
     </div>
   );

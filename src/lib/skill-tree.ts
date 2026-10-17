@@ -62,6 +62,12 @@ export async function getJobTree() {
 }
 
 /**
+ * Roles de clase de Discord cuyo nombre no coincide con el de su clase
+ * transcendente en el árbol de skills.
+ */
+const DISCORD_ROLE_TO_JOB: Record<string, string> = { Doram: "Summoner" };
+
+/**
  * Builds SENT visibles para la sesión actual: se cruza la clase de Discord
  * del jugador (mismo mecanismo que /panel/perfil, vía discord-job-roles.ts)
  * con la clase (Job transcendente) de cada SavedBuild — no importa quién la
@@ -85,7 +91,9 @@ export async function getActiveBuildsForSession(
 
   if (!className) return { className: null, builds: [] };
 
-  const job = await prisma.job.findFirst({ where: { name: className, tier: "TRANSCENDENT" } });
+  const job = await prisma.job.findFirst({
+    where: { name: DISCORD_ROLE_TO_JOB[className] ?? className, tier: "TRANSCENDENT" },
+  });
   if (!job) return { className, builds: [] };
 
   const builds = await prisma.savedBuild.findMany({
