@@ -30,11 +30,11 @@ export default async function NewAttendanceWeekPage() {
     loadSurveyRoleOptions(),
     loadEventChannelOptions(),
     prisma.eventTemplate.findMany({
-      where: { category: "GUILD_LEAGUE", attendanceMode: "DECLINE" },
+      where: { category: "GUILD_LEAGUE", attendanceMode: "DECLINE", archivedAt: null },
       orderBy: { title: "asc" },
     }),
     prisma.eventTemplate.findMany({
-      where: { category: "EMPERIUM_OVERRUN", attendanceMode: "DECLINE" },
+      where: { category: "EMPERIUM_OVERRUN", attendanceMode: "DECLINE", archivedAt: null },
       orderBy: { title: "asc" },
     }),
   ]);

@@ -14,14 +14,16 @@ export function DeleteEventTemplateButton({ id }: { id: string }) {
         disabled={isPending}
         className="text-xs text-muted hover:text-accent disabled:opacity-50"
         onClick={() => {
-          if (!window.confirm("¿Eliminar este template?")) return;
+          if (
+            !window.confirm(
+              "¿Eliminar este template? Si ya tiene eventos creados, se archiva: deja de aparecer, pero sus eventos y asistencias se conservan."
+            )
+          )
+            return;
           setError(null);
           startTransition(async () => {
-            try {
-              await deleteEventTemplate(id);
-            } catch (err) {
-              setError(err instanceof Error ? err.message : "No se pudo eliminar.");
-            }
+            const result = await deleteEventTemplate(id);
+            if (result.error) setError(result.error);
           });
         }}
       >

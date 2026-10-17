@@ -20,15 +20,10 @@ export type NavItem = {
 
 export type NavGroup = { label: string; items: NavItem[] };
 
-// Los tres menús que ve cualquier jugador. "Base de datos" y "Mi personaje"
-// son portadas: desde ahí se entra a sus secciones.
+// Los menús que ve cualquier jugador. La base de datos ya no es una pestaña:
+// sus datos quedan de fondo para armar las guías de clase.
 const nav: NavItem[] = [
   { href: "/panel", label: "Inicio", exact: true },
-  {
-    href: "/panel/base-de-datos",
-    label: "Base de datos",
-    alsoActiveOn: ["/panel/items", "/panel/cards", "/panel/monsters", "/panel/maps"],
-  },
   { href: "/panel/personaje", label: "Mi personaje", alsoActiveOn: ["/panel/ficha"] },
 ];
 
@@ -44,10 +39,8 @@ const navGroups: NavGroup[] = [
       { href: "/panel/eventos", label: "Eventos", requires: "canManageParty" },
       { href: "/admin/evaluacion-core", label: "Evaluación de CORE", requires: "isAdmin" },
       { href: "/admin/requisitos-core", label: "Configuración de requisitos", requires: "isAdmin" },
-      { href: "/admin/core-guild", label: "Organización Core", requires: "isAdmin" },
       { href: "/admin/recruitment", label: "Reclutamiento", requires: "canManageRecruitment" },
       { href: "/admin/members", label: "Miembros", requires: "isAdmin" },
-      { href: "/admin/registro", label: "Registro", requires: "isAdmin" },
       { href: "/admin/leadership", label: "Liderazgo", requires: "isAdmin" },
       { href: "/admin/roles", label: "Roles y permisos", requires: "isAdmin" },
     ],

@@ -24,7 +24,7 @@ export default async function NewEventPage() {
     );
   }
 
-  const templates = await prisma.eventTemplate.findMany({ orderBy: { title: "asc" } });
+  const templates = await prisma.eventTemplate.findMany({ where: { archivedAt: null }, orderBy: { title: "asc" } });
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">

@@ -54,7 +54,7 @@ export default async function EventosPage({
       prisma.user.count(),
       prisma.eventSignup.count(),
       prisma.event.findMany({ orderBy: { startsAt: "desc" }, take: 10 }),
-      prisma.eventTemplate.findMany({ orderBy: { createdAt: "desc" } }),
+      prisma.eventTemplate.findMany({ where: { archivedAt: null }, orderBy: { createdAt: "desc" } }),
       prisma.guildEventSettings.findFirst(),
       editingTemplateId
         ? prisma.eventTemplate.findUnique({ where: { id: editingTemplateId } })

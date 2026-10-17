@@ -47,11 +47,22 @@ export async function updateEventTemplate(id: string, formData: FormData) {
   revalidatePath("/panel/eventos");
 }
 
-export async function deleteEventTemplate(id: string) {
-  try {
+/**
+ * Borra una plantilla, o la archiva si ya tiene eventos creados (no se puede
+ * borrar sin perder esos eventos y sus asistencias). Devuelve el resultado en
+ * vez de lanzar: en producción Next oculta el mensaje de los errores de las
+ * server actions y el panel mostraba un error genérico.
+ */
+export async function deleteEventTemplate(id: string): Promise<{ archived?: boolean; error?: string }> {
+  const session = await getSession();
+  if (!session) return { error: "Necesitas haber iniciado sesión." };
+
+  const events = await prisma.event.count({ where: { templateId: id } });
+  if (events > 0) {
+    await prisma.eventTemplate.update({ where: { id }, data: { archivedAt: new Date() } });
+  } else {
     await prisma.eventTemplate.delete({ where: { id } });
-  } catch {
-    throw new Error("No se puede borrar: hay eventos creados con este template.");
   }
   revalidatePath("/panel/eventos");
+  return { archived: events > 0 };
 }

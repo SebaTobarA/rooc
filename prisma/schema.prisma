@@ -530,8 +530,12 @@ model EventTemplate {
   attendanceMode EventAttendanceMode @default(CONFIRM)
 
   createdById String
-  createdBy   User    @relation(fields: [createdById], references: [id])
+  createdBy   User      @relation(fields: [createdById], references: [id])
   events      Event[]
+  // Una plantilla con eventos creados no se puede borrar (sus eventos la
+  // referencian): "Eliminar" la archiva. Deja de aparecer en el panel y en
+  // los selectores, y sus eventos y asistencias se conservan.
+  archivedAt  DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
