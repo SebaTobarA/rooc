@@ -1,11 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { getEffectivePermissions } from "@/lib/permissions";
 import { JOB_ROLE_NAMES } from "@/lib/discord-job-roles";
-import { APPLICATION_SCREENSHOTS } from "@/lib/recruitment-screenshots";
+import { APPLICATION_SCREENSHOTS, CANDIDATE_SCREENSHOTS } from "@/lib/recruitment-screenshots";
+import { SHEET_REQUIREMENTS } from "@/lib/core-census/requirements";
+import { getGuildMember } from "@/lib/discord-bot";
 import { publishApplication } from "@/lib/recruitment-discord";
 import type { ApplicationStatus } from "@prisma/client";
 
@@ -123,40 +126,146 @@ export async function submitApplication(formData: FormData) {
 const WAITLIST_DEFAULT_NOTE =
   "Agradecemos tu interés, sin embargo actualmente estarás en lista de espera hasta que haya cupos. Mientras tanto sé parte del servidor de Discord y participa del contenido mientras se liberan espacios.";
 
-/**
- * Aprueba o pone en lista de espera una postulación. Requiere ser admin del
- * sitio o tener canManageRecruitment (Guild Leader / Vice Guild Leader /
- * Oficiales, según se configure en /admin/roles) — proxy.ts ya filtra el
- * acceso a la ruta, pero se revalida acá porque es una Server Function.
- */
-export async function reviewApplication(
-  applicationId: string,
-  status: Extract<ApplicationStatus, "APPROVED" | "WAITLISTED">,
-  formData: FormData
-) {
+// ---------------------------------------------------------------------------
+// Ficha de candidato (/admin/recruitment/[id])
+// ---------------------------------------------------------------------------
+
+async function requireRecruiter(): Promise<string> {
   const session = await getSession();
   const permissions = await getEffectivePermissions(session);
   if (!permissions.canManageRecruitment) {
-    throw new Error("Tu rol no tiene permiso para revisar postulaciones.");
+    throw new Error("Tu rol no tiene permiso para gestionar reclutamiento.");
   }
-
-  const reviewer = session?.discordId
+  const user = session?.discordId
     ? await prisma.user.findUnique({ where: { discordId: session.discordId } })
     : null;
+  return user?.globalName ?? user?.username ?? session?.username ?? "Admin";
+}
 
-  const noteInput = String(formData.get("reviewNote") ?? "").trim();
-  const reviewNote = noteInput || (status === "WAITLISTED" ? WAITLIST_DEFAULT_NOTE : "");
+function optionalInt(value: FormDataEntryValue | null, max: number): number | null {
+  const text = typeof value === "string" ? value.trim() : "";
+  if (!text) return null;
+  const number = Math.floor(Number(text));
+  return Number.isFinite(number) && number >= 0 ? Math.min(number, max) : null;
+}
 
-  await prisma.guildApplication.update({
-    where: { id: applicationId },
+function optionalBoolean(value: FormDataEntryValue | null): boolean | null {
+  return value === "yes" ? true : value === "no" ? false : null;
+}
+
+/**
+ * Crea a mano la ficha de un candidato que no postuló desde el panel (lo
+ * eligen de los miembros del server de Discord). Si ya tiene una postulación,
+ * lleva a esa ficha en vez de duplicarla.
+ */
+export async function createCandidate(formData: FormData): Promise<void> {
+  const createdByUsername = await requireRecruiter();
+  const discordId = String(formData.get("discordId") ?? "").trim();
+  if (!discordId) throw new Error("Elige al candidato de la lista de miembros del server.");
+
+  const existing = await prisma.guildApplication.findUnique({ where: { discordId }, select: { id: true } });
+  if (existing) redirect(`/admin/recruitment/${existing.id}`);
+
+  const member = await getGuildMember(discordId);
+  if (!member) throw new Error("Esa persona ya no está en el server de Discord.");
+
+  const className = String(formData.get("className") ?? "").trim();
+  const application = await prisma.guildApplication.create({
     data: {
-      status,
-      reviewNote,
-      reviewedByDiscordId: reviewer?.discordId ?? session?.username ?? "admin",
-      reviewedByUsername: reviewer?.globalName ?? reviewer?.username ?? session?.username ?? "Admin",
-      reviewedAt: new Date(),
+      discordId,
+      discordUsername: member.user.username,
+      discordAvatarHash: member.user.avatar,
+      characterName:
+        String(formData.get("characterName") ?? "").trim() ||
+        member.nick ||
+        member.user.global_name ||
+        member.user.username,
+      className: (JOB_ROLE_NAMES as readonly string[]).includes(className) ? className : "",
+      availability: "",
+      createdByUsername,
     },
   });
 
   revalidatePath("/admin/recruitment");
+  redirect(`/admin/recruitment/${application.id}`);
+}
+
+/** Guarda la ficha del candidato: datos, valores del personaje, capturas y notas. */
+export async function saveCandidateSheet(applicationId: string, formData: FormData): Promise<void> {
+  await requireRecruiter();
+
+  const className = String(formData.get("className") ?? "").trim();
+  const classFlexible = optionalBoolean(formData.get("classFlexible"));
+  const flexibleJobs = formData
+    .getAll("flexibleJobs")
+    .map(String)
+    .filter((job) => (JOB_ROLE_NAMES as readonly string[]).includes(job));
+
+  const values: Record<string, number | boolean | null> = {};
+  for (const requirement of SHEET_REQUIREMENTS) {
+    values[requirement.field] =
+      requirement.kind === "number"
+        ? optionalInt(formData.get(requirement.field), 2_000_000_000)
+        : optionalBoolean(formData.get(requirement.field));
+  }
+
+  // Igual que en la postulación: solo URLs del Blob propio, o vacío.
+  const shots: Record<string, string> = {};
+  for (const shot of CANDIDATE_SCREENSHOTS) {
+    const url = String(formData.get(shot.field) ?? "").trim();
+    shots[shot.field] = url && isOwnBlobUrl(url) ? url : "";
+  }
+
+  await prisma.guildApplication.update({
+    where: { id: applicationId },
+    data: {
+      characterName: String(formData.get("characterName") ?? "").trim().slice(0, 60) || undefined,
+      gameId: String(formData.get("gameId") ?? "").trim().slice(0, 40),
+      className: (JOB_ROLE_NAMES as readonly string[]).includes(className) ? className : undefined,
+      classFlexible,
+      flexibleJobs: classFlexible ? flexibleJobs : [],
+      recruiterComments: String(formData.get("recruiterComments") ?? "").trim().slice(0, 2000),
+      internalNotes: String(formData.get("internalNotes") ?? "").trim().slice(0, 2000),
+      ...values,
+      ...shots,
+    },
+  });
+
+  revalidatePath("/admin/recruitment");
+  redirect(`/admin/recruitment/${applicationId}?guardado=1`);
+}
+
+/**
+ * Decisión sobre la ficha: aprobar, rechazar o lista de espera, con
+ * observaciones. Aprobar desde acá no asigna rol de guild en Discord: eso lo
+ * sigue haciendo el botón del aviso en el canal de reclutamiento, que pregunta
+ * a qué guild entra.
+ */
+export async function reviewCandidate(
+  applicationId: string,
+  status: Extract<ApplicationStatus, "APPROVED" | "REJECTED" | "WAITLISTED" | "PENDING">,
+  formData: FormData
+): Promise<void> {
+  const reviewerName = await requireRecruiter();
+  const session = await getSession();
+  const noteInput = String(formData.get("reviewNote") ?? "").trim().slice(0, 1000);
+  const reviewNote = noteInput || (status === "WAITLISTED" ? WAITLIST_DEFAULT_NOTE : "");
+
+  await prisma.guildApplication.update({
+    where: { id: applicationId },
+    data:
+      status === "PENDING"
+        ? { status, reviewNote: "", reviewedByDiscordId: null, reviewedByUsername: null, reviewedAt: null }
+        : {
+            status,
+            reviewNote,
+            reviewedByDiscordId: session?.discordId ?? session?.username ?? "admin",
+            reviewedByUsername: reviewerName,
+            reviewedAt: new Date(),
+          },
+  });
+
+  revalidatePath("/admin/recruitment");
+  revalidatePath("/panel/postulacion");
+  redirect(`/admin/recruitment/${applicationId}?revisada=1`);
 }

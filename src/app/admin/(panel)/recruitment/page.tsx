@@ -1,10 +1,12 @@
+import Link from "next/link";
+import { ChevronRight, UserPlus } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { getEffectivePermissions } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { discordAvatarUrl } from "@/lib/discord-avatar";
 import { APPLICATION_STATUS_COLOR, APPLICATION_STATUS_LABEL } from "@/lib/labels";
-import { RecruitmentReviewForm } from "@/components/admin/recruitment-review-form";
-import { APPLICATION_SCREENSHOTS } from "@/lib/recruitment-screenshots";
+import { countRequirements } from "@/lib/core-census/requirements";
+import { loadSheetRequirements } from "@/lib/core-census/requirements-config";
 
 export const dynamic = "force-dynamic";
 
@@ -12,15 +14,18 @@ export const metadata = {
   title: "Reclutamiento",
 };
 
-const DATE_FORMATTER = new Intl.DateTimeFormat("es-419", {
+const DATE_FORMATTER = new Intl.DateTimeFormat("es-CL", {
   day: "2-digit",
   month: "2-digit",
   year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-  timeZone: "America/Argentina/Buenos_Aires",
+  timeZone: "America/Santiago",
 });
 
+/**
+ * Listado de candidatos: los que postularon desde /panel/postulacion y los que
+ * el staff cargó a mano. Cada uno abre su ficha, donde se completa y se
+ * revisa antes de aprobar o rechazar.
+ */
 export default async function AdminRecruitmentPage() {
   const session = await getSession();
   const permissions = await getEffectivePermissions(session);
@@ -30,147 +35,82 @@ export default async function AdminRecruitmentPage() {
       <div className="mx-auto max-w-2xl px-4 py-16 text-center">
         <h1 className="text-xl font-bold text-foreground">Sin acceso</h1>
         <p className="mt-2 text-sm text-muted">
-          Tu rol no tiene habilitada la gestión de reclutamiento. Si crees que es un error,
-          consulta con un administrador del server.
+          Tu rol no tiene habilitada la gestión de reclutamiento. Si crees que es un error, consulta con un
+          administrador del server.
         </p>
       </div>
     );
   }
 
-  const applications = await prisma.guildApplication.findMany({
-    orderBy: [{ status: "asc" }, { createdAt: "desc" }],
-  });
-
-  const pendingCount = applications.filter((a) => a.status === "PENDING").length;
+  const [applications, requirements] = await Promise.all([
+    prisma.guildApplication.findMany({ orderBy: [{ status: "asc" }, { createdAt: "desc" }] }),
+    loadSheetRequirements(),
+  ]);
+  const pendingCount = applications.filter((application) => application.status === "PENDING").length;
 
   return (
     <div>
-      <p className="text-sm text-muted">
-        {applications.length} postulación(es) recibidas · {pendingCount} pendiente(s) de
-        revisión. Al aprobar o poner en lista de espera, el postulante ve el resultado en{" "}
-        <span className="text-foreground">/panel/postulacion</span>.
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted">
+          {applications.length} candidato(s) · {pendingCount} pendiente(s) de revisión.
+        </p>
+        <Link href="/admin/recruitment/nueva" className="btn-brand flex items-center gap-2 px-4 py-2 text-sm">
+          <UserPlus className="h-4 w-4" />
+          Nueva ficha de candidato
+        </Link>
+      </div>
 
-      <div className="mt-4 flex flex-col gap-3">
+      <div className="mt-4 flex flex-col gap-2">
         {applications.map((application) => {
           const avatar = discordAvatarUrl(application.discordId, application.discordAvatarHash, 48);
+          const count = countRequirements(requirements, application);
           return (
-            <div key={application.id} className="rounded-xl border border-border bg-surface p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  {avatar ? (
-                    <img src={avatar} alt="" className="h-10 w-10 rounded-full" />
-                  ) : (
-                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-background-elevated text-sm text-muted">
-                      {application.characterName.slice(0, 1).toUpperCase()}
-                    </span>
-                  )}
-                  <div>
-                    <p className="font-semibold text-foreground">
-                      {application.characterName}{" "}
-                      <span className="font-normal text-muted">— {application.className}</span>
-                    </p>
-                    <p className="text-xs text-muted">
-                      @{application.discordUsername}
-                      {application.levelText ? ` · Nivel ${application.levelText}` : ""}
-                    </p>
-                  </div>
-                </div>
-                <span
-                  className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium ${APPLICATION_STATUS_COLOR[application.status]}`}
-                >
-                  {APPLICATION_STATUS_LABEL[application.status]}
+            <Link
+              key={application.id}
+              href={`/admin/recruitment/${application.id}`}
+              className="group flex flex-wrap items-center gap-4 rounded-xl border border-border bg-surface p-4 transition-colors hover:border-accent/50 hover:bg-surface-hover"
+            >
+              {avatar ? (
+                <img src={avatar} alt="" className="h-11 w-11 rounded-full border border-accent/30" />
+              ) : (
+                <span className="flex h-11 w-11 items-center justify-center rounded-full border border-accent/30 bg-background-elevated text-sm font-semibold text-muted">
+                  {application.characterName.slice(0, 1).toUpperCase()}
                 </span>
-              </div>
-
-              <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-                <div>
-                  <dt className="text-xs uppercase tracking-wide text-muted">Disponibilidad</dt>
-                  <dd className="mt-0.5 text-foreground">{application.availability}</dd>
-                </div>
-                <div>
-                  <dt className="text-xs uppercase tracking-wide text-muted">Enviada</dt>
-                  <dd className="mt-0.5 text-foreground">
-                    {DATE_FORMATTER.format(application.createdAt)}
-                  </dd>
-                </div>
-                {application.aboutYou && (
-                  <div className="sm:col-span-2">
-                    <dt className="text-xs uppercase tracking-wide text-muted">Sobre el postulante</dt>
-                    <dd className="mt-0.5 text-foreground">{application.aboutYou}</dd>
-                  </div>
-                )}
-              </dl>
-
-              {(() => {
-                // Las postulaciones anteriores a que las capturas fueran
-                // obligatorias no tienen ninguna: en vez de mostrar 8 huecos
-                // vacíos, se avisa una sola vez.
-                const shots = APPLICATION_SCREENSHOTS.map((shot) => ({
-                  ...shot,
-                  url: application[shot.field],
-                })).filter((shot) => shot.url);
-
-                if (shots.length === 0) {
-                  return (
-                    <p className="mt-3 border-t border-border pt-3 text-xs text-muted">
-                      Esta postulación se envió antes de que se pidieran las capturas de progreso.
-                    </p>
-                  );
-                }
-
-                return (
-                  <div className="mt-3 border-t border-border pt-3">
-                    <p className="text-xs uppercase tracking-wide text-muted">
-                      Capturas de progreso ({shots.length}/{APPLICATION_SCREENSHOTS.length})
-                    </p>
-                    <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                      {shots.map((shot) => (
-                        <a
-                          key={shot.field}
-                          href={shot.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="group flex flex-col gap-1"
-                          title={`Abrir "${shot.label}" en tamaño completo`}
-                        >
-                          <img
-                            src={shot.url}
-                            alt={shot.label}
-                            loading="lazy"
-                            className="h-24 w-full rounded-md border border-border bg-background-elevated object-cover transition group-hover:border-accent"
-                          />
-                          <span className="text-[11px] leading-tight text-muted group-hover:text-foreground">
-                            {shot.label}
-                          </span>
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })()}
-
-              <div className="mt-3 border-t border-border pt-3 text-xs text-muted">
-                {application.reviewedByUsername ? (
-                  <p>
-                    Revisado por @{application.reviewedByUsername} el{" "}
-                    {application.reviewedAt ? DATE_FORMATTER.format(application.reviewedAt) : "—"}
-                    {application.reviewNote ? ` — "${application.reviewNote}"` : ""}
-                  </p>
-                ) : (
-                  <p>Pendiente de revisión</p>
-                )}
-              </div>
-
-              {application.status === "PENDING" && (
-                <RecruitmentReviewForm applicationId={application.id} />
               )}
-            </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-semibold text-foreground group-hover:text-accent">
+                  {application.characterName}
+                  {application.className && (
+                    <span className="ml-2 text-sm font-normal text-muted">{application.className}</span>
+                  )}
+                </p>
+                <p className="truncate text-xs text-muted">
+                  @{application.discordUsername}
+                  {application.gameId ? ` · ID ${application.gameId}` : ""} ·{" "}
+                  {application.createdByUsername
+                    ? `ficha cargada por ${application.createdByUsername}`
+                    : "postuló desde el panel"}{" "}
+                  · {DATE_FORMATTER.format(application.createdAt)}
+                </p>
+              </div>
+              <span className="text-xs text-muted" title="Aspectos exigidos que cumple, según Configuración de requisitos">
+                Cumple {count.ok}/{count.required}
+              </span>
+              <span
+                className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium ${APPLICATION_STATUS_COLOR[application.status]}`}
+              >
+                {APPLICATION_STATUS_LABEL[application.status]}
+              </span>
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted group-hover:text-accent" />
+            </Link>
           );
         })}
 
         {applications.length === 0 && (
-          <p className="text-sm text-muted">Todavía no hay postulaciones.</p>
+          <p className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted">
+            Todavía no hay candidatos. Llegan cuando alguien postula desde el panel, o cárgalos con «Nueva ficha de
+            candidato».
+          </p>
         )}
       </div>
     </div>

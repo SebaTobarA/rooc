@@ -412,6 +412,35 @@ model GuildApplication {
   shotCards           String @default("")
   shotPets            String @default("")
 
+  // --- Ficha de candidato (/admin/recruitment/[id]) ---------------------
+  // La completa el reclutador; el postulante no la ve. Los valores del
+  // personaje son los mismos aspectos que la ficha Core y se comparan contra
+  // los mínimos de Configuración de requisitos (null = sin dato).
+  gameId            String   @default("")
+  // ¿Está dispuesto a cambiar de clase? null = no se le preguntó.
+  classFlexible     Boolean?
+  // Clases a las que podría cambiarse (nombres de JOB_ROLE_NAMES).
+  flexibleJobs      String[] @default([])
+  recruiterComments String   @default("")
+  // Notas internas del staff sobre el candidato.
+  internalNotes     String   @default("")
+  power             Int?
+  refine            Int?
+  medals            Int?
+  mr                Int?
+  feathers          Int?
+  enchants          Int?
+  cardsPvp          Boolean?
+  s2Orange          Boolean?
+  skillTreePvp      Boolean?
+  // Capturas que sube el reclutador (refines y plumas reusan shotGearRefine
+  // y shotFeathers). Ver CANDIDATE_SCREENSHOTS.
+  shotEnchants      String   @default("")
+  shotDivineEquip   String   @default("")
+  shotSkillTree     String   @default("")
+  // Quién cargó la ficha a mano, si no llegó desde /panel/postulacion.
+  createdByUsername String?
+
   status     ApplicationStatus @default(PENDING)
   // Mensaje que ve el postulante junto al estado (ej. el texto de lista de
   // espera). Vacío mientras está PENDING.

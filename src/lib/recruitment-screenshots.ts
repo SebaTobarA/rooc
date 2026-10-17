@@ -56,3 +56,18 @@ export type ApplicationScreenshotField = (typeof APPLICATION_SCREENSHOTS)[number
 /** Tamaño máximo por captura. El límite real de Vercel para el cuerpo de una
  *  petición es 4.5 MB, y cada imagen se sube en su propia petición. */
 export const SCREENSHOT_MAX_BYTES = 4 * 1024 * 1024;
+
+/**
+ * Capturas de la ficha de candidato (/admin/recruitment/[id]): las sube el
+ * reclutador, no el postulante. Refines y plumas reusan las columnas de la
+ * postulación (si el postulante ya las subió, aparecen precargadas).
+ */
+export const CANDIDATE_SCREENSHOTS = [
+  { field: "shotGearRefine", label: "Refines", hint: "Refines principales" },
+  { field: "shotEnchants", label: "Enchants importantes", hint: "Enchants clave" },
+  { field: "shotDivineEquip", label: "Build de divine equip", hint: "Equipamiento divino" },
+  { field: "shotFeathers", label: "Plumas", hint: "Plumas equipadas" },
+  { field: "shotSkillTree", label: "Árbol de skills", hint: "Árbol de skills" },
+] as const;
+
+export type CandidateScreenshotField = (typeof CANDIDATE_SCREENSHOTS)[number]["field"];
