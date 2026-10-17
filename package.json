@@ -11,7 +11,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
-    "import": "tsx scripts/import.ts"
+    "import": "tsx scripts/import.ts",
+    "build:tactics": "cd modules/rooc-tactics && npm ci && npx vite build --base=/tacticas/ --outDir ../../public/tacticas --emptyOutDir"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

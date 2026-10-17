@@ -44,3 +44,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# rooc-tactics (modules/rooc-tactics): sus dependencias y su compilación local.
+# La versión servida por el sitio vive en public/tacticas (npm run build:tactics).
+/modules/rooc-tactics/node_modules
+/modules/rooc-tactics/dist

@@ -407,6 +407,31 @@ Es falta un evento reportado en el que la persona no jugó **o** no estuvo en
 la voz de Discord. Una falta **justificada** (avisó con anticipación; exige
 nota) queda registrada pero no baja el tier.
 
+## Planificador de ligas (rooc-tactics)
+
+El planificador de estrategias de Guild League y Vigrid es la app
+[rooc-tactics](https://github.com/SebaTobarA/rooc-tactics) (Vite + React,
+mapas 2D/3D), importada en `modules/rooc-tactics` con `git subtree`. No es
+parte de la app de Next: tiene su propio `package.json`, TypeScript, lint y
+Tailwind (la app principal los excluye).
+
+- Se compila a `public/tacticas` con `npm run build:tactics`, y esa
+  compilación es la que se sube al repo y sirve Vercel: el deploy no la
+  vuelve a compilar.
+- Se abre en `/admin/tacticas` (menú Administración → Planificador de
+  ligas), dentro del panel, o sola en `/tacticas`. Al ser archivos públicos,
+  `/tacticas` no exige sesión.
+- Para traer cambios del repo original:
+
+  ```bash
+  git subtree pull --prefix=modules/rooc-tactics https://github.com/SebaTobarA/rooc-tactics.git main --squash
+  npm run build:tactics
+  ```
+
+- Las estrategias que se publican desde la app (modo edición) se guardan
+  como commits en el repo rooc-tactics, no acá: aparecen en `/tacticas`
+  después del siguiente `subtree pull` + `build:tactics`.
+
 ## Arquitectura y extensibilidad
 
 El esquema (`prisma/schema.prisma`) tiene los modelos principales — `Item`,

@@ -1,4 +1,7 @@
 @import "tailwindcss";
+/* rooc-tactics trae su propio Tailwind: que la app no genere clases de su código. */
+@source not "../../modules";
+@source not "../../public/tacticas";
 
 /*
  * Identidad visual: paleta y tipografía tomadas del sitio "Special Delivery"

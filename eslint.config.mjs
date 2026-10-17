@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // rooc-tactics (app Vite aparte, con su propio lint) y su compilación.
+    "modules/**",
+    "public/tacticas/**",
   ]),
 ]);
 
