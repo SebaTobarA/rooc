@@ -3,55 +3,17 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { ChevronDown, LogOut, Menu, X } from "lucide-react";
 import { siteConfig, type NavGroup, type NavItem } from "@/config/site";
 
 function Brand() {
   return (
-    <Link href="/panel" className="flex items-center gap-2 font-bold tracking-tight">
-      <img
-        src="/assets/mascota-fantasma-icono.svg"
-        alt=""
-        width={32}
-        height={32}
-        className="h-8 w-8"
-      />
-      <span className="text-lg text-foreground">{siteConfig.shortName}</span>
-    </Link>
-  );
-}
-
-function NavItemLink({
-  href,
-  label,
-  pathname,
-  onNavigate,
-  badge,
-  exact,
-  alsoActiveOn,
-}: {
-  href: string;
-  label: string;
-  pathname: string;
-  onNavigate?: () => void;
-  badge?: number;
-  exact?: boolean;
-  alsoActiveOn?: string[];
-}) {
-  const active = isActive({ href, exact, alsoActiveOn }, pathname);
-  return (
-    <Link
-      href={href}
-      onClick={onNavigate}
-      className={`flex items-center justify-between gap-2 rounded-[10px] px-3 py-2 text-sm font-medium uppercase tracking-wide transition-colors ${
-        active ? "bg-surface text-accent" : "text-muted hover:bg-surface hover:text-foreground"
-      }`}
-    >
-      {label}
-      {Boolean(badge) && (
-        <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-[11px] font-bold normal-case text-accent-foreground">
-          {badge}
-        </span>
-      )}
+    <Link href="/panel" className="flex items-center gap-2.5">
+      <img src="/assets/mascota-fantasma-icono.svg" alt="" width={36} height={36} className="h-9 w-9" />
+      <span className="flex min-w-0 flex-col leading-tight">
+        <span className="truncate font-bold text-foreground">{siteConfig.shortName}</span>
+        <span className="truncate text-[11px] text-muted">Ragnarok Online Origin Classic</span>
+      </span>
     </Link>
   );
 }
@@ -60,6 +22,43 @@ function isActive(item: Pick<NavItem, "href" | "exact" | "alsoActiveOn">, pathna
   if (item.exact) return pathname === item.href;
   return [item.href, ...(item.alsoActiveOn ?? [])].some(
     (href) => pathname === href || pathname.startsWith(`${href}/`)
+  );
+}
+
+function NavItemLink({
+  item,
+  pathname,
+  onNavigate,
+  badge,
+  nested = false,
+}: {
+  item: NavItem;
+  pathname: string;
+  onNavigate?: () => void;
+  badge?: number;
+  nested?: boolean;
+}) {
+  const active = isActive(item, pathname);
+  const Icon = item.icon;
+  return (
+    <Link
+      href={item.href}
+      onClick={onNavigate}
+      aria-current={active ? "page" : undefined}
+      title={item.label}
+      className={`relative flex items-center gap-3 rounded-lg py-2 text-sm font-medium transition-colors ${
+        nested ? "pl-4 pr-3" : "px-3"
+      } ${active ? "bg-accent/10 text-accent" : "text-muted hover:bg-surface hover:text-foreground"}`}
+    >
+      {active && <span className="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-accent" aria-hidden="true" />}
+      <Icon className="h-4 w-4 shrink-0" strokeWidth={2} />
+      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+      {Boolean(badge) && (
+        <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-[11px] font-bold text-accent-foreground">
+          {badge}
+        </span>
+      )}
+    </Link>
   );
 }
 
@@ -74,37 +73,26 @@ function NavAccordionGroup({
 }) {
   const hasActiveItem = group.items.some((item) => isActive(item, pathname));
   const [open, setOpen] = useState(hasActiveItem);
+  const Icon = group.icon;
 
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-0.5">
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
         aria-expanded={open}
-        className="flex items-center justify-between rounded-[10px] px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted transition-colors hover:bg-surface hover:text-foreground"
+        className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-surface hover:text-foreground ${
+          hasActiveItem ? "text-foreground" : "text-muted"
+        }`}
       >
-        {group.label}
-        <svg
-          viewBox="0 0 24 24"
-          className={`h-3 w-3 shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-        >
-          <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        <Icon className="h-4 w-4 shrink-0" strokeWidth={2} />
+        <span className="min-w-0 flex-1 truncate text-left">{group.label}</span>
+        <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
-        <div className="flex flex-col gap-1">
+        <div className="ml-4 flex flex-col gap-0.5 border-l border-border pl-1">
           {group.items.map((item) => (
-            <NavItemLink
-              key={item.href}
-              href={item.href}
-              label={item.label}
-              exact={item.exact}
-              pathname={pathname}
-              onNavigate={onNavigate}
-            />
+            <NavItemLink key={item.href} item={item} pathname={pathname} onNavigate={onNavigate} nested />
           ))}
         </div>
       )}
@@ -124,21 +112,18 @@ function NavLinks({ session, onNavigate }: { session?: SidebarSession | null; on
     .filter((group) => group.items.length > 0);
 
   return (
-    <nav className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        {siteConfig.nav.map((item) => (
-          <NavItemLink
-            key={item.href}
-            href={item.href}
-            label={item.label}
-            exact={item.exact}
-            alsoActiveOn={item.alsoActiveOn}
-            pathname={pathname}
-            onNavigate={onNavigate}
-            badge={item.href === "/panel" ? session?.pendingEventsCount : undefined}
-          />
-        ))}
-      </div>
+    <nav className="flex flex-col gap-0.5">
+      {siteConfig.nav.map((item) => (
+        <NavItemLink
+          key={item.href}
+          item={item}
+          pathname={pathname}
+          onNavigate={onNavigate}
+          badge={item.href === "/panel" ? session?.pendingEventsCount : undefined}
+        />
+      ))}
+
+      {navGroups.length > 0 && <div className="my-3 border-t border-border" aria-hidden="true" />}
 
       {navGroups.map((group) => (
         <NavAccordionGroup key={group.label} group={group} pathname={pathname} onNavigate={onNavigate} />
@@ -160,78 +145,57 @@ export type SidebarSession = {
   pendingEventsCount: number;
 };
 
-function ProfileCard({ session }: { session: SidebarSession }) {
+/** Perfil de quien inició sesión, al pie del menú: lleva al inicio, que es su perfil. */
+function ProfileFooter({ session, onNavigate }: { session: SidebarSession; onNavigate?: () => void }) {
   return (
-    <Link
-      href="/panel"
-      className="profile-card group flex items-center gap-3 rounded-[10px] border border-border bg-surface p-3"
-    >
-      <span className="profile-card__sparkle" style={{ top: "2px", left: "10px", color: "var(--secondary)" }}>
-        ✦
-      </span>
-      <span
-        className="profile-card__sparkle"
-        style={{ bottom: "4px", left: "38px", color: "var(--focus)", animationDelay: "0.9s" }}
-      >
-        ✦
-      </span>
-
-      {/* Flecha "ver detalles", esquina superior derecha, con globo al hacer hover/foco. */}
-      <span className="pointer-events-none absolute -right-2 -top-2 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-border bg-background-elevated text-accent transition-transform group-hover:scale-110">
-        <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.5">
-          <path d="M7 17 17 7M9 7h8v8" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </span>
-      <span className="pointer-events-none absolute -top-9 right-0 z-10 whitespace-nowrap rounded-md border border-border bg-background-elevated px-2 py-1 text-[11px] font-medium text-foreground opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
-        Mi perfil
-        <span className="absolute -bottom-1 right-3 h-2 w-2 rotate-45 border-b border-r border-border bg-background-elevated" />
-      </span>
-
-      <div className="profile-card__avatar">
-        <span className="profile-card__avatar-glow" />
-        <span className="profile-card__ring">
+    <div className="mt-auto border-t border-border pt-4">
+      <div className="flex items-center gap-2">
+        <Link
+          href="/panel"
+          onClick={onNavigate}
+          className="flex min-w-0 flex-1 items-center gap-3 rounded-lg p-1.5 transition-colors hover:bg-surface"
+        >
           {session.avatarUrl ? (
             <img
               src={session.avatarUrl}
               alt=""
-              width={40}
-              height={40}
-              className="block h-10 w-10 rounded-full bg-surface"
+              width={36}
+              height={36}
+              className="h-9 w-9 shrink-0 rounded-full border border-accent/40"
             />
           ) : (
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-background-elevated text-sm font-semibold text-muted">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-accent/40 bg-surface text-sm font-semibold text-muted">
               {session.label.slice(0, 1).toUpperCase()}
             </span>
           )}
-        </span>
-      </div>
-
-      <div className="relative z-[1] flex min-w-0 flex-col gap-0.5">
-        <span className="truncate text-sm font-semibold text-foreground">{session.label}</span>
-        {session.username && (
-          <span className="truncate text-xs text-muted">@{session.username}</span>
-        )}
-        {session.job && (
-          <span className="profile-card__badge mt-0.5 w-fit truncate rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-medium text-accent">
-            {session.job}
+          <span className="flex min-w-0 flex-col">
+            <span className="truncate text-sm font-semibold text-foreground">{session.label}</span>
+            {session.username && <span className="truncate text-xs text-muted">@{session.username}</span>}
+            <span className="mt-1 flex flex-wrap gap-1">
+              {session.isAdmin && (
+                <span className="rounded-full border border-accent/40 bg-accent/10 px-2 py-px text-[10px] font-semibold text-accent">
+                  Admin
+                </span>
+              )}
+              {session.job && (
+                <span className="rounded-full border border-border px-2 py-px text-[10px] font-medium text-muted">
+                  {session.job}
+                </span>
+              )}
+            </span>
           </span>
-        )}
+        </Link>
+        <form action="/api/auth/logout" method="POST">
+          <button
+            type="submit"
+            aria-label="Cerrar sesión"
+            title="Cerrar sesión"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface hover:text-foreground"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
+        </form>
       </div>
-    </Link>
-  );
-}
-
-function AccountBlock() {
-  return (
-    <div className="mt-auto flex flex-col gap-2 border-t border-border pt-4 text-sm">
-      <form action="/api/auth/logout" method="POST">
-        <button
-          type="submit"
-          className="w-full rounded-[10px] border border-border px-3 py-2 text-xs text-muted hover:text-foreground"
-        >
-          Cerrar sesión
-        </button>
-      </form>
     </div>
   );
 }
@@ -241,10 +205,9 @@ function AccountBlock() {
 // acá igual (proxy.ts), así que ni tiene sentido mostrarle el resto del nav.
 function ApplicantNavLinks({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
   return (
-    <nav className="flex flex-col gap-1">
+    <nav className="flex flex-col gap-0.5">
       <NavItemLink
-        href="/panel/postulacion"
-        label="Tu postulación"
+        item={{ ...siteConfig.nav[0], href: "/panel/postulacion", label: "Tu postulación", exact: false }}
         pathname={pathname}
         onNavigate={onNavigate}
       />
@@ -252,38 +215,43 @@ function ApplicantNavLinks({ pathname, onNavigate }: { pathname: string; onNavig
   );
 }
 
+function SidebarContent({ session, onNavigate }: { session?: SidebarSession | null; onNavigate?: () => void }) {
+  const pathname = usePathname();
+  return (
+    <>
+      {session?.isApplicantOnly ? (
+        <ApplicantNavLinks pathname={pathname} onNavigate={onNavigate} />
+      ) : (
+        <NavLinks session={session} onNavigate={onNavigate} />
+      )}
+      {session && <ProfileFooter session={session} onNavigate={onNavigate} />}
+    </>
+  );
+}
+
 /** Menú lateral izquierdo (desktop) con menú deslizable equivalente en mobile. */
 export function SiteSidebar({ session }: { session?: SidebarSession | null }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const pathname = usePathname();
 
   return (
     <>
       {/* --- Sidebar fijo, solo desktop --- */}
-      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col gap-6 overflow-y-auto border-r border-border bg-background p-5 sm:flex">
+      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col gap-6 overflow-y-auto border-r border-border bg-background-elevated p-4 sm:flex">
         <Brand />
-        {session && <ProfileCard session={session} />}
-        {session?.isApplicantOnly ? (
-          <ApplicantNavLinks pathname={pathname} />
-        ) : (
-          <NavLinks session={session} />
-        )}
-        {session && <AccountBlock />}
+        <SidebarContent session={session} />
       </aside>
 
       {/* --- Barra superior + botón hamburguesa, solo mobile --- */}
-      <div className="sticky top-0 z-40 flex items-center justify-between border-b border-border bg-background/95 px-4 py-3 backdrop-blur sm:hidden">
+      <div className="sticky top-0 z-40 flex items-center justify-between border-b border-border bg-background-elevated/95 px-4 py-3 backdrop-blur sm:hidden">
         <Brand />
         <button
           type="button"
           onClick={() => setDrawerOpen(true)}
-          className="flex h-9 w-9 items-center justify-center rounded-md border border-border text-foreground"
+          className="flex h-9 w-9 items-center justify-center rounded-lg border border-border text-foreground"
           aria-label="Abrir menú"
           aria-expanded={drawerOpen}
         >
-          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M4 7h16M4 12h16M4 17h16" strokeLinecap="round" />
-          </svg>
+          <Menu className="h-5 w-5" />
         </button>
       </div>
 
@@ -296,27 +264,19 @@ export function SiteSidebar({ session }: { session?: SidebarSession | null }) {
             onClick={() => setDrawerOpen(false)}
             className="absolute inset-0 bg-black/60"
           />
-          <div className="relative flex h-full w-64 flex-col gap-6 overflow-y-auto border-r border-border bg-background p-5 shadow-xl">
+          <div className="relative flex h-full w-72 flex-col gap-6 overflow-y-auto border-r border-border bg-background-elevated p-4 shadow-xl">
             <div className="flex items-center justify-between">
               <Brand />
               <button
                 type="button"
                 onClick={() => setDrawerOpen(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-md border border-border text-foreground"
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-foreground"
                 aria-label="Cerrar menú"
               >
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
-                </svg>
+                <X className="h-4 w-4" />
               </button>
             </div>
-            {session && <ProfileCard session={session} />}
-            {session?.isApplicantOnly ? (
-              <ApplicantNavLinks pathname={pathname} onNavigate={() => setDrawerOpen(false)} />
-            ) : (
-              <NavLinks session={session} onNavigate={() => setDrawerOpen(false)} />
-            )}
-            {session && <AccountBlock />}
+            <SidebarContent session={session} onNavigate={() => setDrawerOpen(false)} />
           </div>
         </div>
       )}

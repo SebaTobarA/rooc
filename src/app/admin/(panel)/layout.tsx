@@ -14,7 +14,7 @@ export default async function AdminPanelLayout({ children }: { children: React.R
   const sidebarSession = await getSidebarSession();
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="theme-panel flex min-h-screen flex-col">
       <div className="flex flex-1 flex-col sm:flex-row">
         <SiteSidebar session={sidebarSession} />
         <div className="flex min-w-0 flex-1 flex-col">

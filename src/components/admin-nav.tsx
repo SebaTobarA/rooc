@@ -1,13 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ChevronRight } from "lucide-react";
 import { siteConfig } from "@/config/site";
 
 /**
- * Título de la sección de admin en la que se está. Reemplaza a la barra de
- * links que había arriba de cada página de /admin: la navegación ahora vive
- * solo en el menú lateral (siteConfig.navGroups), y de ahí mismo sale el
- * nombre de cada sección.
+ * Encabezado de cada página de admin: la ruta de navegación (grupo › sección)
+ * y el título con el ícono de la sección. La navegación vive solo en el menú
+ * lateral (siteConfig.navGroups), y de ahí mismo salen el nombre y el ícono.
  */
 export function AdminHeading() {
   const pathname = usePathname();
@@ -20,11 +21,28 @@ export function AdminHeading() {
     .sort((a, b) => b.href.length - a.href.length)[0];
 
   if (!match) return null;
+  const Icon = match.icon;
+  const isSubpage = pathname !== match.href;
 
   return (
-    <header className="border-b border-border pb-4">
-      <p className="text-xs font-semibold uppercase tracking-wide text-muted">{match.group}</p>
-      <h1 className="mt-1 text-xl font-bold text-foreground">{match.label}</h1>
+    <header className="border-b border-border pb-5">
+      <nav aria-label="Ruta" className="flex flex-wrap items-center gap-1.5 text-xs text-muted">
+        <span>{match.group}</span>
+        <ChevronRight className="h-3 w-3" aria-hidden="true" />
+        {isSubpage ? (
+          <Link href={match.href} className="hover:text-accent">
+            {match.label}
+          </Link>
+        ) : (
+          <span className="text-foreground">{match.label}</span>
+        )}
+      </nav>
+      <div className="mt-3 flex items-center gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-accent/30 bg-accent/10 text-accent">
+          <Icon className="h-5 w-5" strokeWidth={2} />
+        </span>
+        <h1 className="text-xl font-bold text-foreground sm:text-2xl">{match.label}</h1>
+      </div>
     </header>
   );
 }

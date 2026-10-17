@@ -7,7 +7,7 @@ export default async function PanelLayout({ children }: { children: React.ReactN
   const sidebarSession = await getSidebarSession();
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="theme-panel flex min-h-screen flex-col">
       <div className="flex flex-1 flex-col sm:flex-row">
         <SiteSidebar session={sidebarSession} />
         <div className="flex min-w-0 flex-1 flex-col">

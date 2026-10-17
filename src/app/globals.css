@@ -281,3 +281,63 @@ body {
     display: none;
   }
 }
+
+/* ---------------------------------------------------------------------
+ * Tema del panel y del admin: azul marino con acentos cian, tarjetas con
+ * borde fino y fondo apenas más claro. Se aplica con la clase .theme-panel
+ * en los layouts de /panel y /admin, así la web pública conserva su estilo.
+ * Redefine los mismos tokens de arriba (y los --pb-* del Party Builder
+ * viejo, que siguen usando el historial y algunos formularios).
+ * ------------------------------------------------------------------- */
+.theme-panel {
+  --background: #050e1a;
+  --background-elevated: #081526;
+  --surface: #0b1c30;
+  --surface-hover: #10253d;
+  --border: #19324f;
+  --foreground: #e6f0fa;
+  --muted: #8ba3bd;
+
+  --accent: #38c6f2;
+  --accent-hover: #7fdbf8;
+  --accent-foreground: #04111f;
+  --secondary: #93d8f7;
+  --focus: #ffe27a;
+
+  --gradient-title: linear-gradient(135deg, #ffffff 20%, var(--accent) 100%);
+
+  --pb-surface-1: #081526;
+  --pb-surface-2: #0b1c30;
+  --pb-surface-3: #10253d;
+  --pb-border: #19324f;
+  --pb-border-hover: rgba(56, 198, 242, 0.4);
+  --pb-accent: #38c6f2;
+  --pb-accent-dim: rgba(56, 198, 242, 0.14);
+  --pb-accent-hover: #7fdbf8;
+  --pb-accent-glow: rgba(56, 198, 242, 0.25);
+  --pb-text-secondary: #8ba3bd;
+  --pb-text-muted: #5d7590;
+
+  background:
+    radial-gradient(1200px 600px at 85% -10%, rgba(56, 198, 242, 0.08), transparent 60%),
+    var(--background);
+  color: var(--foreground);
+  color-scheme: dark;
+}
+
+/* En el tema del panel los títulos de página van en blanco con un toque cian,
+   sin mayúsculas forzadas, como en la ficha de candidato. */
+.theme-panel .heading-gradient {
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.theme-panel .btn-brand {
+  text-transform: none;
+  letter-spacing: 0.01em;
+}
+
+.theme-panel .btn-brand:hover,
+.theme-panel .btn-brand:focus-visible {
+  box-shadow: 0 8px 24px rgba(56, 198, 242, 0.3);
+}
