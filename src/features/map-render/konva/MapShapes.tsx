@@ -1,0 +1,233 @@
+import { memo, useMemo } from 'react';
+import { Circle, Group, Image as KImage, Line, Path, Rect, Shape } from 'react-konva';
+import type { Context } from 'konva/lib/Context';
+import { hillshade } from '../../../lib/elevation.ts';
+import { scatterForest, mulberry32 } from '../../../lib/forest.ts';
+import { ringsToPath } from '../../../lib/geometry.ts';
+import { isWalkable } from '../../../lib/walk.ts';
+import type { Projection } from '../../../lib/projection.ts';
+import type { PolyList, Selection } from '../../../store/editorStore.ts';
+import type { MapConfig, Polygon } from '../../../types/index.ts';
+
+interface Props {
+  map: MapConfig;
+  proj: Projection;
+  /** Si se entrega, las formas responden al clic (editor de mapa). */
+  onPick?: (selection: Selection) => void;
+}
+
+let noiseCanvas: HTMLCanvasElement | undefined;
+/** Textura de ruido generada una sola vez; da grano al mapa sin usar arte del juego. */
+function noise(): HTMLCanvasElement {
+  if (noiseCanvas) return noiseCanvas;
+  const size = 160;
+  noiseCanvas = document.createElement('canvas');
+  noiseCanvas.width = noiseCanvas.height = size;
+  const ctx = noiseCanvas.getContext('2d')!;
+  const img = ctx.createImageData(size, size);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const v = Math.random() * 255;
+    img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+    img.data[i + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  return noiseCanvas;
+}
+
+const TAU = Math.PI * 2;
+
+/**
+ * El mapa propio en 2D. Todo se dibuja desde la geometría y el estilo de la config:
+ * bosque con copas, senderos de pasto y arena, muros de ruinas, plazas de piedra, agua y nubes.
+ */
+export const MapShapes = memo(function MapShapes({ map, proj, onPick }: Props) {
+  const { geometry: g, style } = map;
+  const listening = !!onPick;
+  const d = (p: Polygon) => ringsToPath([p.points, ...(p.holes ?? [])], proj);
+  const pick = (list: PolyList, id: string) => (onPick ? () => onPick({ type: 'polygon', list, id }) : undefined);
+  const boundsPath = useMemo(() => ringsToPath([g.bounds], proj), [g.bounds, proj]);
+  // El dibujo llena todo el rectángulo del mapa: lo que queda fuera del contorno jugable también es bosque.
+  const clipRect = (ctx: Context) => {
+    ctx.beginPath();
+    ctx.rect(0, 0, proj.w, proj.h);
+    ctx.closePath();
+  };
+  const terrain = style.terrain ?? 'forest';
+  const rockFill = (p: Polygon) => (p.kind === 'rock' ? style.rock : p.kind === 'ruin' ? (terrain === 'ruins' ? style.wall : style.plazaStroke) : style.forestShade);
+
+  // Copas de árboles, ordenadas de arriba hacia abajo para que se solapen como un bosque visto desde el cielo.
+  // En el cañón y en las ruinas son bloques de roca o piedra (los tonos salen del estilo), un poco más chicos.
+  const trees = useMemo(
+    () =>
+      scatterForest(g, map.aspect, terrain === 'forest' ? 62 : 74, 7, 'rect')
+        .map((t) => ({ ...proj.toWorld(t.pos), r: (terrain === 'forest' ? 9 : 7) + t.size * 6, tone: Math.floor(t.shade * style.canopy.length) }))
+        .sort((a, b) => a.y - b.y),
+    [g, map.aspect, proj, style.canopy.length, terrain],
+  );
+
+  const markerWorld = useMemo(() => map.markers.map((m) => proj.toWorld(m.pos)), [map.markers, proj]);
+
+  // Nubes: un marco alrededor del rectángulo del mapa que se mete un poco en el bosque del borde,
+  // sin tapar nunca senderos, pilares ni respawns.
+  const clouds = useMemo(() => {
+    const rand = mulberry32(11);
+    const out: { x: number; y: number; r: number }[] = [];
+    const { w, h } = proj;
+    const edges: [number, number, number, number, number, number][] = [
+      // x0, y0, x1, y1, normal x, normal y
+      [0, 0, w, 0, 0, -1],
+      [w, 0, w, h, 1, 0],
+      [w, h, 0, h, 0, 1],
+      [0, h, 0, 0, -1, 0],
+    ];
+    for (const [x0, y0, x1, y1, nx, ny] of edges) {
+      const len = Math.hypot(x1 - x0, y1 - y0);
+      const steps = Math.ceil(len / 30);
+      for (let k = 0; k <= steps; k++) {
+        const t = k / steps;
+        for (let layer = 0; layer < 3; layer++) {
+          const r = 28 + rand() * 30 + layer * 14;
+          // La primera franja entra en el mapa; las siguientes quedan afuera.
+          const offset = -r * 0.55 + layer * 46 + rand() * 16;
+          const puff = { x: x0 + (x1 - x0) * t + nx * offset + (rand() - 0.5) * 24, y: y0 + (y1 - y0) * t + ny * offset + (rand() - 0.5) * 24, r };
+          // Radio de la nube más su borde difuso (sombra de 22 px).
+          const reach = puff.r + 26;
+          const covers =
+            [0, 1, 2, 3, 4, 5, 6, 7].some((q) => isWalkable(proj.toNorm({ x: puff.x + Math.cos((q * Math.PI) / 4) * reach, y: puff.y + Math.sin((q * Math.PI) / 4) * reach }), g)) ||
+            isWalkable(proj.toNorm(puff), g) ||
+            markerWorld.some((m) => Math.hypot(m.x - puff.x, m.y - puff.y) < reach + 22);
+          if (!covers) out.push(puff);
+        }
+      }
+    }
+    return out;
+  }, [g, markerWorld, proj]);
+
+  // Relieve: mesetas y rampas sombreadas (solo en mapas con alturas, como los altares de Vigrid).
+  const relief = useMemo(() => hillshade(g, map.aspect), [g, map.aspect]);
+  const walkPath = useMemo(() => ringsToPath(g.walkable.flatMap((p) => [p.points, ...(p.holes ?? [])]), proj), [g.walkable, proj]);
+
+  // Los agujeros de lo transitable son los brazos de las espirales: ahí van los muros de las ruinas.
+  const wallPath = useMemo(() => ringsToPath(g.walkable.flatMap((p) => p.holes ?? []), proj), [g.walkable, proj]);
+
+  return (
+    <Group listening={listening}>
+      <Rect width={proj.w} height={proj.h} fill={style.forest} listening={false} />
+      {/* El contorno jugable solo se ve y se selecciona en el editor de mapa. */}
+      {onPick && <Path data={boundsPath} stroke="#f472b6" strokeWidth={2} dash={[8, 6]} opacity={0.7} hitStrokeWidth={12} onClick={pick('bounds', 'bounds')} />}
+      <Group clipFunc={clipRect}>
+        {g.obstacles.filter((p) => p.kind === 'forest').map((p) => (
+          <Path key={p.id} data={d(p)} fill={style.forestShade} opacity={0.28} fillRule="evenodd" onClick={pick('obstacles', p.id)} />
+        ))}
+        <Shape
+          listening={false}
+          sceneFunc={(ctx) => {
+            // Primero la sombra de todas las copas, después las copas por tono: pocos rellenos, muchos círculos.
+            ctx.beginPath();
+            for (const t of trees) { ctx.moveTo(t.x + 3 + t.r, t.y + 4); ctx.arc(t.x + 3, t.y + 4, t.r, 0, TAU); }
+            ctx.fillStyle = style.canopyShade;
+            ctx.globalAlpha = 0.55;
+            ctx.fill();
+            ctx.globalAlpha = 1;
+            for (const t of trees) {
+              ctx.beginPath();
+              ctx.arc(t.x, t.y, t.r, 0, TAU);
+              ctx.fillStyle = style.canopy[t.tone];
+              ctx.fill();
+              ctx.beginPath();
+              ctx.arc(t.x - t.r * 0.25, t.y - t.r * 0.3, t.r * 0.45, 0, TAU);
+              ctx.fillStyle = 'rgba(255,255,255,0.09)';
+              ctx.fill();
+            }
+          }}
+        />
+        {g.water.map((p) => (
+          <Group key={p.id}>
+            <Path data={d(p)} fill={style.water} stroke="#8fc3ee" strokeWidth={3} lineJoin="round" fillRule="evenodd"
+              shadowColor="#0b2a4a" shadowBlur={10} shadowOpacity={0.6} onClick={pick('water', p.id)} />
+          </Group>
+        ))}
+        {g.walkable.map((p) => {
+          const data = d(p);
+          return (
+            <Group key={p.id}>
+              {/* Sombra del bosque sobre el claro y base de arena. */}
+              <Path data={data} fill={style.walkable} fillRule="evenodd" shadowColor="#07160d" shadowBlur={16} shadowOpacity={0.85} onClick={pick('walkable', p.id)} />
+              {/* Pasto: un borde ancho y difuso recortado al interior, así la arena queda al centro de los senderos. */}
+              <Group clipFunc={() => [new Path2D(data), 'evenodd']} listening={false}>
+                <Path data={data} stroke={style.grass} strokeWidth={20} lineJoin="round" opacity={0.95} shadowColor={style.grass} shadowBlur={18} shadowOpacity={1} />
+                <Path data={data} stroke={style.forest} strokeWidth={7} lineJoin="round" opacity={0.55} />
+              </Group>
+            </Group>
+          );
+        })}
+        {relief && (
+          <Group clipFunc={() => [new Path2D(walkPath), 'evenodd']} listening={false}>
+            <KImage image={relief} width={proj.w} height={proj.h} {...(proj.flipped ? { x: proj.w, y: proj.h, scaleX: -1, scaleY: -1 } : {})} />
+          </Group>
+        )}
+        {/* Muros de ruinas: bloques de piedra a lo largo de los brazos de las espirales (solo en el bosque de Vale of Clash). */}
+        {terrain === 'forest' && (
+          <>
+            <Path data={wallPath} stroke="#4b525a" strokeWidth={6.5} lineJoin="round" lineCap="butt" dash={[13, 5]} opacity={0.8} listening={false} />
+            <Path data={wallPath} stroke={style.wall} strokeWidth={4} lineJoin="round" lineCap="butt" dash={[13, 5]} listening={false} />
+          </>
+        )}
+        {g.obstacles.filter((p) => p.kind !== 'forest').map((p) => {
+          const data = d(p);
+          return (
+            <Group key={p.id}>
+              <Path data={data} fill={rockFill(p)} stroke={terrain === 'forest' ? '#3d444c' : style.canopyShade} strokeWidth={2} lineJoin="round" fillRule="evenodd"
+                shadowColor="#000" shadowBlur={terrain === 'forest' ? 8 : 12} shadowOffsetX={terrain === 'forest' ? 0 : 4} shadowOffsetY={terrain === 'forest' ? 0 : 6} shadowOpacity={0.55} onClick={pick('obstacles', p.id)} />
+              {/* Cresta o muro con volumen: luz arriba a la izquierda y la cara en sombra hacia abajo. */}
+              {terrain !== 'forest' && (
+                <Group clipFunc={() => [new Path2D(data), 'evenodd']} listening={false}>
+                  <Path data={data} stroke={style.canopyShade} strokeWidth={9} lineJoin="round" opacity={0.35} x={3} y={4} />
+                  <Path data={data} stroke={style.canopy[3]} strokeWidth={4} lineJoin="round" opacity={0.7} x={-1.5} y={-2} />
+                  {terrain === 'ruins' && <Path data={data} stroke={style.canopyShade} strokeWidth={1} dash={[2, 11]} opacity={0.5} />}
+                </Group>
+              )}
+            </Group>
+          );
+        })}
+        {g.decor.map((p) => (
+          <Path key={p.id} data={d(p)} fill={rockFill(p)} stroke="#3d444c" strokeWidth={1.5} lineJoin="round" fillRule="evenodd" onClick={pick('decor', p.id)} />
+        ))}
+        {g.plazas.map((c) => {
+          const o = proj.toWorld(c.center);
+          const r = proj.len(c.radius);
+          const spokes = c.kind === 'center' ? 16 : c.kind === 'respawn' ? 8 : 6;
+          return (
+            <Group key={c.id} x={o.x} y={o.y} onClick={onPick ? () => onPick({ type: 'plaza', id: c.id }) : undefined}>
+              <Circle radius={r + 3} fill={style.plazaStroke} opacity={0.55} listening={false} />
+              <Circle radius={r} fill={style.plaza} stroke={style.plazaStroke} strokeWidth={2.5} shadowColor="#000" shadowBlur={8} shadowOpacity={0.45} />
+              {/* Losas de piedra: anillos concéntricos y juntas radiales. */}
+              <Circle radius={r * 0.7} stroke={style.plazaStroke} strokeWidth={1} opacity={0.65} listening={false} />
+              <Circle radius={r * 0.38} stroke={style.plazaStroke} strokeWidth={1} opacity={0.65} fill="rgba(255,255,255,0.12)" listening={false} />
+              {Array.from({ length: spokes }, (_, i) => {
+                const a = (i / spokes) * TAU;
+                return <Line key={i} points={[Math.cos(a) * r * 0.38, Math.sin(a) * r * 0.38, Math.cos(a) * r, Math.sin(a) * r]} stroke={style.plazaStroke} strokeWidth={1} opacity={0.5} listening={false} />;
+              })}
+            </Group>
+          );
+        })}
+        {style.textureOpacity > 0 && (
+          <Rect width={proj.w} height={proj.h} fillPatternImage={noise() as unknown as HTMLImageElement} opacity={style.textureOpacity}
+            globalCompositeOperation="overlay" listening={false} />
+        )}
+      </Group>
+      <Shape
+        listening={false}
+        opacity={0.96}
+        fill={style.cloud}
+        shadowColor={style.cloud}
+        shadowBlur={22}
+        sceneFunc={(ctx, shape) => {
+          ctx.beginPath();
+          for (const c of clouds) { ctx.moveTo(c.x + c.r, c.y); ctx.arc(c.x, c.y, c.r, 0, TAU); }
+          ctx.fillStrokeShape(shape);
+        }}
+      />
+    </Group>
+  );
+});
