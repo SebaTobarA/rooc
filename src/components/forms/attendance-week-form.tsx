@@ -20,8 +20,8 @@ export function AttendanceWeekForm({
   return (
     <form action={action} className="grid max-w-2xl gap-4">
       <p className="text-sm text-muted">
-        Publica un solo mensaje en Discord con los 3 días fijos de la semana: Martes y Jueves (Guild
-        League) + Domingo (War of Emperium). Cada persona marca en qué días no puede jugar, y puede
+        Crea los 3 días fijos de la semana, Martes y Jueves (Guild League) + Domingo (Emperium
+        Overrun), y publica un mensaje por día en Discord. Todos parten como presentes. Cada persona marca en qué días no puede jugar, y puede
         responder o cambiar su respuesta en cualquier momento, aunque sea tarde.
       </p>
 

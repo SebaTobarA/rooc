@@ -1,6 +1,5 @@
 "use server";
 
-import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -21,11 +20,9 @@ const schema = z.object({
 
 /**
  * Crea los 3 eventos fijos de la semana (Martes y Jueves Guild League +
- * Domingo War of Emperium) agrupados bajo un mismo weekGroupId, y los
- * publica juntos como un solo mensaje combinado en Discord — ver
- * renderAndPublishEmbed/buildWeeklyAttendanceEmbed. El cierre de
- * inscripciones de cada día queda fijo a las 18:00 hora de Chile de ese
- * mismo día, tal como se definió con la guild.
+ * Domingo Emperium Overrun) y publica cada uno como su propio mensaje en
+ * Discord, en modo "marcar inasistencia": todos parten como presentes y solo
+ * avisa quien llega tarde o no alcanza.
  */
 export async function createAttendanceWeek(formData: FormData) {
   const data = schema.parse({
@@ -68,7 +65,9 @@ export async function createAttendanceWeek(formData: FormData) {
     { offset: 5, template: emperiumTemplate, label: "Domingo" },
   ];
 
-  const weekGroupId = randomUUID();
+  // Un mensaje por día (antes los 3 iban juntos en un solo mensaje, con
+  // weekGroupId): cada día tiene su propio roster por job, como los eventos
+  // de asistencia, y se responde por separado.
   const createdEventIds: string[] = [];
 
   for (const day of dayPlan) {
@@ -86,7 +85,6 @@ export async function createAttendanceWeek(formData: FormData) {
         startsAt,
         endsAt,
         signupsCloseAt,
-        weekGroupId,
         allowedRoleIds,
         createdById: user.id,
       },
@@ -94,7 +92,9 @@ export async function createAttendanceWeek(formData: FormData) {
     createdEventIds.push(event.id);
   }
 
-  await renderAndPublishEmbed(createdEventIds[0], data.channelId);
+  for (const eventId of createdEventIds) {
+    await renderAndPublishEmbed(eventId, data.channelId);
+  }
 
   revalidatePath("/panel/eventos");
   redirect("/panel/eventos");

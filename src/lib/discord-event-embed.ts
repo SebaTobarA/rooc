@@ -313,7 +313,7 @@ export function buildDeclineRosterEmbed(
       ANSWER_ANYTIME_LINE,
       formatAllowedRolesLine(event.allowedRoleIds),
       "",
-      "Por defecto **participan todos**. Si no vas a poder ir, avisá con los botones de abajo y salís de la lista.",
+      "Por defecto **todos participan**. Si llegas tarde o no alcanzas, avísalo con los botones de abajo.",
       "",
       "**Description:**",
       event.description || "-",
@@ -334,10 +334,12 @@ export function buildDeclineRosterComponents(eventId: string): DiscordActionRow[
     {
       type: 1,
       components: [
-        button("Llegaré tarde", 2, makeCustomId("dl", eventId)),
-        button("No asistiré", 4, makeCustomId("dn", eventId)),
-        button("Voy a tiempo", 3, makeCustomId("dy", eventId)),
-        button("Cambiar de job", 1, makeCustomId("dj", eventId)),
+        // Mismos botones que el modo asistencia, pero acá todos parten como
+        // presentes: "Participar" solo deshace un aviso de tarde o falta.
+        button("Participar", 3, makeCustomId("dy", eventId)),
+        button("Llego tarde", 2, makeCustomId("dl", eventId)),
+        button("No alcanzo", 4, makeCustomId("dn", eventId)),
+        button("Cambiar de job", 2, makeCustomId("dj", eventId)),
       ],
     },
   ];
