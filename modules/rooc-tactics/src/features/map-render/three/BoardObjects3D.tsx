@@ -1,0 +1,485 @@
+import { memo, useMemo } from 'react';
+import { Line } from '@react-three/drei';
+import * as THREE from 'three';
+import { jobById } from '../../../config/jobs.ts';
+import { roleById } from '../../../config/roles.ts';
+import { tierRank } from '../../../config/modes/index.ts';
+import { lookOf } from '../../../config/objectiveKinds.ts';
+import { elevationAt } from '../../../lib/elevation.ts';
+import { resolvedStats, useScoringStore } from '../../../store/scoringStore.ts';
+import { useStrategyStore } from '../../../store/strategyStore.ts';
+import { zoneCenters, zoneOf, ZONE_KEYS } from '../../../lib/numpad.ts';
+import { partyOfToken } from '../../party/partyActions.ts';
+import type { Projection3 } from '../../../lib/projection.ts';
+import type { Drawing, MapConfig, Marker, ObjectiveState, Party, Raid, Side, Token, Vec2 } from '../../../types/index.ts';
+import { groupLabel, tokenBadge } from '../../party/describeToken.ts';
+import { curveControl } from '../../board/hit.ts';
+import { teamColor } from '../../board/konva/Tokens.tsx';
+import type { Draft } from '../../board/useToolController.ts';
+import { formatTimer, objectiveValue, SIDE_COLORS, STATUS_COLORS } from '../konva/Markers.tsx';
+import { labelTexture, pingTexture, tokenTexture } from './textures.ts';
+
+const FLAT = -Math.PI / 2;
+/** Altura a la que se proyectan los dibujos; además se dibujan sin prueba de profundidad para que nada los tape. */
+const DRAW_Y = 0.6;
+export const TOKEN_Y = 2.6;
+
+function Label({ text, position, color, height = 1.6 }: { text: string; position: [number, number, number]; color?: string; height?: number }) {
+  const { texture, aspect } = labelTexture(text, color);
+  return (
+    <sprite position={position} scale={[height * aspect, height, 1]} renderOrder={20}>
+      <spriteMaterial map={texture} depthTest={false} transparent />
+    </sprite>
+  );
+}
+
+// ---------- Marcadores ----------
+
+function Pillar({ marker, objective, modeId, x, z }: { marker: Marker; objective?: ObjectiveState; modeId: string; x: number; z: number }) {
+  const status = objective?.status ?? 'pending';
+  const pending = status === 'pending';
+  const destroyed = status === 'destroyed';
+  // El tamaño crece con el tier: B < A < S.
+  const rank = tierRank(modeId, objective?.tier ?? marker.tier);
+  const k = 0.75 + rank * 0.8;
+  const h = destroyed ? 1 : 3.2 + rank * 3.2;
+  const color = pending ? '#cbd5e1' : STATUS_COLORS[status];
+  const stone = '#b9c0c8';
+  const ghost = { transparent: pending, opacity: pending ? 0.4 : 1 };
+  const glow = status === 'active' ? 0.55 : status.startsWith('captured') ? 0.3 : 0;
+  const tier = objective?.tier ?? marker.tier;
+  return (
+    <group position={[x, 0.42, z]}>
+      {/* Basamento, fuste y capitel. */}
+      <mesh position-y={0.25}>
+        <cylinderGeometry args={[k * 1.25, k * 1.45, 0.5, 8]} />
+        <meshLambertMaterial color={stone} flatShading {...ghost} />
+      </mesh>
+      <mesh position-y={0.5 + h / 2} rotation-z={destroyed ? 0.12 : 0}>
+        <cylinderGeometry args={[k * 0.62, k * 0.82, h, 8]} />
+        <meshLambertMaterial color={color} flatShading {...ghost} emissive={color} emissiveIntensity={glow * 0.5} />
+      </mesh>
+      {!destroyed && (
+        <>
+          <mesh position-y={0.5 + h + 0.2}>
+            <cylinderGeometry args={[k * 1.0, k * 0.66, 0.4, 8]} />
+            <meshLambertMaterial color={stone} flatShading {...ghost} />
+          </mesh>
+          {/* Cristal sobre el pilar: brilla cuando está activo o capturado. */}
+          <mesh position-y={0.5 + h + 1.5} scale={[k * 0.7, k * 1.15, k * 0.7]}>
+            <octahedronGeometry args={[1]} />
+            <meshLambertMaterial color={pending ? '#e2e8f0' : color} flatShading {...ghost} emissive={pending ? '#000000' : color} emissiveIntensity={glow} />
+          </mesh>
+        </>
+      )}
+      {destroyed && [0, 1, 2, 3].map((i) => (
+        <mesh key={i} position={[Math.cos(i * 1.7) * k * 1.9, 0.25, Math.sin(i * 1.7) * k * 1.9]} rotation={[i, i * 2, i * 0.5]}>
+          <boxGeometry args={[k * 0.8, k * 0.5, k * 0.6]} />
+          <meshLambertMaterial color={STATUS_COLORS.destroyed} flatShading />
+        </mesh>
+      ))}
+      {status.startsWith('captured') && (
+        <mesh rotation-x={FLAT} position-y={0.08} renderOrder={4}>
+          <ringGeometry args={[k * 2.6, k * 3.3, 40]} />
+          <meshBasicMaterial color={color} transparent opacity={0.75} depthTest={false} />
+        </mesh>
+      )}
+      {tier && <Label text={tier} position={[0, h + 4.2, 0]} color="#fde68a" height={2.4} />}
+      {objective?.timerSeconds != null && <Label text={formatTimer(objective.timerSeconds)} position={[0, h + (tier ? 6.2 : 4.2), 0]} color="#fde68a" />}
+    </group>
+  );
+}
+
+/** Objetivos de Vigrid en volumen: formas simples con el color del tipo y su ícono flotando encima. */
+function Objective3D({ marker, objective, x, z }: { marker: Marker; objective?: ObjectiveState; x: number; z: number }) {
+  const look = lookOf(marker)!;
+  const status = objective?.status;
+  const dim = status === 'destroyed' || status === 'pending';
+  const glow = status === 'active' ? 0.45 : status?.startsWith('captured') ? 0.3 : 0.15;
+  const mat = (color: string, extra: object = {}) => <meshLambertMaterial color={color} flatShading transparent={dim} opacity={dim ? 0.55 : 1} {...extra} />;
+  const lit = (color: string) => mat(color, { emissive: color, emissiveIntensity: glow });
+  const stone = '#b9b2a6';
+  let body: React.ReactNode;
+  let top = 3.4;
+  switch (marker.kind) {
+    case 'entry':
+      top = 5.2;
+      body = (
+        <>
+          {[-1.6, 1.6].map((dx) => <mesh key={dx} position={[dx, 2, 0]}><boxGeometry args={[0.55, 4, 0.55]} />{mat(look.color)}</mesh>)}
+          <mesh position={[0, 4.2, 0]}><boxGeometry args={[4.4, 0.5, 0.8]} />{mat(look.color)}</mesh>
+          <mesh position={[0, 0.1, 0]}><cylinderGeometry args={[2.6, 2.8, 0.2, 8]} />{mat(stone)}</mesh>
+        </>
+      );
+      break;
+    case 'respawn-point':
+      top = 2.6;
+      body = (
+        <>
+          <mesh position-y={0.12}><cylinderGeometry args={[1.5, 1.6, 0.24, 16]} />{lit(look.color)}</mesh>
+          <mesh position-y={1.6} scale={[0.6, 0.9, 0.6]}><octahedronGeometry args={[1]} />{lit(look.color)}</mesh>
+        </>
+      );
+      break;
+    case 'horn':
+      top = 6.2;
+      body = (
+        <>
+          <mesh position-y={0.3}><cylinderGeometry args={[2.6, 3, 0.6, 12]} />{mat(stone)}</mesh>
+          {/* Cuerno dorado inclinado sobre el estrado. */}
+          <mesh position={[0, 3, 0]} rotation-z={0.9}><coneGeometry args={[1.1, 4.2, 14, 1, true]} />{lit(look.color)}</mesh>
+          <mesh position={[1.4, 3.9, 0]}><torusGeometry args={[1.1, 0.22, 8, 20]} />{lit('#fde68a')}</mesh>
+        </>
+      );
+      break;
+    case 'fenrir':
+      top = 5.2;
+      body = (
+        <>
+          <mesh position={[0, 1.8, 0]} scale={[1.6, 1.1, 2.4]}><icosahedronGeometry args={[1, 0]} />{mat(look.color)}</mesh>
+          <mesh position={[0, 3, 1.9]} scale={[0.9, 0.8, 1.1]}><icosahedronGeometry args={[1, 0]} />{mat('#475569')}</mesh>
+          {[-0.45, 0.45].map((dx) => <mesh key={dx} position={[dx, 3.9, 1.8]}><coneGeometry args={[0.28, 0.8, 4]} />{mat('#475569')}</mesh>)}
+          {[-0.35, 0.35].map((dx) => <mesh key={`e${dx}`} position={[dx, 3.15, 2.85]}><sphereGeometry args={[0.14, 6, 6]} /><meshBasicMaterial color="#ef4444" /></mesh>)}
+        </>
+      );
+      break;
+    case 'element-lord':
+      top = 5;
+      body = (
+        <>
+          <mesh position-y={0.35}><cylinderGeometry args={[1.5, 1.8, 0.7, 6]} />{mat(stone)}</mesh>
+          <mesh position-y={2.6} scale={[1.1, 1.6, 1.1]}><octahedronGeometry args={[1]} />{lit(look.color)}</mesh>
+        </>
+      );
+      break;
+    case 'altar': {
+      const corrupted = status === 'destroyed';
+      top = 4;
+      body = (
+        <>
+          <mesh position-y={0.4}><cylinderGeometry args={[2.1, 2.4, 0.8, 8]} />{mat(stone)}</mesh>
+          <mesh position-y={1.6}><boxGeometry args={[1.2, 1.6, 1.2]} />{mat(corrupted ? '#4c1d95' : '#d6c3a0')}</mesh>
+          <mesh position-y={2.6}><cylinderGeometry args={[1.1, 0.8, 0.4, 8]} />{lit(corrupted ? '#7c3aed' : look.color)}</mesh>
+        </>
+      );
+      break;
+    }
+    case 'dracula':
+      top = 4.6;
+      body = (
+        <>
+          <mesh position-y={1.6} scale={[1, 1, 0.6]}><cylinderGeometry args={[0.8, 1.1, 3.2, 6]} />{mat(look.color)}</mesh>
+          <mesh position-y={3.4}><coneGeometry args={[0.9, 0.8, 6]} />{lit('#7f1d1d')}</mesh>
+        </>
+      );
+      break;
+    default:
+      top = 4.8;
+      body = (
+        <>
+          <mesh position-y={0.9}><cylinderGeometry args={[0.25, 0.35, 1.8, 5]} />{mat('#8a6a4a')}</mesh>
+          <mesh position-y={2.6}><icosahedronGeometry args={[1.4, 0]} />{mat(look.color)}</mesh>
+        </>
+      );
+  }
+  const ring = status?.startsWith('captured') ? STATUS_COLORS[status] : null;
+  return (
+    <group position={[x, 0.42, z]}>
+      {body}
+      {ring && (
+        <mesh rotation-x={FLAT} position-y={0.08} renderOrder={4}>
+          <ringGeometry args={[3, 3.7, 40]} />
+          <meshBasicMaterial color={ring} transparent opacity={0.8} depthTest={false} />
+        </mesh>
+      )}
+      <Label text={look.icon} position={[0, top + 1.2, 0]} height={2.2} />
+      {objective?.timerSeconds != null && <Label text={formatTimer(objective.timerSeconds)} position={[0, top + 3, 0]} color="#fde68a" />}
+    </group>
+  );
+}
+
+export const Markers3D = memo(function Markers3D({ map, proj, objectives, labelHeight = 1.2 }: { map: MapConfig; proj: Projection3; objectives: ObjectiveState[]; labelHeight?: number }) {
+  const overrides = useScoringStore((s) => s.overrides);
+  const field = useStrategyStore((s) => s.strategy.field) ?? 'main';
+  const { stats } = resolvedStats(map.modeId, overrides, field);
+  const unitShort = field === 'sub' ? 'moral' : 'pts';
+  return (
+    <group>
+      {map.markers.map((m) => {
+        const [x, z] = proj.toGround(m.pos);
+        // Los marcadores se apoyan en el relieve (mesetas y rampas).
+        const lift = elevationAt(map.geometry, map.aspect, m.pos);
+        const tier = objectives.find((o) => o.markerId === m.id)?.tier ?? m.tier;
+        const value = stats.find((s) => s.id === tier)?.pillarTotal;
+        const pillar = m.kind === 'central-pillar' || m.kind === 'pillar-slot';
+        const bossValue = pillar ? null : objectiveValue(map.modeId, field, m.kind);
+        const label = <Label text={`${m.label}${m.confirmed || pillar ? '' : ' (?)'} · Z${zoneOf(m.pos, map.numpad)}${pillar && value != null ? ` · ${value} ${unitShort}` : ''}${bossValue != null ? ` · ${(bossValue / 1000).toLocaleString('es')}k` : ''}`} position={[x, 0.3, z + 3]} height={labelHeight} />;
+        if (lookOf(m)) {
+          return <group key={m.id} position-y={lift}><Objective3D marker={m} objective={objectives.find((o) => o.markerId === m.id)} x={x} z={z} />{label}</group>;
+        }
+        if (m.kind === 'central-pillar' || m.kind === 'pillar-slot') {
+          return <group key={m.id} position-y={lift}><Pillar marker={m} objective={objectives.find((o) => o.markerId === m.id)} modeId={map.modeId} x={x} z={z} />{label}</group>;
+        }
+        if (m.kind === 'respawn') {
+          const color = SIDE_COLORS[m.side ?? 'green'];
+          return (
+            <group key={m.id} position-y={lift}>
+              <group position={[x, 0.44, z]}>
+                {/* Plataforma de la guild con estandarte. */}
+                <mesh position-y={0.2}>
+                  <cylinderGeometry args={[2.3, 2.6, 0.4, 6]} />
+                  <meshLambertMaterial color={color} flatShading />
+                </mesh>
+                <mesh position-y={0.5}>
+                  <cylinderGeometry args={[1.5, 1.7, 0.25, 6]} />
+                  <meshLambertMaterial color="#f8fafc" flatShading />
+                </mesh>
+                <mesh position={[0, 2.9, 0]}>
+                  <cylinderGeometry args={[0.12, 0.12, 4.8, 5]} />
+                  <meshLambertMaterial color="#5b4636" />
+                </mesh>
+                <mesh position={[0.95, 4.3, 0]}>
+                  <boxGeometry args={[1.8, 1.5, 0.12]} />
+                  <meshLambertMaterial color={color} emissive={color} emissiveIntensity={0.25} />
+                </mesh>
+                <mesh position={[0, 5.45, 0]}>
+                  <octahedronGeometry args={[0.35]} />
+                  <meshLambertMaterial color="#f5b82e" flatShading />
+                </mesh>
+              </group>
+              {label}
+            </group>
+          );
+        }
+        const color = m.kind === 'point-green' ? '#a3d93a' : '#a970e6';
+        return (
+          <group key={m.id} position-y={lift}>
+            <mesh position={[x, 0.2, z]}>
+              <cylinderGeometry args={[1.1, 1.3, 0.4, 8]} />
+              <meshLambertMaterial color="#b9c0c8" flatShading />
+            </mesh>
+            {m.kind === 'point-green' ? (
+              <mesh position={[x, 2, z]} scale={[0.9, 1.3, 0.9]}>
+                <octahedronGeometry args={[1.1]} />
+                <meshLambertMaterial color={color} flatShading emissive={color} emissiveIntensity={0.25} />
+              </mesh>
+            ) : (
+              <>
+                <mesh position={[x, 1.6, z]}>
+                  <cylinderGeometry args={[0.7, 0.95, 2.4, 6]} />
+                  <meshLambertMaterial color={color} flatShading />
+                </mesh>
+                <mesh position={[x, 3.2, z]}>
+                  <coneGeometry args={[1.05, 1.1, 6]} />
+                  <meshLambertMaterial color="#7c4fc4" flatShading />
+                </mesh>
+              </>
+            )}
+            {label}
+          </group>
+        );
+      })}
+    </group>
+  );
+});
+
+// ---------- Grilla numpad ----------
+
+export const Numpad3D = memo(function Numpad3D({ map, proj, azimuth }: { map: MapConfig; proj: Projection3; azimuth: number }) {
+  const { cols, rows } = map.numpad;
+  const y = DRAW_Y - 0.1;
+  const at = (p: Vec2): [number, number, number] => { const [x, z] = proj.toGround(p); return [x, y, z]; };
+  const seg = (a: Vec2, b: Vec2) => [at(a), at(b)];
+  const lines = [...cols.map((x) => seg({ x, y: 0 }, { x, y: 1 })), ...rows.map((v) => seg({ x: 0, y: v }, { x: 1, y: v }))];
+  return (
+    <group>
+      {lines.map((pts, i) => (
+        <Line key={i} points={pts} color={map.style.grid} lineWidth={1.5} transparent opacity={0.55} depthTest={false} renderOrder={5} />
+      ))}
+      {zoneCenters(map.numpad).map(({ zone, center }) => {
+        const [x, z] = proj.toGround(center);
+        const { texture, aspect } = labelTexture(`${zone} ${ZONE_KEYS[zone]}`.trim(), map.style.grid, 64);
+        // Acostado sobre el suelo y girado para leerse desde la cámara.
+        return (
+          <mesh key={zone} position={[x, y, z]} rotation={[FLAT, 0, azimuth]} renderOrder={5}>
+            <planeGeometry args={[4.5 * aspect, 4.5]} />
+            <meshBasicMaterial map={texture} transparent opacity={0.5} depthTest={false} />
+          </mesh>
+        );
+      })}
+    </group>
+  );
+});
+
+// ---------- Tokens ----------
+
+interface TokensProps {
+  tokens: Token[];
+  proj: Projection3;
+  map: MapConfig;
+  parties: Party[];
+  raids: Raid[];
+  allySide: Side;
+  selection: string[];
+}
+
+/** Tamaño del sprite de un token en unidades de mundo. */
+export const tokenSpriteSize = (t: Token) => (t.group?.type === 'raid' ? 10 : t.group ? 8 : 7);
+
+export const Tokens3D = memo(function Tokens3D({ tokens, proj, map, parties, raids, allySide, selection }: TokensProps) {
+  return (
+    <group>
+      {tokens.map((t) => {
+        const [x, z] = proj.toGround(t.pos);
+        const lift = elevationAt(map.geometry, map.aspect, t.pos);
+        const job = jobById(t.jobId);
+        const role = roleById(t.role);
+        const ring = teamColor(t.team, allySide);
+        const zone = `Z${zoneOf(t.pos, map.numpad)}`;
+        const texture = tokenTexture({
+          abbr: tokenBadge(t, { parties, raids }),
+          color: t.group ? (t.group.type === 'raid' ? '#0f172a' : '#1e293b') : (job?.color ?? '#475569'),
+          ring,
+          party: t.group ? undefined : partyOfToken(parties, t)?.number,
+          roleColor: t.group ? undefined : role?.color,
+          shape: t.group?.type,
+          label: t.group ? `${groupLabel(t, { parties, raids })} · ${zone}` : `${t.playerName ? t.playerName + ' · ' : ''}${role ? role.short + ' · ' : ''}${zone}`,
+          selected: selection.includes(t.id),
+          locked: !!t.locked,
+        });
+        return (
+          <group key={t.id}>
+            <mesh position={[x, 0.3 + lift, z]} rotation-x={FLAT} renderOrder={8}>
+              <circleGeometry args={[1.2, 20]} />
+              <meshBasicMaterial color={ring} transparent opacity={0.85} depthTest={false} />
+            </mesh>
+            {/* Billboard: el sprite siempre mira a la cámara. */}
+            <sprite position={[x, TOKEN_Y + lift, z]} scale={[tokenSpriteSize(t), tokenSpriteSize(t), 1]} renderOrder={15}>
+              <spriteMaterial map={texture} depthTest={false} transparent />
+            </sprite>
+          </group>
+        );
+      })}
+    </group>
+  );
+});
+
+// ---------- Dibujos ----------
+
+/** Densifica una polilínea para que siga el relieve (rampas) en vez de atravesarlo. */
+function densify(points: Vec2[], step = 0.008): Vec2[] {
+  const out: Vec2[] = [];
+  points.forEach((p, i) => {
+    if (i > 0) {
+      const a = points[i - 1];
+      const n = Math.floor(Math.hypot(p.x - a.x, p.y - a.y) / step);
+      for (let k = 1; k < n; k++) out.push({ x: a.x + ((p.x - a.x) * k) / n, y: a.y + ((p.y - a.y) * k) / n });
+    }
+    out.push(p);
+  });
+  return out;
+}
+
+function Drawing3D({ d, proj, map, selected }: { d: Draft; proj: Projection3; map: MapConfig; selected: boolean }) {
+  const aspect = map.aspect;
+  const v = (p: Vec2): [number, number, number] => { const [x, z] = proj.toGround(p); return [x, DRAW_Y + elevationAt(map.geometry, aspect, p), z]; };
+  const color = d.color;
+  const width = d.width * 0.9 + (selected ? 2 : 0);
+  const line = (pts: [number, number, number][]) => <Line points={pts} color={selected ? '#38bdf8' : color} lineWidth={width} depthTest={false} renderOrder={10} transparent />;
+
+  const head = useMemo(() => {
+    if (d.tool !== 'arrow' && d.tool !== 'curve-arrow') return null;
+    const end = d.points[d.points.length - 1];
+    const prev = d.tool === 'curve-arrow' ? (d.points.length === 3 ? d.points[1] : curveControl(d.points[0], end, aspect)) : d.points[d.points.length - 2];
+    const [ex, ez] = proj.toGround(end);
+    const [px, pz] = proj.toGround(prev);
+    return { ex, ez, ey: DRAW_Y + elevationAt(map.geometry, aspect, end), angle: Math.atan2(ex - px, ez - pz) };
+  }, [d, proj, aspect, map.geometry]);
+
+  switch (d.tool) {
+    case 'pen':
+    case 'line':
+      return d.points.length > 1 ? line(densify(d.points).map(v)) : null;
+    case 'arrow':
+    case 'curve-arrow': {
+      const [a, b] = [d.points[0], d.points[d.points.length - 1]];
+      // Una flecha enrutada por los senderos trae puntos intermedios.
+      let pts = densify(d.points).map(v);
+      if (d.tool === 'curve-arrow') {
+        const c = d.points.length === 3 ? d.points[1] : curveControl(a, b, aspect);
+        pts = new THREE.CatmullRomCurve3([a, c, b].map((p) => new THREE.Vector3(...v(p)))).getPoints(24).map((p) => [p.x, DRAW_Y + elevationAt(map.geometry, aspect, proj.toNorm(p.x, p.z)), p.z]);
+      }
+      const size = 0.45 + d.width * 0.14;
+      return (
+        <>
+          {line(pts)}
+          {head && (
+            <mesh position={[head.ex, head.ey, head.ez]} rotation={[FLAT, 0, head.angle + Math.PI]} renderOrder={10}>
+              <coneGeometry args={[size, size * 2, 3]} />
+              <meshBasicMaterial color={color} depthTest={false} />
+            </mesh>
+          )}
+        </>
+      );
+    }
+    case 'rect': {
+      const [a, b] = d.points;
+      const corners = [a, { x: b.x, y: a.y }, b, { x: a.x, y: b.y }, a].map(v);
+      const [cx, cz] = proj.toGround({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+      return (
+        <>
+          <mesh position={[cx, DRAW_Y - 0.02, cz]} rotation-x={FLAT} renderOrder={9}>
+            <planeGeometry args={[Math.abs(b.x - a.x) * proj.w, Math.abs(b.y - a.y) * proj.d]} />
+            <meshBasicMaterial color={color} transparent opacity={0.15} depthTest={false} />
+          </mesh>
+          {line(corners)}
+        </>
+      );
+    }
+    case 'circle': {
+      const [c, e] = d.points;
+      const [cx, cz] = proj.toGround(c);
+      const [ex, ez] = proj.toGround(e);
+      const r = Math.hypot(ex - cx, ez - cz);
+      const pts = Array.from({ length: 49 }, (_, i): [number, number, number] => [cx + r * Math.cos((i / 48) * Math.PI * 2), DRAW_Y, cz + r * Math.sin((i / 48) * Math.PI * 2)]);
+      return (
+        <>
+          <mesh position={[cx, DRAW_Y - 0.02, cz]} rotation-x={FLAT} renderOrder={9}>
+            <circleGeometry args={[r, 40]} />
+            <meshBasicMaterial color={color} transparent opacity={0.15} depthTest={false} />
+          </mesh>
+          {line(pts)}
+        </>
+      );
+    }
+    case 'text': {
+      const p = v(d.points[0]);
+      return <Label text={d.text ?? ''} position={[p[0], p[1] + 1, p[2]]} color={selected ? '#38bdf8' : color} height={1.2 + d.width * 0.25} />;
+    }
+    case 'ping': {
+      const p = v(d.points[0]);
+      return (
+        <sprite position={[p[0], p[1] + 1.6, p[2]]} scale={[3.6, 3.6, 1]} renderOrder={12}>
+          <spriteMaterial map={pingTexture(color, selected)} depthTest={false} transparent />
+        </sprite>
+      );
+    }
+  }
+}
+
+interface DrawingsProps {
+  drawings: Drawing[];
+  draft: Draft | null;
+  proj: Projection3;
+  map: MapConfig;
+  selection: string[];
+}
+
+export const Drawings3D = memo(function Drawings3D({ drawings, draft, proj, map, selection }: DrawingsProps) {
+  return (
+    <group>
+      {drawings.map((d) => <Drawing3D key={d.id} d={d} proj={proj} map={map} selected={selection.includes(d.id)} />)}
+      {draft && <Drawing3D d={draft} proj={proj} map={map} selected={false} />}
+    </group>
+  );
+});
