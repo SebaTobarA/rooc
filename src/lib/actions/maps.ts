@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { requireAdmin } from "@/lib/auth";
 import { slugify } from "@/lib/slug";
 
 const mapSchema = z.object({
@@ -27,6 +28,7 @@ function revalidateMapPaths(slug?: string) {
 }
 
 export async function createMap(formData: FormData) {
+  await requireAdmin();
   const data = parseMapForm(formData);
   const slug = slugify(data.name);
 
@@ -39,6 +41,7 @@ export async function createMap(formData: FormData) {
 }
 
 export async function updateMap(id: string, formData: FormData) {
+  await requireAdmin();
   const data = parseMapForm(formData);
   const existing = await prisma.gameMap.findUniqueOrThrow({ where: { id } });
   const slug = data.name === existing.name ? existing.slug : slugify(data.name);
@@ -51,6 +54,7 @@ export async function updateMap(id: string, formData: FormData) {
 }
 
 export async function deleteMap(id: string) {
+  await requireAdmin();
   const existing = await prisma.gameMap.delete({ where: { id } });
   revalidateMapPaths(existing.slug);
   redirect("/admin/maps");
@@ -64,6 +68,7 @@ const npcSchema = z.object({
 });
 
 export async function addNpc(mapId: string, formData: FormData) {
+  await requireAdmin();
   const data = npcSchema.parse({
     name: formData.get("name"),
     role: formData.get("role") ?? "",
@@ -76,6 +81,7 @@ export async function addNpc(mapId: string, formData: FormData) {
 }
 
 export async function deleteNpc(npcId: string) {
+  await requireAdmin();
   const npc = await prisma.npc.delete({ where: { id: npcId } });
   const map = await prisma.gameMap.findUnique({ where: { id: npc.mapId } });
   revalidateMapPaths(map?.slug);

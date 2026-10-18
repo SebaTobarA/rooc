@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { Element, MonsterRace, MonsterSize } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { requireAdmin } from "@/lib/auth";
 import { slugify } from "@/lib/slug";
 
 const monsterSchema = z.object({
@@ -47,6 +48,7 @@ function revalidateMonsterPaths(slug?: string) {
 }
 
 export async function createMonster(formData: FormData) {
+  await requireAdmin();
   const data = parseMonsterForm(formData);
   const slug = slugify(data.name);
 
@@ -59,6 +61,7 @@ export async function createMonster(formData: FormData) {
 }
 
 export async function updateMonster(id: string, formData: FormData) {
+  await requireAdmin();
   const data = parseMonsterForm(formData);
   const existing = await prisma.monster.findUniqueOrThrow({ where: { id } });
   const slug = data.name === existing.name ? existing.slug : slugify(data.name);
@@ -74,6 +77,7 @@ export async function updateMonster(id: string, formData: FormData) {
 }
 
 export async function deleteMonster(id: string) {
+  await requireAdmin();
   const existing = await prisma.monster.delete({ where: { id } });
   revalidateMonsterPaths(existing.slug);
   redirect("/admin/monsters");
@@ -82,6 +86,7 @@ export async function deleteMonster(id: string) {
 // --- Relación Monstruo <-> Mapa -------------------------------------------
 
 export async function addMonsterToMap(monsterId: string, mapId: string) {
+  await requireAdmin();
   await prisma.mapMonster.upsert({
     where: { mapId_monsterId: { mapId, monsterId } },
     update: {},
@@ -93,6 +98,7 @@ export async function addMonsterToMap(monsterId: string, mapId: string) {
 }
 
 export async function removeMonsterFromMap(mapMonsterId: string) {
+  await requireAdmin();
   await prisma.mapMonster.delete({ where: { id: mapMonsterId } });
   revalidateMonsterPaths();
   revalidatePath("/panel/maps");

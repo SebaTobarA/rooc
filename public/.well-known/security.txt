@@ -1,0 +1,6 @@
+Contact: https://specialdelivery.vercel.app/seguridad
+Contact: https://discord.gg/XnTrEKEGw
+Expires: 2027-10-17T00:00:00.000Z
+Preferred-Languages: es, en
+Canonical: https://specialdelivery.vercel.app/.well-known/security.txt
+Policy: https://specialdelivery.vercel.app/seguridad

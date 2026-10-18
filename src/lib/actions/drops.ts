@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { requireAdmin } from "@/lib/auth";
 
 const dropSchema = z.object({
   monsterId: z.string().min(1, "Elige un monstruo"),
@@ -30,6 +31,7 @@ async function revalidateDropPaths(monsterId: string, itemId: string) {
 }
 
 export async function createDrop(formData: FormData) {
+  await requireAdmin();
   const data = parseDropForm(formData);
 
   await prisma.drop.upsert({
@@ -43,6 +45,7 @@ export async function createDrop(formData: FormData) {
 }
 
 export async function updateDrop(id: string, formData: FormData) {
+  await requireAdmin();
   const data = parseDropForm(formData);
 
   await prisma.drop.update({ where: { id }, data });
@@ -52,6 +55,7 @@ export async function updateDrop(id: string, formData: FormData) {
 }
 
 export async function deleteDrop(id: string) {
+  await requireAdmin();
   const existing = await prisma.drop.delete({ where: { id } });
   await revalidateDropPaths(existing.monsterId, existing.itemId);
   redirect("/admin/drops");

@@ -70,14 +70,14 @@ export function CandidateShotField({
           <label className="flex h-full w-full cursor-pointer flex-col items-center justify-center gap-1 text-muted hover:text-accent">
             {uploading ? <Loader2 className="h-6 w-6 animate-spin" /> : <ImagePlus className="h-6 w-6" />}
             <span className="text-[11px]">{uploading ? "Subiendo…" : "Subir captura"}</span>
-            <input type="file" accept="image/*" onChange={handleFile} className="sr-only" disabled={uploading} />
+            <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={handleFile} className="sr-only" disabled={uploading} />
           </label>
         )}
       </div>
       {url && (
         <label className="cursor-pointer text-center text-[11px] text-accent hover:underline">
           {uploading ? "Subiendo…" : "Reemplazar"}
-          <input type="file" accept="image/*" onChange={handleFile} className="sr-only" disabled={uploading} />
+          <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={handleFile} className="sr-only" disabled={uploading} />
         </label>
       )}
       <p className="text-center text-[11px] text-muted">{hint}</p>

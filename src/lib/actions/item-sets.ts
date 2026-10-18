@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { requireAdmin } from "@/lib/auth";
 import { slugify } from "@/lib/slug";
 
 const setSchema = z.object({
@@ -57,6 +58,7 @@ function revalidateSetPaths() {
 }
 
 export async function createItemSet(formData: FormData) {
+  await requireAdmin();
   const data = parseSetForm(formData);
   const tiers = parseTiers(formData);
   const pieceBonuses = parsePieceBonuses(formData);
@@ -76,6 +78,7 @@ export async function createItemSet(formData: FormData) {
 }
 
 export async function updateItemSet(id: string, formData: FormData) {
+  await requireAdmin();
   const data = parseSetForm(formData);
   const tiers = parseTiers(formData);
   const pieceBonuses = parsePieceBonuses(formData);
@@ -101,6 +104,7 @@ export async function updateItemSet(id: string, formData: FormData) {
 }
 
 export async function deleteItemSet(id: string) {
+  await requireAdmin();
   await prisma.itemSet.delete({ where: { id } });
   revalidateSetPaths();
   redirect("/admin/sets");

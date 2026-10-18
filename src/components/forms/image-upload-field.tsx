@@ -49,7 +49,7 @@ export function ImageUploadField({
       <div className="flex items-center gap-2">
         <input
           type="file"
-          accept="image/*"
+          accept="image/png,image/jpeg,image/webp,image/gif"
           onChange={handleFileChange}
           className="text-sm text-muted file:mr-3 file:rounded-md file:border file:border-border file:bg-background-elevated file:px-3 file:py-1.5 file:text-sm file:text-foreground"
         />

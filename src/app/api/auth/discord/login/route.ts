@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { buildDiscordAuthorizeUrl, DISCORD_STATE_COOKIE } from "@/lib/discord-auth";
+import { safeRedirectPath } from "@/lib/safe-redirect";
 
 /**
  * Inicia el login general con Discord (cualquier miembro del server, y
@@ -10,7 +11,7 @@ import { buildDiscordAuthorizeUrl, DISCORD_STATE_COOKIE } from "@/lib/discord-au
  */
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const from = url.searchParams.get("from") ?? "/panel";
+  const from = safeRedirectPath(url.searchParams.get("from"), "/panel");
 
   const stateToken = crypto.randomUUID();
   const state = `${stateToken}:${encodeURIComponent(from)}`;

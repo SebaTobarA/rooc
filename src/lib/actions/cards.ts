@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { CardRarity, CardSlot } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { requireAdmin } from "@/lib/auth";
 import { slugify } from "@/lib/slug";
 
 const cardSchema = z.object({
@@ -44,6 +45,7 @@ function revalidateCardPaths(slug?: string) {
 }
 
 export async function createCard(formData: FormData) {
+  await requireAdmin();
   const data = parseCardForm(formData);
   const slug = slugify(data.name);
 
@@ -56,6 +58,7 @@ export async function createCard(formData: FormData) {
 }
 
 export async function updateCard(id: string, formData: FormData) {
+  await requireAdmin();
   const data = parseCardForm(formData);
   const existing = await prisma.card.findUniqueOrThrow({ where: { id } });
 
@@ -73,6 +76,7 @@ export async function updateCard(id: string, formData: FormData) {
 }
 
 export async function deleteCard(id: string) {
+  await requireAdmin();
   const existing = await prisma.card.delete({ where: { id } });
   revalidateCardPaths(existing.slug);
   redirect("/admin/cards");

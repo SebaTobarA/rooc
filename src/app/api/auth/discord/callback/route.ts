@@ -12,6 +12,7 @@ import {
 } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { isDbGrantedAdmin } from "@/lib/permissions";
+import { safeRedirectPath } from "@/lib/safe-redirect";
 
 function errorRedirect(request: Request, from: string, reason: string) {
   const target = from.startsWith("/admin") ? "/admin/login" : "/";
@@ -31,7 +32,12 @@ export async function GET(request: Request) {
   }
 
   const [stateToken, encodedFrom] = state.split(":");
-  const from = encodedFrom ? decodeURIComponent(encodedFrom) : "/panel";
+  let from = "/panel";
+  try {
+    from = safeRedirectPath(encodedFrom ? decodeURIComponent(encodedFrom) : null, "/panel");
+  } catch {
+    // `state` mal codificado: se vuelve al panel.
+  }
 
   const expectedStateToken = request.headers
     .get("cookie")

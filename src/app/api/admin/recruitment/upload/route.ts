@@ -3,6 +3,7 @@ import { put } from "@vercel/blob";
 import { getSession } from "@/lib/auth";
 import { getEffectivePermissions } from "@/lib/permissions";
 import { SCREENSHOT_MAX_BYTES } from "@/lib/recruitment-screenshots";
+import { validateImageUpload } from "@/lib/upload-validation";
 
 /**
  * Subida de las capturas de la ficha de candidato. Vive bajo
@@ -21,11 +22,9 @@ export async function POST(request: Request) {
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "Falta el archivo." }, { status: 400 });
   }
-  if (!file.type.startsWith("image/")) {
-    return NextResponse.json({ error: "El archivo debe ser una imagen." }, { status: 400 });
-  }
-  if (file.size > SCREENSHOT_MAX_BYTES) {
-    return NextResponse.json({ error: "La captura no puede superar los 4 MB." }, { status: 400 });
+  const invalid = await validateImageUpload(file, SCREENSHOT_MAX_BYTES);
+  if (invalid) {
+    return NextResponse.json({ error: invalid }, { status: 400 });
   }
 
   try {

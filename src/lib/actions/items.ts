@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { EquipSlot, ItemRarity, WeaponType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { requireAdmin } from "@/lib/auth";
 import { slugify } from "@/lib/slug";
 
 const itemSchema = z.object({
@@ -40,6 +41,7 @@ function revalidateItemPaths(slug?: string) {
 }
 
 export async function createItem(formData: FormData) {
+  await requireAdmin();
   const { setId, ...data } = parseItemForm(formData);
   const slug = slugify(data.name);
 
@@ -52,6 +54,7 @@ export async function createItem(formData: FormData) {
 }
 
 export async function updateItem(id: string, formData: FormData) {
+  await requireAdmin();
   const { setId, ...data } = parseItemForm(formData);
   const existing = await prisma.item.findUniqueOrThrow({ where: { id } });
 
@@ -69,6 +72,7 @@ export async function updateItem(id: string, formData: FormData) {
 }
 
 export async function deleteItem(id: string) {
+  await requireAdmin();
   const existing = await prisma.item.delete({ where: { id } });
   revalidateItemPaths(existing.slug);
   redirect("/admin/items");

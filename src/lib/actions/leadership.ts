@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { requireAdmin } from "@/lib/auth";
 
 function revalidateLeadershipPaths() {
   revalidatePath("/admin/leadership");
@@ -9,6 +10,7 @@ function revalidateLeadershipPaths() {
 }
 
 export async function createPosition(formData: FormData) {
+  await requireAdmin();
   const title = String(formData.get("title") ?? "").trim();
   if (!title) return;
 
@@ -21,6 +23,7 @@ export async function createPosition(formData: FormData) {
 }
 
 export async function updatePositionTitle(id: string, formData: FormData) {
+  await requireAdmin();
   const title = String(formData.get("title") ?? "").trim();
   if (!title) return;
 
@@ -29,11 +32,13 @@ export async function updatePositionTitle(id: string, formData: FormData) {
 }
 
 export async function deletePosition(id: string) {
+  await requireAdmin();
   await prisma.leadershipPosition.delete({ where: { id } });
   revalidateLeadershipPaths();
 }
 
 export async function movePosition(id: string, direction: "up" | "down") {
+  await requireAdmin();
   const positions = await prisma.leadershipPosition.findMany({ orderBy: { order: "asc" } });
   const index = positions.findIndex((p) => p.id === id);
   const swapIndex = direction === "up" ? index - 1 : index + 1;
@@ -51,6 +56,7 @@ export async function movePosition(id: string, direction: "up" | "down") {
 }
 
 export async function addMemberToPosition(positionId: string, formData: FormData) {
+  await requireAdmin();
   const discordId = String(formData.get("discordId") ?? "").trim();
   const discordUsername = String(formData.get("discordUsername") ?? "").trim();
   const discordAvatarHash = String(formData.get("discordAvatarHash") ?? "").trim() || null;
@@ -77,6 +83,7 @@ export async function addMemberToPosition(positionId: string, formData: FormData
 }
 
 export async function updateMemberNickname(memberId: string, formData: FormData) {
+  await requireAdmin();
   const nickname = String(formData.get("nickname") ?? "").trim();
   if (!nickname) return;
 
@@ -85,6 +92,7 @@ export async function updateMemberNickname(memberId: string, formData: FormData)
 }
 
 export async function removeMember(memberId: string) {
+  await requireAdmin();
   await prisma.leadershipMember.delete({ where: { id: memberId } });
   revalidateLeadershipPaths();
 }

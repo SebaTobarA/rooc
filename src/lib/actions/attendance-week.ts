@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
+import { getSession, requirePermission } from "@/lib/auth";
 import { chileWallTimeToUtc, addDaysToDateString } from "@/lib/chile-time";
 import { renderAndPublishEmbed } from "@/lib/events";
 import { readAllowedRoleIds } from "@/lib/discord-survey-roles";
@@ -25,6 +25,7 @@ const schema = z.object({
  * avisa quien llega tarde o no alcanza.
  */
 export async function createAttendanceWeek(formData: FormData) {
+  await requirePermission("canManageParty");
   const data = schema.parse({
     guildLeagueTemplateId: formData.get("guildLeagueTemplateId"),
     emperiumTemplateId: formData.get("emperiumTemplateId"),

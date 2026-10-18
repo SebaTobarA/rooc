@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
+import { getSession, requirePermission } from "@/lib/auth";
 import { getEffectivePermissions } from "@/lib/permissions";
 import { renderAndPublishEmbed } from "@/lib/events";
 import { deleteChannelMessage } from "@/lib/discord-bot";
@@ -53,6 +53,7 @@ function revalidateEventPaths(id?: string) {
 }
 
 export async function createEvent(formData: FormData) {
+  await requirePermission("canManageParty");
   const data = eventSchema.parse({
     title: formData.get("title"),
     description: formData.get("description") ?? "",
@@ -85,6 +86,7 @@ export async function createEvent(formData: FormData) {
 }
 
 export async function sendEvent(id: string, formData: FormData) {
+  await requirePermission("canManageParty");
   const channelId = String(formData.get("channelId") ?? "");
   if (!channelId) throw new Error("Elige a qué canal comunicar el evento.");
 
@@ -109,6 +111,7 @@ export async function sendEvent(id: string, formData: FormData) {
  * se aplican al grupo entero.
  */
 export async function updateEventAllowedRoles(id: string, formData: FormData) {
+  await requirePermission("canManageParty");
   const allowedRoleIds = readAllowedRoleIds(formData);
   const event = await prisma.event.findUniqueOrThrow({
     where: { id },
@@ -140,6 +143,7 @@ export async function updateEventAllowedRoles(id: string, formData: FormData) {
  * defecto.
  */
 export async function resendEvent(id: string) {
+  await requirePermission("canManageParty");
   const existing = await prisma.event.findUniqueOrThrow({ where: { id }, select: { channelId: true } });
   await prisma.event.update({ where: { id }, data: { channelId: null, messageId: null } });
   await renderAndPublishEmbed(id, existing.channelId ?? undefined);
@@ -153,6 +157,7 @@ export async function resendEvent(id: string) {
  * aceptando gente, o hay que cerrar antes de lo previsto).
  */
 export async function updateEventSignupsCloseAt(id: string, formData: FormData) {
+  await requirePermission("canManageParty");
   const date = String(formData.get("signupsCloseAtDate") ?? "");
   const time = String(formData.get("signupsCloseAtTime") ?? "");
   if (!date || !time) throw new Error("Elige la fecha y hora de cierre.");
@@ -194,6 +199,7 @@ export async function getEventSignups(eventId: string) {
  * mensaje ya borrado.
  */
 export async function deleteEvent(id: string) {
+  await requirePermission("canManageParty");
   const existing = await prisma.event.findUniqueOrThrow({ where: { id } });
 
   if (existing.weekGroupId) {

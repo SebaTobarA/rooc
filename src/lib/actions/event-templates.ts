@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { EventAttendanceMode, EventCategory } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
+import { getSession, requirePermission } from "@/lib/auth";
+import { getEffectivePermissions } from "@/lib/permissions";
 
 const templateSchema = z.object({
   title: z.string().min(1, "El nombre es obligatorio"),
@@ -29,6 +30,7 @@ function parseTemplateForm(formData: FormData) {
 }
 
 export async function createEventTemplate(formData: FormData) {
+  await requirePermission("canManageParty");
   const data = parseTemplateForm(formData);
 
   const session = await getSession();
@@ -42,6 +44,7 @@ export async function createEventTemplate(formData: FormData) {
 }
 
 export async function updateEventTemplate(id: string, formData: FormData) {
+  await requirePermission("canManageParty");
   const data = parseTemplateForm(formData);
   await prisma.eventTemplate.update({ where: { id }, data });
   revalidatePath("/panel/eventos");
@@ -55,7 +58,8 @@ export async function updateEventTemplate(id: string, formData: FormData) {
  */
 export async function deleteEventTemplate(id: string): Promise<{ archived?: boolean; error?: string }> {
   const session = await getSession();
-  if (!session) return { error: "Necesitas haber iniciado sesión." };
+  const permissions = await getEffectivePermissions(session);
+  if (!permissions.canManageParty) return { error: "Tu rol no tiene permiso para borrar plantillas." };
 
   const events = await prisma.event.count({ where: { templateId: id } });
   if (events > 0) {

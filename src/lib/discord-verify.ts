@@ -29,6 +29,10 @@ export function verifyDiscordRequest(
   timestamp: string | null
 ): boolean {
   if (!signature || !timestamp) return false;
+  // Una interacción firmada que alguien capturó no se puede reenviar más
+  // tarde: Discord manda el timestamp en segundos y se acepta hasta 5 min.
+  const ageSeconds = Math.abs(Date.now() / 1000 - Number(timestamp));
+  if (!Number.isFinite(ageSeconds) || ageSeconds > 300) return false;
   try {
     return nacl.sign.detached.verify(
       new TextEncoder().encode(timestamp + rawBody),

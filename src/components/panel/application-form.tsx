@@ -185,7 +185,7 @@ export function ApplicationForm({
 
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
                   required={!url}
                   onChange={(event) => handleFileChange(event, shot.field)}
                   className="text-sm text-muted file:mr-3 file:rounded-md file:border file:border-border file:bg-background-elevated file:px-3 file:py-1.5 file:text-sm file:text-foreground"

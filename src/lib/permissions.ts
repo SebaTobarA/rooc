@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { SessionPayload } from "@/lib/session";
+import { isOwnerId } from "@/lib/discord-auth";
 
 /**
  * true si el discordId fue otorgado como admin desde /admin/roles
@@ -10,6 +11,17 @@ import type { SessionPayload } from "@/lib/session";
 export async function isDbGrantedAdmin(discordId: string): Promise<boolean> {
   const grant = await prisma.adminGrant.findUnique({ where: { discordId } });
   return grant !== null;
+}
+
+/**
+ * Baja el isAdmin de una sesión de Discord cuyo admin ya fue revocado: la
+ * cookie lo guarda al iniciar sesión, pero un AdminGrant se puede quitar
+ * antes de que venza. Lo usan getSession y proxy.ts.
+ */
+export async function revalidateAdmin(session: SessionPayload): Promise<SessionPayload> {
+  if (!session.isAdmin || !session.discordId) return session;
+  if (isOwnerId(session.discordId) || (await isDbGrantedAdmin(session.discordId))) return session;
+  return { ...session, isAdmin: false };
 }
 
 export type EffectivePermissions = {

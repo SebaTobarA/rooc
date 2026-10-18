@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { siteConfig } from "@/config/site";
+import { isPasswordLoginEnabled } from "@/lib/password-login";
+import { safeRedirectPath } from "@/lib/safe-redirect";
 
 export const metadata = {
   title: "Ingresar al panel admin",
@@ -10,6 +12,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   discord_not_member: "Esa cuenta de Discord no pertenece al server de Special Delivery.",
   discord_invalid: "No se pudo completar el inicio de sesión con Discord. Intenta de nuevo.",
   discord_failed: "Hubo un error al conectar con Discord. Intenta de nuevo.",
+  too_many: "Demasiados intentos fallidos. Espera 15 minutos antes de volver a intentar.",
 };
 
 export default async function AdminLoginPage({
@@ -19,7 +22,8 @@ export default async function AdminLoginPage({
 }) {
   const params = await searchParams;
   const errorMessage = params.error ? ERROR_MESSAGES[params.error] : undefined;
-  const from = params.from ?? "/admin";
+  const from = safeRedirectPath(params.from, "/admin");
+  const passwordLogin = isPasswordLoginEnabled();
 
   return (
     <div className="flex min-h-[calc(100vh-4rem-5rem)] items-center justify-center px-4 py-16">
@@ -46,45 +50,53 @@ export default async function AdminLoginPage({
           Iniciar sesión con Discord
         </a>
 
-        <div className="my-5 flex items-center gap-3 text-xs text-muted">
-          <span className="h-px flex-1 bg-border" />
-          o con usuario y contraseña
-          <span className="h-px flex-1 bg-border" />
-        </div>
+        <p className="mt-3 text-xs text-muted">
+          Te lleva a discord.com para autorizar el ingreso. Special Delivery nunca te pide tu contraseña de Discord.
+        </p>
 
-        <form action="/api/admin/login" method="POST" className="space-y-4">
-          <input type="hidden" name="from" value={from} />
+        {passwordLogin && (
+          <>
+            <div className="my-5 flex items-center gap-3 text-xs text-muted">
+              <span className="h-px flex-1 bg-border" />
+              o con usuario y contraseña
+              <span className="h-px flex-1 bg-border" />
+            </div>
 
-          <div>
-            <label htmlFor="username" className="mb-1 block text-sm text-muted">
-              Usuario
-            </label>
-            <input
-              id="username"
-              name="username"
-              type="text"
-              required
-              className="w-full rounded-md border border-border bg-background-elevated px-3 py-2 text-foreground outline-none focus:border-accent"
-            />
-          </div>
+            <form action="/api/admin/login" method="POST" className="space-y-4">
+              <input type="hidden" name="from" value={from} />
 
-          <div>
-            <label htmlFor="password" className="mb-1 block text-sm text-muted">
-              Contraseña
-            </label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              required
-              className="w-full rounded-md border border-border bg-background-elevated px-3 py-2 text-foreground outline-none focus:border-accent"
-            />
-          </div>
+              <div>
+                <label htmlFor="username" className="mb-1 block text-sm text-muted">
+                  Usuario
+                </label>
+                <input
+                  id="username"
+                  name="username"
+                  type="text"
+                  required
+                  className="w-full rounded-md border border-border bg-background-elevated px-3 py-2 text-foreground outline-none focus:border-accent"
+                />
+              </div>
 
-          <button type="submit" className="btn-brand w-full px-3 py-2">
-            Ingresar
-          </button>
-        </form>
+              <div>
+                <label htmlFor="password" className="mb-1 block text-sm text-muted">
+                  Contraseña
+                </label>
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  required
+                  className="w-full rounded-md border border-border bg-background-elevated px-3 py-2 text-foreground outline-none focus:border-accent"
+                />
+              </div>
+
+              <button type="submit" className="btn-brand w-full px-3 py-2">
+                Ingresar
+              </button>
+            </form>
+          </>
+        )}
       </div>
     </div>
   );

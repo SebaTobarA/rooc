@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getSession } from "@/lib/auth";
 import { detectFormat, parseRows } from "@/lib/import/parse";
 import { importersByEntity, type ImportEntity } from "@/lib/import/importers";
 
@@ -9,6 +10,11 @@ const VALID_ENTITIES: ImportEntity[] = ["items", "cards", "monsters", "maps", "d
  * middleware.ts (requiere sesión de admin válida).
  */
 export async function POST(request: Request) {
+  const session = await getSession();
+  if (!session?.isAdmin) {
+    return NextResponse.json({ error: "No autorizado." }, { status: 403 });
+  }
+
   const formData = await request.formData();
   const entity = formData.get("entity");
   const file = formData.get("file");

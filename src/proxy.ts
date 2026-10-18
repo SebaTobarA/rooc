@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { SESSION_COOKIE_NAME, verifySessionToken } from "@/lib/session";
-import { getEffectivePermissions } from "@/lib/permissions";
+import { getEffectivePermissions, revalidateAdmin } from "@/lib/permissions";
 
 const APPLICANT_FORM_PATH = "/panel/postulacion";
 
@@ -24,7 +24,8 @@ export async function proxy(request: NextRequest) {
   }
 
   const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
-  const session = await verifySessionToken(token);
+  const verified = await verifySessionToken(token);
+  const session = verified ? await revalidateAdmin(verified) : null;
 
   if (pathname.startsWith("/admin") || pathname.startsWith("/api/admin")) {
     if (session?.isAdmin) return NextResponse.next();

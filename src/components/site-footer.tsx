@@ -9,9 +9,14 @@ export function SiteFooter() {
           {siteConfig.name} — {siteConfig.tagline}. Proyecto de fans, sin afiliación
           oficial.
         </p>
-        <Link href="/admin/login" className="hover:text-foreground">
-          Panel admin
-        </Link>
+        <div className="flex gap-4">
+          <Link href="/seguridad" className="hover:text-foreground">
+            Seguridad
+          </Link>
+          <Link href="/admin/login" className="hover:text-foreground">
+            Panel admin
+          </Link>
+        </div>
       </div>
     </footer>
   );

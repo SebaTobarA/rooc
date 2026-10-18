@@ -3,6 +3,7 @@ import { put } from "@vercel/blob";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { SCREENSHOT_MAX_BYTES } from "@/lib/recruitment-screenshots";
+import { validateImageUpload } from "@/lib/upload-validation";
 
 /**
  * Subida de las capturas del formulario de postulación. A diferencia de
@@ -37,12 +38,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Falta el archivo." }, { status: 400 });
   }
 
-  if (!file.type.startsWith("image/")) {
-    return NextResponse.json({ error: "El archivo debe ser una imagen." }, { status: 400 });
-  }
-
-  if (file.size > SCREENSHOT_MAX_BYTES) {
-    return NextResponse.json({ error: "La captura no puede superar los 4 MB." }, { status: 400 });
+  const invalid = await validateImageUpload(file, SCREENSHOT_MAX_BYTES);
+  if (invalid) {
+    return NextResponse.json({ error: invalid }, { status: 400 });
   }
 
   try {

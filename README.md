@@ -166,9 +166,11 @@ Tanto la importación por CLI como por admin usan el mismo código
 ## Panel de administración
 
 - URL: `/admin/login`
-- Credenciales: variables de entorno `ADMIN_USERNAME` / `ADMIN_PASSWORD`
-  (usuario único, sin tabla de usuarios — pensado para un solo
-  administrador o para compartir credenciales dentro de un equipo chico).
+- Ingreso normal: con Discord (ver abajo).
+- Respaldo con usuario/contraseña: `ADMIN_USERNAME` / `ADMIN_PASSWORD`.
+  Está **apagado** salvo que se defina `ADMIN_PASSWORD_LOGIN_ENABLED=true`
+  y la contraseña tenga al menos 16 caracteres; aun activado, bloquea una IP
+  15 minutos tras 5 intentos fallidos.
 - La sesión es una cookie HTTP-only firmada con `ADMIN_SESSION_SECRET`
   (HMAC-SHA256), válida por 7 días. Generá tu propio secreto con:
 
@@ -204,8 +206,24 @@ Para activarlo:
    y agregalo a `ADMIN_DISCORD_IDS`.
 
 Si `DISCORD_CLIENT_ID`/`DISCORD_CLIENT_SECRET` no están configurados, el
-botón de Discord simplemente va a fallar al hacer clic — el login por
-usuario/contraseña sigue funcionando igual.
+botón de Discord simplemente va a fallar al hacer clic — para entrar igual
+hay que activar el respaldo por usuario/contraseña (ver arriba).
+
+## Seguridad
+
+- Cada server action y cada endpoint de `/api/admin` revalida el permiso en
+  el servidor (`requireAdmin` / `requirePermission` en `src/lib/auth.ts`):
+  ocultar un botón no alcanza, las server actions se pueden llamar directo.
+- El `isAdmin` de la cookie se revalida contra `ADMIN_DISCORD_IDS` y
+  `AdminGrant` en cada request: quitar un admin surte efecto de inmediato.
+- `from` (a dónde volver tras el login) pasa por `safeRedirectPath`: solo
+  rutas internas, así un link de login no puede terminar en un sitio falso.
+- Cabeceras de seguridad (CSP, HSTS, X-Frame-Options, etc.) en
+  `next.config.ts`. Si se agrega un servicio externo (imágenes, iframes,
+  APIs llamadas desde el navegador), hay que sumarlo a la CSP.
+- Subidas: solo PNG/JPG/WEBP/GIF verificados por firma (sin SVG).
+- `/seguridad` explica a los miembros cómo reconocer el sitio oficial, y
+  `/.well-known/security.txt` indica dónde reportar.
 
 ## Reclutamiento (postulaciones)
 

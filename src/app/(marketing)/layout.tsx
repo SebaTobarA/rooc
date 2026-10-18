@@ -84,6 +84,7 @@ export default async function MarketingLayout({ children }: { children: React.Re
             <Link href="/#inicio">Inicio</Link>
             <Link href="/#historia">Acerca de la Guild</Link>
             <Link href="/reclutamiento">Reclutamiento</Link>
+            <Link href="/seguridad">Seguridad</Link>
           </nav>
 
           <a

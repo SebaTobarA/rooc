@@ -2,12 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { requireAdmin } from "@/lib/auth";
 
 export async function updateRolePermission(
   discordRoleId: string,
   roleName: string,
   formData: FormData
 ) {
+  await requireAdmin();
   const data = {
     roleName,
     canViewPanel: formData.get("canViewPanel") === "on",
@@ -34,6 +36,7 @@ export async function updateRolePermission(
  * defecto de un miembro común; si ya existía no la pisa.
  */
 export async function addVisibleRole(discordRoleId: string, roleName: string) {
+  await requireAdmin();
   const existing = await prisma.rolePermission.findUnique({ where: { discordRoleId } });
   if (existing) return;
 
@@ -60,6 +63,7 @@ export async function addVisibleRole(discordRoleId: string, roleName: string) {
  * botón de quitar en la UI.
  */
 export async function removeVisibleRole(discordRoleId: string) {
+  await requireAdmin();
   await prisma.rolePermission.delete({ where: { discordRoleId } }).catch(() => {});
   revalidatePath("/admin/roles");
 }

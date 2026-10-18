@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import type { JobTier } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { requireAdmin } from "@/lib/auth";
 
 function revalidateSkillTreePaths() {
   revalidatePath("/admin/build-pvp");
@@ -40,6 +41,7 @@ async function resolveChildTier(parentId?: string): Promise<JobTier> {
 }
 
 export async function createJob(formData: FormData) {
+  await requireAdmin();
   const data = parseJobForm(formData);
   const tier = await resolveChildTier(data.parentId);
   if (tier === "TRANSCENDENT") {
@@ -64,6 +66,7 @@ export async function createJob(formData: FormData) {
 }
 
 export async function updateJob(id: string, formData: FormData) {
+  await requireAdmin();
   const data = parseJobForm(formData);
 
   await prisma.job.update({
@@ -80,6 +83,7 @@ export async function updateJob(id: string, formData: FormData) {
 }
 
 export async function deleteJob(id: string) {
+  await requireAdmin();
   await prisma.job.delete({ where: { id } });
   revalidateSkillTreePaths();
   redirect("/admin/build-pvp");
@@ -114,6 +118,7 @@ function parseSkillForm(formData: FormData) {
 }
 
 export async function createSkill(jobId: string, formData: FormData) {
+  await requireAdmin();
   const data = parseSkillForm(formData);
 
   await prisma.skill.create({
@@ -125,6 +130,7 @@ export async function createSkill(jobId: string, formData: FormData) {
 }
 
 export async function updateSkill(id: string, jobId: string, formData: FormData) {
+  await requireAdmin();
   const data = parseSkillForm(formData);
 
   await prisma.skill.update({
@@ -137,6 +143,7 @@ export async function updateSkill(id: string, jobId: string, formData: FormData)
 }
 
 export async function deleteSkill(id: string, jobId: string) {
+  await requireAdmin();
   await prisma.skill.delete({ where: { id } });
   revalidateSkillTreePaths();
   redirect(`/admin/build-pvp/${jobId}`);
@@ -149,6 +156,7 @@ export async function deleteSkill(id: string, jobId: string) {
  * con el nivel requerido de cada una.
  */
 export async function setSkillPrerequisites(skillId: string, jobId: string, formData: FormData) {
+  await requireAdmin();
   const entries: { requiresSkillId: string; requiredLevel: number }[] = [];
 
   for (const [key, value] of formData.entries()) {
