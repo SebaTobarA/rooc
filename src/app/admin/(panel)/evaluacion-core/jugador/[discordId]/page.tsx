@@ -16,6 +16,7 @@ import {
   summarizeMonth,
 } from "@/lib/core-census/tier";
 import { JOB_ROLE_NAMES } from "@/lib/discord-job-roles";
+import { sameName } from "@/lib/core-census/screenshot";
 import { BackLink } from "@/components/back-link";
 import { JobComfortField } from "@/components/core-census/job-comfort-field";
 import { SheetFields } from "@/components/core-census/sheet-fields";
@@ -161,6 +162,36 @@ export default async function CorePlayerPage({
             correctos: al aceptar pasan a su ficha; al rechazar, la ficha queda como está.
             {pendingSubmission.note ? ` Comentario del jugador: «${pendingSubmission.note}»` : ""}
           </p>
+
+          {/* Lo que se leyó de la captura que subió (la imagen no se guarda). */}
+          {pendingSubmission.screenshotPower !== null ? (
+            <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm">
+              {[
+                {
+                  label: "Job en la captura",
+                  value: pendingSubmission.screenshotJob ?? "ilegible",
+                  ok: pendingSubmission.screenshotJob === sheet.jobName,
+                },
+                {
+                  label: "Nombre en la captura",
+                  // El OCR solo busca el nombre de la ficha: null = no apareció.
+                  value: pendingSubmission.screenshotName ?? "no aparece",
+                  ok: sameName(pendingSubmission.screenshotName, player.characterName),
+                },
+                { label: "Power en la captura", value: String(pendingSubmission.screenshotPower), ok: true },
+              ].map((item) => (
+                <li key={item.label}>
+                  <span className="text-muted">{item.label}: </span>
+                  <span className={`font-semibold ${item.ok ? "text-emerald-400" : "text-amber-400"}`}>
+                    {item.value}
+                    {item.ok ? "" : " (no coincide con la ficha)"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-3 text-xs text-muted">Reportada antes de que se pidiera la captura del personaje.</p>
+          )}
 
           <div className="mt-3 overflow-x-auto rounded-xl border border-border">
             <table className="w-full whitespace-nowrap text-left text-sm">

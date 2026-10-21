@@ -62,6 +62,12 @@ export function SubmissionHistory({
               .map((requirement) => `${requirement.label} ${formatRequirementValue(requirement, submission)}`)
               .join(" · ")}
           </p>
+          {submission.screenshotPower !== null && (
+            <p className="mt-1 text-xs text-muted">
+              Leído en la captura: {submission.screenshotName ?? "nombre no encontrado"} ·{" "}
+              {submission.screenshotJob ?? "job no encontrado"} · Power {submission.screenshotPower}
+            </p>
+          )}
           {submission.note && <p className="mt-1 text-sm text-muted">Comentario: {submission.note}</p>}
           {submission.reviewedAt && (
             <p className="mt-1 text-xs text-muted">

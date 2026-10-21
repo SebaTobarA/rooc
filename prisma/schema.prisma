@@ -505,10 +505,17 @@ model PartyTemplate {
   messageId      String?
   communicatedAt DateTime?
 
+  // Composición permanente de la guild para ese tipo de evento: no se ata a
+  // un día (eventId null) y se va editando según lo que necesite la guild.
+  // Hay como mucho una por tipo de evento (lo asegura savePermanentComposition);
+  // de ahí sale el roster que ve cada jugador en el inicio del panel.
+  permanent Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([event])
+  @@index([event, permanent])
 }
 
 // ---------------------------------------------------------------------------
@@ -1055,6 +1062,14 @@ model CoreSheetSubmission {
   skillTreePvp Boolean?
   // Comentario del jugador para quien valida.
   note         String   @default("")
+
+  // Lo que se leyó de la captura de la ventana "Character" que el jugador
+  // subió con el reporte (ver analyzeCharacterScreenshot). La imagen no se
+  // guarda: se analiza y se descarta; queda solo lo leído, para que quien
+  // valida lo compare con la ficha.
+  screenshotJob   String?
+  screenshotName  String?
+  screenshotPower Int?
 
   status             CoreSubmissionStatus @default(PENDING)
   reviewNote         String               @default("")

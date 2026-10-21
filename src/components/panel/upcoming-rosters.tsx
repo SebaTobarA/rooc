@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { EVENT_CATEGORY_LABEL } from "@/lib/labels";
 import { readSnapshot } from "@/lib/party/template-snapshot";
+import { ATTENDANCE_TEXT_CLASS, attendanceMark } from "@/lib/party/attendance";
 import type { Party, Player } from "@/types/party";
 
 const DATE_FORMATTER = new Intl.DateTimeFormat("es-CL", {
@@ -12,8 +13,7 @@ const DATE_FORMATTER = new Intl.DateTimeFormat("es-CL", {
   timeZone: "America/Santiago",
 });
 
-// Cuántos eventos próximos se muestran como máximo (una semana de guild).
-const MAX_EVENTS = 3;
+const CATEGORIES = ["GUILD_LEAGUE", "EMPERIUM_OVERRUN"] as const;
 
 const CAMPO_LABEL = { principal: "Campo principal", secundario: "Campo secundario" } as const;
 
@@ -100,44 +100,47 @@ function PartyColumn({ party, members, discordId }: { party: Party; members: Pla
 }
 
 /**
- * "Roster próximos eventos" del inicio del panel: de las parties que se
- * armaron en el Party Builder (/panel/party) para los eventos que vienen,
- * la raid (o el campo, en Guild League) donde va el jugador, con su lugar
- * resaltado. Sale de la plantilla enlazada a cada evento
- * (PartyTemplate.eventId): la que se comunicó a Discord si hay alguna, y si
- * no la última guardada.
+ * "Mi composición" del inicio del panel: de la composición permanente que se
+ * arma en el Party Builder (/panel/party) para cada tipo de evento, la raid
+ * (o el campo, en Guild League) donde va el jugador, con su lugar resaltado.
+ * Al lado, lo que respondió en la encuesta del próximo evento de ese tipo,
+ * para que vea si figura como que juega.
  */
 export async function UpcomingRosters({ discordId }: { discordId: string }) {
-  const events = await prisma.event.findMany({
-    where: { endsAt: { gte: new Date() }, partyTemplates: { some: {} } },
-    orderBy: { startsAt: "asc" },
-    take: MAX_EVENTS,
-    include: {
-      template: { select: { icon: true } },
-      partyTemplates: { orderBy: { updatedAt: "desc" } },
-    },
-  });
+  const [templates, nextEvents] = await Promise.all([
+    prisma.partyTemplate.findMany({ where: { permanent: true }, orderBy: { updatedAt: "desc" } }),
+    Promise.all(
+      CATEGORIES.map((category) =>
+        prisma.event.findFirst({
+          where: { category, endsAt: { gte: new Date() } },
+          orderBy: { startsAt: "asc" },
+          include: { signups: { where: { discordId }, select: { status: true } } },
+        })
+      )
+    ),
+  ]);
 
-  const rosters = events.flatMap((event) => {
-    const template = event.partyTemplates.find((candidate) => candidate.communicatedAt) ?? event.partyTemplates[0];
+  const rosters = CATEGORIES.flatMap((category, index) => {
+    const template = templates.find((candidate) => candidate.event === category);
     const snapshot = template ? readSnapshot(template.data) : null;
-    return snapshot ? [{ event, snapshot }] : [];
+    return snapshot ? [{ category, snapshot, nextEvent: nextEvents[index] }] : [];
   });
 
   return (
     <section className="mt-8 rounded-xl border border-border bg-surface p-5">
-      <h2 className="font-semibold text-foreground">Roster próximos eventos</h2>
+      <h2 className="font-semibold text-foreground">Mi composición</h2>
       <p className="mt-1 text-sm text-muted">
-        La raid en la que vas en los eventos que vienen, según el Party Builder. Tu lugar aparece resaltado.
+        La raid en la que vas en cada evento de la guild, según la composición del Party Builder. Tu lugar aparece
+        resaltado.
       </p>
 
       {rosters.length === 0 && (
         <p className="mt-4 rounded-[10px] border border-dashed border-border p-5 text-center text-sm text-muted">
-          Todavía no hay parties armadas para los próximos eventos.
+          Todavía no hay composiciones armadas.
         </p>
       )}
 
-      {rosters.map(({ event, snapshot }) => {
+      {rosters.map(({ category, snapshot, nextEvent }) => {
         const membersByParty = new Map<string, Player[]>();
         for (const player of snapshot.players) {
           if (!player.partyId) continue;
@@ -148,24 +151,30 @@ export async function UpcomingRosters({ discordId }: { discordId: string }) {
         const me = snapshot.players.find((player) => player.id === discordId);
         const myParty = me?.partyId ? snapshot.parties.find((party) => party.id === me.partyId) : undefined;
         // Solo la raid (o el campo) donde va el jugador: no necesita ver el
-        // resto del evento. Si todavía no lo asignaron, no se muestra ninguna.
+        // resto de la composición. Si no está en ninguna party, no se muestra.
         const groups = groupParties(
           snapshot.parties,
           new Map(snapshot.raids.map((raid) => [raid.id, raid.name]))
         ).filter((group) => group.parties.some((party) => party.id === myParty?.id));
+        const mark =
+          myParty && nextEvent?.status === "PUBLISHED"
+            ? attendanceMark(nextEvent.attendanceMode, nextEvent.signups[0]?.status)
+            : null;
 
         return (
-          <div key={event.id} className="mt-5 border-t border-border pt-4 first:mt-4">
+          <div key={category} className="mt-5 border-t border-border pt-4 first:mt-4">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h3 className="text-sm font-semibold text-foreground">
-                {event.template.icon ? `${event.template.icon} ` : ""}
-                {EVENT_CATEGORY_LABEL[event.category]}
-                <span className="ml-2 font-normal capitalize text-muted">{DATE_FORMATTER.format(event.startsAt)}</span>
-              </h3>
+              <h3 className="text-sm font-semibold text-foreground">{EVENT_CATEGORY_LABEL[category]}</h3>
               <p className={`text-xs font-semibold ${myParty ? "text-accent" : "text-muted"}`}>
-                {myParty ? `Vas en ${myParty.name}` : "Todavía no estás en una party de este evento"}
+                {myParty ? `Vas en ${myParty.name}` : "No estás en la composición de este evento"}
               </p>
             </div>
+            {mark && nextEvent && (
+              <p className={`mt-1 text-xs ${ATTENDANCE_TEXT_CLASS[mark.tone]}`}>
+                <span className="capitalize">{DATE_FORMATTER.format(nextEvent.startsAt)}</span>: {mark.label}
+                {mark.tone === "unknown" ? " — responde la asistencia en Discord para que cuenten contigo." : ""}
+              </p>
+            )}
 
             {groups.map((group) => (
               <div key={group.key} className="mt-3">

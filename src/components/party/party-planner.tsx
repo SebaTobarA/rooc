@@ -2,14 +2,18 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowDown, ArrowDownAZ, Plus, Settings, Sparkles, Trash2, Users, X } from "lucide-react";
-import { createPartyTemplate, updatePartyTemplate } from "@/lib/actions/party-templates";
+import type { EventAttendanceMode, EventSignupStatus } from "@prisma/client";
+import { ArrowDown, ArrowDownAZ, CornerDownRight, Plus, Settings, Sparkles, Trash2, Users, X } from "lucide-react";
+import { savePermanentComposition } from "@/lib/actions/party-templates";
+import { ATTENDANCE_DOT_CLASS, ATTENDANCE_TEXT_CLASS, attendanceMark } from "@/lib/party/attendance";
+import type { EventChannelOption } from "@/lib/discord-guild-channels";
 import { inferRole, normalizeClass } from "@/lib/party/infer-role";
 import type { PartyTemplateSnapshot } from "@/lib/party/template-snapshot";
 import { fillPartiesFromPool } from "@/lib/party/use-campo";
 import type { CampoSide, Party, Player, Raid, SlotLabel } from "@/types/party";
 
-type EventType = "GUILD_LEAGUE" | "EMPERIUM_OVERRUN";
+export type PlannerEventType = "GUILD_LEAGUE" | "EMPERIUM_OVERRUN";
+type EventType = PlannerEventType;
 
 export interface PlannerMember {
   id: string;
@@ -17,13 +21,24 @@ export interface PlannerMember {
   clase: string;
 }
 
-export interface PlannerEvent {
+/** Composición permanente guardada de un tipo de evento. */
+export interface PlannerComposition {
   id: string;
-  category: EventType;
-  /** Fecha ya formateada para el desplegable, ej. "martes 13/10". */
+  data: PartyTemplateSnapshot;
+  /** Canal donde se informó la última vez, para proponerlo de nuevo. */
+  channelId: string | null;
+  updatedAt: string;
+}
+
+/** Encuesta de asistencia del próximo evento de ese tipo. */
+export interface PlannerAttendance {
+  /** Fecha ya formateada, ej. "martes 13/10". */
   label: string;
-  /** Composición ya guardada para ese evento, si existe. */
-  saved: { id: string; data: PartyTemplateSnapshot } | null;
+  /** false = el evento existe pero todavía no se envió la encuesta a Discord. */
+  published: boolean;
+  mode: EventAttendanceMode;
+  /** discordId -> respuesta; quien no respondió no figura. */
+  statuses: Record<string, EventSignupStatus>;
 }
 
 interface Board {
@@ -31,18 +46,11 @@ interface Board {
   raids: Raid[];
   /** id de party -> discordIds de sus jugadores, en el orden en que se ven. */
   members: Record<string, string[]>;
-  eventId: string;
-  /** Plantilla de la que salió este tablero: guardar la actualiza en vez de crear otra. */
-  template: { id: string; eventId: string } | null;
 }
 
 const EVENT_LABEL: Record<EventType, string> = {
   GUILD_LEAGUE: "Guild League",
   EMPERIUM_OVERRUN: "Emperium Overrun",
-};
-const EVENT_DAYS: Record<EventType, string> = {
-  GUILD_LEAGUE: "martes y jueves",
-  EMPERIUM_OVERRUN: "domingo",
 };
 const CAMPO_LABEL: Record<CampoSide, string> = { principal: "Campo Primario", secundario: "Campo Secundario" };
 const SLOT_OPTIONS: SlotLabel[] = ["Tanque", "Soporte", "Daño", "Flexible"];
@@ -71,23 +79,30 @@ const DEFAULT_JOB_COLORS: Record<string, string> = {
   Doram: "#6fe0f5",
 };
 const FALLBACK_COLOR = "#7a8794";
+const SAVED_FORMATTER = new Intl.DateTimeFormat("es-CL", {
+  day: "2-digit",
+  month: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  timeZone: "America/Santiago",
+});
 const COLORS_STORAGE_KEY = "sd-party-job-colors";
 
 function emptyBoard(): Board {
-  return { parties: [], raids: [], members: {}, eventId: "", template: null };
+  return { parties: [], raids: [], members: {} };
 }
 
 function newId(prefix: string): string {
   return `${prefix}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function boardFromSnapshot(snapshot: PartyTemplateSnapshot, template: { id: string; eventId: string }): Board {
+function boardFromSnapshot(snapshot: PartyTemplateSnapshot): Board {
   // El orden dentro de cada party es el de la lista de jugadores guardada.
   const members: Record<string, string[]> = {};
   for (const player of snapshot.players) {
     if (player.partyId) (members[player.partyId] ??= []).push(player.id);
   }
-  return { parties: snapshot.parties, raids: snapshot.raids, members, eventId: template.eventId, template };
+  return { parties: snapshot.parties, raids: snapshot.raids, members };
 }
 
 /** Saca a un jugador de la party en la que esté. */
@@ -100,28 +115,56 @@ function withoutPlayer(members: Record<string, string[]>, playerId: string): Rec
 interface PartyPlannerProps {
   canManage: boolean;
   members: PlannerMember[];
-  events: PlannerEvent[];
-  /** Plantilla abierta con "Editar" desde el historial. */
-  editing: { id: string; category: EventType; eventId: string; data: PartyTemplateSnapshot } | null;
+  /** La composición permanente vigente de cada tipo de evento. */
+  compositions: Record<EventType, PlannerComposition | null>;
+  /** Quién avisó que juega el próximo evento de cada tipo. */
+  attendance: Record<EventType, PlannerAttendance | null>;
+  /** Canales de Discord donde se puede informar la composición. */
+  channels: EventChannelOption[];
+  /** Canal de asistencia configurado en Eventos: el propuesto por defecto. */
+  defaultChannelId: string | null;
+  /** Plantilla del historial abierta con "Editar". */
+  editing: { id: string; category: EventType; data: PartyTemplateSnapshot } | null;
 }
 
 /**
  * Party Builder: arriba el core de la guild (todos los [SD] Core, con su job),
- * abajo la configuración de equipos del evento elegido. Cada tipo de evento
- * tiene su propio tablero y su propio guardado, que queda enlazado al evento
- * del día elegido (PartyTemplate.eventId): de ahí lo leen el roster del
- * inicio del panel y los reportes post evento.
+ * abajo la configuración de equipos de cada tipo de evento. Cada tipo tiene
+ * una composición permanente, no atada a un día: se va modificando según lo
+ * que necesite la guild y de ella sale el roster que ve cada jugador en el
+ * inicio del panel. La asistencia del próximo evento solo se cruza para
+ * controlar quién de la composición avisó que juega.
  */
-export function PartyPlanner({ canManage, members, events, editing }: PartyPlannerProps) {
+export function PartyPlanner({
+  canManage,
+  members,
+  compositions: savedCompositions,
+  attendance,
+  channels,
+  defaultChannelId,
+  editing,
+}: PartyPlannerProps) {
   const router = useRouter();
-  const [eventType, setEventType] = useState<EventType | null>(editing?.category ?? null);
+  const [eventType, setEventType] = useState<EventType | null>(editing?.category ?? "GUILD_LEAGUE");
   const [campo, setCampo] = useState<CampoSide>("principal");
-  const [boards, setBoards] = useState<Record<EventType, Board>>(() => ({
-    GUILD_LEAGUE:
-      editing?.category === "GUILD_LEAGUE" ? boardFromSnapshot(editing.data, editing) : emptyBoard(),
-    EMPERIUM_OVERRUN:
-      editing?.category === "EMPERIUM_OVERRUN" ? boardFromSnapshot(editing.data, editing) : emptyBoard(),
-  }));
+  // Cada tablero arranca con la composición vigente (o la del historial que
+  // se abrió con "Editar").
+  const [boards, setBoards] = useState<Record<EventType, Board>>(() => {
+    const initial = (type: EventType): Board => {
+      if (editing?.category === type) return boardFromSnapshot(editing.data);
+      const saved = savedCompositions[type];
+      return saved ? boardFromSnapshot(saved.data) : emptyBoard();
+    };
+    return { GUILD_LEAGUE: initial("GUILD_LEAGUE"), EMPERIUM_OVERRUN: initial("EMPERIUM_OVERRUN") };
+  });
+  const [notify, setNotify] = useState(false);
+  const [notifyChannel, setNotifyChannel] = useState<Record<EventType, string>>(() => {
+    const fallback = defaultChannelId ?? channels[0]?.id ?? "";
+    return {
+      GUILD_LEAGUE: savedCompositions.GUILD_LEAGUE?.channelId ?? fallback,
+      EMPERIUM_OVERRUN: savedCompositions.EMPERIUM_OVERRUN?.channelId ?? fallback,
+    };
+  });
   const [sortBy, setSortBy] = useState<"name" | "job">("job");
   const [colors, setColors] = useState<Record<string, string>>(DEFAULT_JOB_COLORS);
   const [showColors, setShowColors] = useState(false);
@@ -184,8 +227,8 @@ export function PartyPlanner({ canManage, members, events, editing }: PartyPlann
   // tenga el rol, para no perderlo al editar.
   const roster = useMemo(() => {
     const byId = new Map(members.map((member) => [member.id, member]));
-    for (const event of events) {
-      for (const player of event.saved?.data.players ?? []) {
+    for (const composition of Object.values(savedCompositions)) {
+      for (const player of composition?.data.players ?? []) {
         if (!byId.has(player.id)) byId.set(player.id, { id: player.id, nickname: player.nickname, clase: player.clase });
       }
     }
@@ -193,7 +236,7 @@ export function PartyPlanner({ canManage, members, events, editing }: PartyPlann
       if (!byId.has(player.id)) byId.set(player.id, { id: player.id, nickname: player.nickname, clase: player.clase });
     }
     return [...byId.values()];
-  }, [members, events, editing]);
+  }, [members, savedCompositions, editing]);
   const memberById = useMemo(() => new Map(roster.map((member) => [member.id, member])), [roster]);
   const coreIds = useMemo(() => new Set(members.map((member) => member.id)), [members]);
 
@@ -384,18 +427,36 @@ export function PartyPlanner({ canManage, members, events, editing }: PartyPlann
     });
   }
 
-  function loadSaved(event: PlannerEvent) {
-    if (!event.saved) return;
-    const saved = event.saved;
-    patchBoard(() => boardFromSnapshot(saved.data, { id: saved.id, eventId: event.id }));
-    setMessage({ kind: "ok", text: "Se cargó la composición guardada de ese día." });
+  /** Crea una party nueva (en un raid o sin raid) y mete ahí al jugador. */
+  function placeInNewParty(playerId: string, raidId: string | null) {
+    setMessage(null);
+    if (partiesInRaid(raidId).length >= MAX_PARTIES_PER_RAID) {
+      setMessage({ kind: "error", text: `Un raid admite hasta ${MAX_PARTIES_PER_RAID} parties. Agrega otro raid.` });
+      return;
+    }
+    const partyId = newId("party");
+    patchBoard((current) => ({
+      ...current,
+      parties: [
+        ...current.parties,
+        {
+          id: partyId,
+          name: `Party ${current.parties.filter((party) => party.campo === scopeCampo && (party.raidId ?? null) === raidId).length + 1}`,
+          capacity: PARTY_SIZE,
+          campo: scopeCampo,
+          raidId,
+        },
+      ],
+      members: { ...withoutPlayer(current.members, playerId), [partyId]: [playerId] },
+    }));
+    setSelectedId(null);
   }
 
   function save() {
     if (!board || !eventType) return;
-    const event = events.find((candidate) => candidate.id === board.eventId);
-    if (!event) {
-      setMessage({ kind: "error", text: `Elige el día del evento (${EVENT_DAYS[eventType]}) antes de guardar.` });
+    const channelId = notify ? notifyChannel[eventType] : null;
+    if (notify && !channelId) {
+      setMessage({ kind: "error", text: "Elige el canal de Discord donde informar la composición." });
       return;
     }
 
@@ -412,22 +473,24 @@ export function PartyPlanner({ canManage, members, events, editing }: PartyPlann
         .map((member) => toPlayer(member, null)),
     ];
     const data: PartyTemplateSnapshot = { players, parties: board.parties, raids: board.raids };
-    const name = `${EVENT_LABEL[eventType]} — ${event.label}`;
+    const label = EVENT_LABEL[eventType];
 
     setMessage(null);
     startSaving(async () => {
       try {
-        // Una sola composición por evento: si ese día ya tiene una (la cargada
-        // en pantalla u otra guardada antes), se actualiza en vez de sumar.
-        const existingId = board.template?.eventId === event.id ? board.template.id : event.saved?.id;
-        const result = existingId
-          ? await updatePartyTemplate(existingId, name, data)
-          : await createPartyTemplate(eventType, name, data, event.id);
-        patchBoard((current) => ({ ...current, template: { id: result.id, eventId: event.id } }));
-        setMessage({
-          kind: "ok",
-          text: `${EVENT_LABEL[eventType]} del ${event.label} guardado. Ya aparece en el roster de cada jugador.`,
-        });
+        const result = await savePermanentComposition(eventType, data, channelId);
+        setMessage(
+          result.notifyError
+            ? {
+                kind: "error",
+                text: `Composición de ${label} guardada, pero no se pudo informar por Discord: ${result.notifyError}`,
+              }
+            : {
+                kind: "ok",
+                text: `Composición de ${label} guardada${channelId ? " e informada por Discord" : ""}. Ya aparece en el panel de cada jugador.`,
+              }
+        );
+        if (!result.notifyError) setNotify(false);
         router.refresh();
       } catch (err) {
         setMessage({ kind: "error", text: err instanceof Error ? err.message : "No se pudo guardar." });
@@ -435,18 +498,32 @@ export function PartyPlanner({ canManage, members, events, editing }: PartyPlann
     });
   }
 
-  const typeEvents = eventType ? events.filter((event) => event.category === eventType) : [];
-  const selectedEvent = board ? typeEvents.find((event) => event.id === board.eventId) : undefined;
   const assignedCount = partyOf.size;
+  const nextEvent = eventType ? attendance[eventType] : null;
+  const markOf = (memberId: string) =>
+    nextEvent?.published ? attendanceMark(nextEvent.mode, nextEvent.statuses[memberId]) : null;
+  // Control de asistencia: de los que están en la composición, cuántos
+  // avisaron que juegan el próximo evento.
+  const assignedMarks = nextEvent?.published ? [...partyOf.keys()].map(markOf) : [];
+  const attendanceSummary = {
+    ok: assignedMarks.filter((mark) => mark?.tone === "ok").length,
+    late: assignedMarks.filter((mark) => mark?.tone === "late").length,
+    no: assignedMarks.filter((mark) => mark?.tone === "no").length,
+    unknown: assignedMarks.filter((mark) => mark?.tone === "unknown").length,
+  };
   const interactive = Boolean(board) && canManage;
 
   function renderChip(member: PlannerMember, inParty: Party | null) {
     const color = colors[member.clase] ?? FALLBACK_COLOR;
     // En el pool, quien ya tiene party queda atenuado con el nombre de su party.
     const assignedTo = inParty ? undefined : partyById.get(partyOf.get(member.id) ?? "");
+    const mark = markOf(member.id);
+    // Tocar un jugador del core abre un menú para mandarlo directo a una
+    // party o raid, sin tener que bajar hasta la sección de equipos.
+    const showMenu = !inParty && interactive && selectedId === member.id;
     return (
+      <div key={member.id} className="relative min-w-0">
       <div
-        key={member.id}
         draggable={interactive}
         onDragStart={(event) => event.dataTransfer.setData("text/plain", member.id)}
         onDragOver={inParty ? (event) => event.preventDefault() : undefined}
@@ -464,7 +541,16 @@ export function PartyPlanner({ canManage, members, events, editing }: PartyPlann
         }`}
       >
         <span className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-sm font-semibold text-foreground">{member.nickname}</span>
+          <span className="flex min-w-0 items-center gap-1.5">
+            {mark && (
+              <span
+                className={`h-2 w-2 shrink-0 rounded-full ${ATTENDANCE_DOT_CLASS[mark.tone]}`}
+                title={`${nextEvent?.label}: ${mark.label}`}
+                aria-label={mark.label}
+              />
+            )}
+            <span className="truncate text-sm font-semibold text-foreground">{member.nickname}</span>
+          </span>
           <span className="truncate text-[11px] text-muted">
             {member.clase}
             {assignedTo ? ` · ${assignedTo.name}` : ""}
@@ -482,6 +568,95 @@ export function PartyPlanner({ canManage, members, events, editing }: PartyPlann
             className="shrink-0 rounded text-muted hover:text-rose-400"
           >
             <X size={14} />
+          </button>
+        )}
+      </div>
+      {showMenu && renderSendMenu(member)}
+      </div>
+    );
+  }
+
+  /** Destinos para el jugador tocado en el core: cada party del campo a la vista o una party nueva. */
+  function renderSendMenu(member: PlannerMember) {
+    const currentPartyId = partyOf.get(member.id);
+    const groups: { raidId: string | null; title: string | null }[] = [
+      ...scopeRaids.map((raid) => ({ raidId: raid.id, title: raid.name })),
+      { raidId: null, title: scopeRaids.length > 0 ? "Sin raid" : null },
+    ];
+    return (
+      <div
+        role="menu"
+        aria-label={`Enviar a ${member.nickname}`}
+        onClick={(event) => event.stopPropagation()}
+        className="absolute left-0 top-full z-40 mt-1 max-h-80 w-60 overflow-y-auto rounded-xl border border-accent/50 bg-background-elevated p-2 shadow-2xl"
+      >
+        <div className="mb-1 flex items-center justify-between gap-2 px-1">
+          <p className="truncate text-xs font-semibold text-foreground">
+            Enviar a {member.nickname}
+            {eventType === "GUILD_LEAGUE" ? ` · ${CAMPO_LABEL[campo]}` : ""}
+          </p>
+          <button
+            type="button"
+            onClick={() => setSelectedId(null)}
+            aria-label="Cerrar"
+            className="shrink-0 text-muted hover:text-foreground"
+          >
+            <X size={13} />
+          </button>
+        </div>
+        {groups.map(({ raidId, title }) => {
+          const parties = partiesInRaid(raidId);
+          const hasRoom = parties.length < MAX_PARTIES_PER_RAID;
+          if (raidId === null && parties.length === 0 && scopeRaids.length > 0) return null;
+          return (
+            <div key={raidId ?? "none"} className="mt-1">
+              {title && (
+                <p className="px-1 text-[10px] font-semibold uppercase tracking-wide text-muted">{title}</p>
+              )}
+              {parties.map((party) => {
+                const count = (board?.members[party.id] ?? []).length;
+                const isHere = party.id === currentPartyId;
+                const isFull = count >= party.capacity && !isHere;
+                return (
+                  <button
+                    key={party.id}
+                    type="button"
+                    role="menuitem"
+                    disabled={isFull || isHere}
+                    onClick={() => placePlayer(member.id, party.id)}
+                    className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-xs text-foreground hover:bg-accent/10 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent"
+                  >
+                    <span className="flex min-w-0 items-center gap-1">
+                      <CornerDownRight size={12} className="shrink-0 text-muted" />
+                      <span className="truncate">{party.name}</span>
+                    </span>
+                    <span className="shrink-0 text-muted">{isHere ? "Aquí" : `${count}/${party.capacity}`}</span>
+                  </button>
+                );
+              })}
+              {hasRoom && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => placeInNewParty(member.id, raidId)}
+                  className="flex w-full items-center gap-1 rounded-md px-2 py-1.5 text-left text-xs text-accent hover:bg-accent/10"
+                >
+                  <Plus size={12} />
+                  Nueva party{title ? ` en ${title}` : ""}
+                </button>
+              )}
+            </div>
+          );
+        })}
+        {currentPartyId && (
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => placePlayer(member.id, null)}
+            className="mt-1 flex w-full items-center gap-1 rounded-md border-t border-border px-2 pt-2 text-left text-xs text-rose-400 hover:text-rose-300"
+          >
+            <X size={12} />
+            Sacar de su party
           </button>
         )}
       </div>
@@ -576,8 +751,8 @@ export function PartyPlanner({ canManage, members, events, editing }: PartyPlann
     <div className={`mx-auto max-w-6xl px-4 py-10 sm:px-6 ${showDock ? "lg:pr-64" : ""}`}>
       <h1 className="heading-gradient text-2xl font-extrabold sm:text-3xl">Party Builder</h1>
       <p className="mt-1 text-sm text-muted">
-        Arma las raids y parties de cada evento con los miembros del core. Arrastra un jugador a una party, o tócalo
-        y luego toca la party. Dentro de una party, arrástralo sobre otro jugador para cambiar el orden.
+        Arma la composición permanente de cada evento con los miembros del core. Toca un jugador para enviarlo a una
+        party o raid, o arrástralo a su party. Dentro de una party, arrástralo sobre otro jugador para cambiar el orden.
       </p>
 
       {/* ============ 1. CORE SPECIAL DELIVERY ============ */}
@@ -705,6 +880,39 @@ export function PartyPlanner({ canManage, members, events, editing }: PartyPlann
                 ))}
               </div>
             )}
+
+            {/* ---- Control de asistencia del próximo evento ---- */}
+            <div className="mt-4 rounded-[10px] border border-border bg-background-elevated px-4 py-3 text-xs">
+              {!nextEvent ? (
+                <p className="text-muted">
+                  No hay un próximo evento de {EVENT_LABEL[eventType]} creado: cuando exista, aquí se ve quién de la
+                  composición avisó que juega.
+                </p>
+              ) : !nextEvent.published ? (
+                <p className="text-muted">
+                  El próximo evento ({nextEvent.label}) todavía no se envió a Discord, así que nadie ha respondido la
+                  asistencia.
+                </p>
+              ) : (
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                  <span className="font-semibold capitalize text-foreground">Asistencia {nextEvent.label}</span>
+                  {(
+                    [
+                      ["ok", "juegan"],
+                      ["late", "llegan tarde"],
+                      ["no", "no juegan"],
+                      ["unknown", "sin responder"],
+                    ] as const
+                  ).map(([tone, text]) => (
+                    <span key={tone} className={`flex items-center gap-1.5 ${ATTENDANCE_TEXT_CLASS[tone]}`}>
+                      <span className={`h-2 w-2 rounded-full ${ATTENDANCE_DOT_CLASS[tone]}`} aria-hidden="true" />
+                      {attendanceSummary[tone]} {text}
+                    </span>
+                  ))}
+                  <span className="text-muted">de {assignedCount} en la composición. El punto junto a cada nombre es su respuesta.</span>
+                </div>
+              )}
+            </div>
 
             {canManage && (
               <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -892,41 +1100,58 @@ export function PartyPlanner({ canManage, members, events, editing }: PartyPlann
               </p>
             )}
 
-            {/* ---- Guardado del evento ---- */}
+            {/* ---- Guardar la composición permanente ---- */}
             {canManage && (
-              <div className="mt-6 flex flex-wrap items-end gap-3 border-t border-border pt-4">
-                <label className="text-xs text-muted">
-                  Día del evento ({EVENT_DAYS[eventType]})
-                  <select
-                    value={board.eventId}
-                    onChange={(event) => patchBoard((current) => ({ ...current, eventId: event.target.value }))}
-                    className="mt-1 block min-w-[220px] rounded-[10px] border border-border bg-background-elevated px-3 py-2 text-sm capitalize text-foreground"
-                  >
-                    <option value="">Elige el día…</option>
-                    {typeEvents.map((event) => (
-                      <option key={event.id} value={event.id}>
-                        {event.label}
-                        {event.saved ? " · ya tiene composición" : ""}
+              <div className="mt-6 flex flex-col gap-3 border-t border-border pt-4">
+                <p className="text-xs text-muted">
+                  La composición de {EVENT_LABEL[eventType]} es permanente: no va atada a un día, se modifica cuando
+                  la guild lo necesite y cada jugador ve su party en el inicio del panel.
+                  {savedCompositions[eventType]
+                    ? ` Última vez guardada: ${SAVED_FORMATTER.format(new Date(savedCompositions[eventType].updatedAt))}.`
+                    : " Todavía no se ha guardado ninguna."}
+                </p>
+                <div className="flex flex-wrap items-center gap-3">
+                  <label className="flex items-center gap-2 text-sm text-foreground">
+                    <input
+                      type="checkbox"
+                      checked={notify}
+                      onChange={(event) => setNotify(event.target.checked)}
+                      className="h-4 w-4 accent-[var(--color-accent)]"
+                    />
+                    Informar por Discord
+                  </label>
+                  {notify && (
+                    <select
+                      value={notifyChannel[eventType]}
+                      onChange={(event) =>
+                        setNotifyChannel((prev) => ({ ...prev, [eventType]: event.target.value }))
+                      }
+                      aria-label="Canal de Discord"
+                      className="min-w-[220px] rounded-[10px] border border-border bg-background-elevated px-3 py-2 text-sm text-foreground"
+                    >
+                      <option value="" disabled>
+                        Elige el canal…
                       </option>
-                    ))}
-                  </select>
-                </label>
-                {selectedEvent?.saved && selectedEvent.saved.id !== board.template?.id && (
+                      {channels.map((channel) => (
+                        <option key={channel.id} value={channel.id}>
+                          {channel.category ? `${channel.category} / ${channel.label}` : channel.label}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                   <button
                     type="button"
-                    onClick={() => loadSaved(selectedEvent)}
-                    className="rounded-[10px] border border-border px-3 py-2 text-xs font-semibold uppercase tracking-wide text-foreground hover:bg-surface-hover"
+                    onClick={save}
+                    disabled={isSaving}
+                    className="btn-brand px-4 py-2 text-sm disabled:opacity-50 sm:ml-auto"
                   >
-                    Cargar la guardada (reemplaza lo de pantalla)
+                    {isSaving ? "Guardando…" : "Guardar composición"}
                   </button>
-                )}
-                <button type="button" onClick={save} disabled={isSaving} className="btn-brand px-4 py-2 text-sm disabled:opacity-50">
-                  {isSaving ? "Guardando…" : `Guardar ${EVENT_LABEL[eventType]}`}
-                </button>
-                {typeEvents.length === 0 && (
-                  <p className="w-full text-xs text-amber-400">
-                    No hay eventos próximos de {EVENT_LABEL[eventType]} creados. Créalos en Eventos → Semana de
-                    asistencia para poder guardar.
+                </div>
+                {notify && (
+                  <p className="text-xs text-muted">
+                    Se publica el roster mencionando a [SD] Core. Si ya se había informado en ese canal, se edita el
+                    mismo mensaje en vez de mandar otro.
                   </p>
                 )}
               </div>

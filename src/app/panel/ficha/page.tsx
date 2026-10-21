@@ -5,6 +5,7 @@ import { loadSheetRequirements } from "@/lib/core-census/requirements-config";
 import { BackLink } from "@/components/back-link";
 import { SheetFields } from "@/components/core-census/sheet-fields";
 import { SubmissionHistory } from "@/components/core-census/submission-history";
+import { CharacterScreenshotField } from "@/components/core-census/character-screenshot-field";
 
 export const dynamic = "force-dynamic";
 
@@ -84,9 +85,7 @@ export default async function UpdateMySheetPage({ searchParams }: { searchParams
           />
         </label>
 
-        <button type="submit" className="btn-brand mt-4 px-4 py-2 text-sm">
-          Enviar a validación
-        </button>
+        <CharacterScreenshotField />
       </form>
 
       <section className="mt-8">

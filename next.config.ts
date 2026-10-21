@@ -41,6 +41,10 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Tesseract.js (OCR de la captura del personaje, ver
+  // src/lib/core-census/screenshot.ts) arranca su worker desde un archivo
+  // propio del paquete: se deja fuera del bundle para que lo encuentre.
+  serverExternalPackages: ["tesseract.js"],
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

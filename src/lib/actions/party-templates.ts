@@ -119,21 +119,14 @@ export async function findLatestTemplateForCategory(
 }
 
 /**
- * Publica (primera vez) o edita (siguientes veces) el roster de la
- * plantilla en el canal de asistencia, mencionando al rol para que
- * notifique de verdad — los embeds no generan ping, por eso la mención va
- * en `content`. Mismo patrón que sendEvent/resendEvent en
+ * Publica el roster de la plantilla en un canal mencionando al rol [SD] Core
+ * para que notifique de verdad (los embeds no generan ping, por eso la
+ * mención va en `content`). Si ya se había publicado en ese mismo canal se
+ * edita aquel mensaje; si se elige otro canal, o alguien borró el mensaje,
+ * se publica uno nuevo. Mismo patrón que sendEvent/resendEvent en
  * src/lib/actions/events.ts.
  */
-export async function communicatePartyTemplate(templateId: string): Promise<void> {
-  const session = await getSession();
-  if (!session?.discordId) throw new Error("No autenticado.");
-
-  const permissions = await getEffectivePermissions(session);
-  if (!permissions.canManageParty) {
-    throw new Error("Tu rol no tiene permiso para comunicar partys.");
-  }
-
+async function publishTemplateRoster(templateId: string, channelId: string): Promise<void> {
   const template = await prisma.partyTemplate.findUniqueOrThrow({
     where: { id: templateId },
     include: { sourceEvent: true },
@@ -144,24 +137,91 @@ export async function communicatePartyTemplate(templateId: string): Promise<void
     throw new Error("Esta plantilla tiene un formato viejo y no se puede comunicar — guárdala de nuevo.");
   }
 
-  const eventTitle = template.sourceEvent?.title ?? template.name;
+  const label = eventCategoryLabel(template.event);
+  const eventTitle = template.permanent ? "composición vigente" : (template.sourceEvent?.title ?? template.name);
   await loadJobRoleEmojis();
   const embed = buildPartyRosterEmbed(eventTitle, template.event, snapshot.players, snapshot.parties);
-  const content = `<@&${PARTY_COMMS_ROLE_ID}> te comunicamos que el roster para ${eventCategoryLabel(template.event)} será el siguiente:`;
+  const content = template.permanent
+    ? `<@&${PARTY_COMMS_ROLE_ID}> se actualizó la composición de ${label}. También puedes ver tu party en el inicio del panel.`
+    : `<@&${PARTY_COMMS_ROLE_ID}> te comunicamos que el roster para ${label} será el siguiente:`;
 
-  if (template.channelId && template.messageId) {
-    const edited = await editChannelMessage(template.channelId, template.messageId, { content, embeds: [embed] });
-    if (!edited) {
-      throw new Error("La comunicación anterior ya no existe en Discord — alguien borró ese mensaje.");
+  if (template.channelId === channelId && template.messageId) {
+    const edited = await editChannelMessage(channelId, template.messageId, { content, embeds: [embed] });
+    if (edited) {
+      await prisma.partyTemplate.update({ where: { id: templateId }, data: { communicatedAt: new Date() } });
+      return;
     }
-    await prisma.partyTemplate.update({ where: { id: templateId }, data: { communicatedAt: new Date() } });
-  } else {
-    const message = await postChannelMessage(PARTY_COMMS_CHANNEL_ID, { content, embeds: [embed] });
-    await prisma.partyTemplate.update({
-      where: { id: templateId },
-      data: { channelId: PARTY_COMMS_CHANNEL_ID, messageId: message.id, communicatedAt: new Date() },
-    });
+  }
+
+  const message = await postChannelMessage(channelId, { content, embeds: [embed] });
+  await prisma.partyTemplate.update({
+    where: { id: templateId },
+    data: { channelId, messageId: message.id, communicatedAt: new Date() },
+  });
+}
+
+/**
+ * Comunica una plantilla del historial a Discord: al canal donde ya se
+ * publicó, o al de asistencia si es la primera vez.
+ */
+export async function communicatePartyTemplate(templateId: string): Promise<void> {
+  const session = await getSession();
+  if (!session?.discordId) throw new Error("No autenticado.");
+
+  const permissions = await getEffectivePermissions(session);
+  if (!permissions.canManageParty) {
+    throw new Error("Tu rol no tiene permiso para comunicar partys.");
+  }
+
+  const template = await prisma.partyTemplate.findUniqueOrThrow({ where: { id: templateId } });
+  await publishTemplateRoster(templateId, template.channelId ?? PARTY_COMMS_CHANNEL_ID);
+  revalidatePath("/panel/party");
+}
+
+/**
+ * Guarda la composición permanente de un tipo de evento: no se ata a un día,
+ * se va modificando según lo que necesite la guild. Hay una sola por tipo de
+ * evento, así que si ya existe se actualiza. Con `notifyChannelId` además se
+ * informa por Discord en ese canal; si eso falla la composición igual queda
+ * guardada y se devuelve el motivo para mostrarlo.
+ */
+export async function savePermanentComposition(
+  category: "GUILD_LEAGUE" | "EMPERIUM_OVERRUN",
+  data: PartyTemplateSnapshot,
+  notifyChannelId: string | null
+): Promise<{ id: string; notifyError?: string }> {
+  const session = await getSession();
+  if (!session?.discordId) throw new Error("No autenticado.");
+
+  const permissions = await getEffectivePermissions(session);
+  if (!permissions.canManageParty) {
+    throw new Error("Tu rol no tiene permiso para guardar composiciones.");
+  }
+
+  const user = await prisma.user.findUnique({ where: { discordId: session.discordId } });
+  if (!user) throw new Error("Usuario no encontrado.");
+
+  const name = `Composición ${eventCategoryLabel(category)}`;
+  const existing = await prisma.partyTemplate.findFirst({
+    where: { event: category, permanent: true },
+    orderBy: { updatedAt: "desc" },
+  });
+  const template = existing
+    ? await prisma.partyTemplate.update({ where: { id: existing.id }, data: { name, data: data as object } })
+    : await prisma.partyTemplate.create({
+        data: { event: category, name, data: data as object, createdById: user.id, permanent: true },
+      });
+
+  let notifyError: string | undefined;
+  if (notifyChannelId) {
+    try {
+      await publishTemplateRoster(template.id, notifyChannelId);
+    } catch (err) {
+      notifyError = err instanceof Error ? err.message : "No se pudo informar por Discord.";
+    }
   }
 
   revalidatePath("/panel/party");
+  revalidatePath("/panel");
+  return { id: template.id, notifyError };
 }

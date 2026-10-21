@@ -17,6 +17,7 @@ import { SHEET_REQUIREMENTS, pickSheetValues, type RequirementOverrides } from "
 import { JOB_ROLE_NAMES } from "@/lib/discord-job-roles";
 import { readSnapshot } from "@/lib/party/template-snapshot";
 import { EVALUATION_START } from "@/lib/core-census/tier";
+import { readScreenshotProof } from "@/lib/core-census/screenshot";
 
 const EVALUATION_PATH = "/admin/evaluacion-core";
 
@@ -182,7 +183,22 @@ export async function submitMySheetUpdate(formData: FormData): Promise<void> {
   const sheet = await prisma.coreCharacterSheet.findUnique({ where: { discordId } });
   if (!sheet?.inCore) throw new Error("Solo los miembros [SD] Core pueden actualizar su ficha.");
 
-  const data = submissionSchema.parse({ ...readSheetValues(formData), note: formData.get("note") ?? "" });
+  // La captura del personaje es obligatoria: el Power sale de lo que se leyó
+  // en ella (no de lo que se tipee) y el job y el nombre leídos quedan para
+  // que el moderador los compare con la ficha.
+  const proof = readScreenshotProof(String(formData.get("screenshotProof") ?? ""), discordId);
+  if (!proof) {
+    throw new Error("Falta la captura de tu personaje, o pasó más de una hora desde que la subiste. Vuelve a subirla.");
+  }
+
+  const parsed = submissionSchema.parse({ ...readSheetValues(formData), note: formData.get("note") ?? "" });
+  const data = {
+    ...parsed,
+    power: proof.power ?? parsed.power,
+    screenshotJob: proof.job,
+    screenshotName: proof.characterName,
+    screenshotPower: proof.power,
+  };
 
   const pending = await prisma.coreSheetSubmission.findFirst({ where: { discordId, status: "PENDING" } });
   if (pending) {
@@ -282,7 +298,7 @@ export async function saveEventCensus(eventId: string, rows: CensusRowInput[]): 
 
   const event = await prisma.event.findUnique({
     where: { id: eventId },
-    select: { id: true, startsAt: true, signups: { select: { discordId: true, status: true } } },
+    select: { id: true, category: true, startsAt: true, signups: { select: { discordId: true, status: true } } },
   });
   if (!event) return { error: "Este evento ya no existe." };
   if (event.startsAt < EVALUATION_START) return { error: "Este evento es anterior al inicio de la evaluación." };
@@ -290,13 +306,23 @@ export async function saveEventCensus(eventId: string, rows: CensusRowInput[]): 
 
   // Job y party de cada jugador en este evento, para medir rendimiento más
   // adelante: del Party Builder si se armó una plantilla para el evento (la
-  // última guardada), y si no, el job de la ficha.
+  // última guardada) o, si no, de la composición permanente de ese tipo de
+  // evento; sin ninguna de las dos, el job de la ficha.
   const [sheets, template] = await Promise.all([
     prisma.coreCharacterSheet.findMany({
       where: { discordId: { in: parsed.data.map((row) => row.discordId) } },
       select: { discordId: true, jobName: true },
     }),
-    prisma.partyTemplate.findFirst({ where: { eventId }, orderBy: { updatedAt: "desc" } }),
+    prisma.partyTemplate
+      .findFirst({ where: { eventId }, orderBy: { updatedAt: "desc" } })
+      .then(
+        (linked) =>
+          linked ??
+          prisma.partyTemplate.findFirst({
+            where: { event: event.category, permanent: true },
+            orderBy: { updatedAt: "desc" },
+          })
+      ),
   ]);
   const sheetJobById = new Map(sheets.map((sheet) => [sheet.discordId, sheet.jobName]));
   const snapshot = template ? readSnapshot(template.data) : null;

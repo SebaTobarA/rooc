@@ -4,8 +4,15 @@ import { getEffectivePermissions } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { loadCorePlayers } from "@/lib/core-census/data";
 import { readSnapshot } from "@/lib/party/template-snapshot";
+import { loadEventChannelOptions } from "@/lib/discord-guild-channels";
 import { BotErrorNotice } from "@/components/admin/bot-error-notice";
-import { PartyPlanner, type PlannerEvent, type PlannerMember } from "@/components/party/party-planner";
+import {
+  PartyPlanner,
+  type PlannerAttendance,
+  type PlannerComposition,
+  type PlannerEventType,
+  type PlannerMember,
+} from "@/components/party/party-planner";
 import { SavedTemplates } from "@/components/party/saved-templates";
 
 export const dynamic = "force-dynamic";
@@ -21,15 +28,12 @@ const DAY_FORMATTER = new Intl.DateTimeFormat("es-CL", {
   timeZone: "America/Santiago",
 });
 
-// Cuántos eventos próximos se ofrecen para guardar una composición (unas
-// cuatro semanas de guild: martes, jueves y domingo).
-const UPCOMING_EVENTS = 12;
+const CATEGORIES = ["GUILD_LEAGUE", "EMPERIUM_OVERRUN"] as const satisfies readonly PlannerEventType[];
 
 // Vive fuera del componente para no llamar Date.now() directo en el render
-// (regla react-hooks/purity). Un día de margen para poder corregir la
-// composición de un evento que acaba de terminar.
-function upcomingSince(): Date {
-  return new Date(Date.now() - 24 * 60 * 60 * 1000);
+// (regla react-hooks/purity).
+function now(): Date {
+  return new Date();
 }
 
 export default async function PartyPage({ searchParams }: { searchParams: Promise<{ edit?: string }> }) {
@@ -49,48 +53,69 @@ export default async function PartyPage({ searchParams }: { searchParams: Promis
   }
 
   const { edit: editingTemplateId } = await searchParams;
+  const since = now();
 
   // El pool es el core de la guild: quienes tienen el rol [SD] Core, con el
   // job de su ficha (ver syncCorePlayers).
-  const [{ players, syncError }, upcoming, templateToEdit] = await Promise.all([
-    loadCorePlayers({ sync: true }),
-    prisma.event.findMany({
-      where: { endsAt: { gte: upcomingSince() } },
-      orderBy: { startsAt: "asc" },
-      take: UPCOMING_EVENTS,
-      include: { partyTemplates: { orderBy: { updatedAt: "desc" }, take: 1 } },
-    }),
-    editingTemplateId
-      ? prisma.partyTemplate.findUnique({ where: { id: editingTemplateId } })
-      : Promise.resolve(null),
-  ]);
+  const [{ players, syncError }, permanentTemplates, nextEvents, channels, settings, templateToEdit] =
+    await Promise.all([
+      loadCorePlayers({ sync: true }),
+      prisma.partyTemplate.findMany({ where: { permanent: true }, orderBy: { updatedAt: "desc" } }),
+      // El próximo evento de cada tipo, para cruzar la composición con quién
+      // avisó que juega.
+      Promise.all(
+        CATEGORIES.map((category) =>
+          prisma.event.findFirst({
+            where: { category, endsAt: { gte: since } },
+            orderBy: { startsAt: "asc" },
+            include: { signups: { select: { discordId: true, status: true } } },
+          })
+        )
+      ),
+      permissions.canManageParty ? loadEventChannelOptions() : Promise.resolve([]),
+      prisma.guildEventSettings.findFirst(),
+      editingTemplateId
+        ? prisma.partyTemplate.findUnique({ where: { id: editingTemplateId } })
+        : Promise.resolve(null),
+    ]);
 
   const members: PlannerMember[] = players
     .filter((player) => player.inCore)
     .map((player) => ({ id: player.discordId, nickname: player.characterName, clase: player.job ?? "Sin job" }));
 
-  const events: PlannerEvent[] = upcoming.map((event) => {
-    const template = event.partyTemplates[0];
-    const snapshot = template ? readSnapshot(template.data) : null;
-    return {
-      id: event.id,
-      category: event.category,
-      label: DAY_FORMATTER.format(event.startsAt),
-      saved: template && snapshot ? { id: template.id, data: snapshot } : null,
-    };
-  });
+  const compositions = Object.fromEntries(
+    CATEGORIES.map((category) => {
+      const template = permanentTemplates.find((candidate) => candidate.event === category);
+      const snapshot = template ? readSnapshot(template.data) : null;
+      const composition: PlannerComposition | null =
+        template && snapshot
+          ? { id: template.id, data: snapshot, channelId: template.channelId, updatedAt: template.updatedAt.toISOString() }
+          : null;
+      return [category, composition];
+    })
+  ) as Record<PlannerEventType, PlannerComposition | null>;
+
+  const attendance = Object.fromEntries(
+    CATEGORIES.map((category, index) => {
+      const event = nextEvents[index];
+      const entry: PlannerAttendance | null = event
+        ? {
+            label: DAY_FORMATTER.format(event.startsAt),
+            published: event.status === "PUBLISHED",
+            mode: event.attendanceMode,
+            statuses: Object.fromEntries(event.signups.map((signup) => [signup.discordId, signup.status])),
+          }
+        : null;
+      return [category, entry];
+    })
+  ) as Record<PlannerEventType, PlannerAttendance | null>;
 
   // "Editar" desde el historial: abre esa composición en el tablero de su
-  // tipo de evento. Solo sirve si quedó enlazada a un evento.
+  // tipo de evento; al guardarla pasa a ser la composición vigente.
   const editingSnapshot = templateToEdit ? readSnapshot(templateToEdit.data) : null;
   const editing =
-    templateToEdit && editingSnapshot && templateToEdit.eventId && permissions.canManageParty
-      ? {
-          id: templateToEdit.id,
-          category: templateToEdit.event as "GUILD_LEAGUE" | "EMPERIUM_OVERRUN",
-          eventId: templateToEdit.eventId,
-          data: editingSnapshot,
-        }
+    templateToEdit && editingSnapshot && permissions.canManageParty
+      ? { id: templateToEdit.id, category: templateToEdit.event as PlannerEventType, data: editingSnapshot }
       : null;
 
   return (
@@ -105,7 +130,10 @@ export default async function PartyPage({ searchParams }: { searchParams: Promis
         key={editing?.id ?? "new"}
         canManage={permissions.canManageParty}
         members={members}
-        events={events}
+        compositions={compositions}
+        attendance={attendance}
+        channels={channels}
+        defaultChannelId={settings?.defaultChannelId ?? null}
         editing={editing}
       />
 

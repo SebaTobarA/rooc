@@ -37,7 +37,8 @@ function countFromSnapshot(data: unknown): { players: number; parties: number } 
  */
 export async function SavedTemplates({ canManageParty }: { canManageParty: boolean }) {
   const templates = await prisma.partyTemplate.findMany({
-    orderBy: { createdAt: "desc" },
+    // La composición vigente de cada evento primero, después el resto.
+    orderBy: [{ permanent: "desc" }, { createdAt: "desc" }],
     include: { createdBy: true, sourceEvent: true },
   });
 
@@ -53,7 +54,10 @@ export async function SavedTemplates({ canManageParty }: { canManageParty: boole
           return (
             <div key={template.id} className="saved-template-card">
               <div>
-                <p className="party-card-name">{eventTitle}</p>
+                <p className="party-card-name">
+                  {eventTitle}
+                  {template.permanent ? " · vigente" : ""}
+                </p>
                 <p className="chip-class">
                   {EVENT_LABEL[template.event] ?? template.event} · {players} jugador(es) · {parties}{" "}
                   party(s) · por {template.createdBy.globalName ?? template.createdBy.username}
