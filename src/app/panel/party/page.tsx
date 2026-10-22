@@ -4,6 +4,8 @@ import { getEffectivePermissions } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { loadCorePlayers } from "@/lib/core-census/data";
 import { readSnapshot } from "@/lib/party/template-snapshot";
+import { loadDraft } from "@/lib/party/draft";
+import type { DraftPayload } from "@/lib/party/draft-ops";
 import { loadEventChannelOptions } from "@/lib/discord-guild-channels";
 import { BotErrorNotice } from "@/components/admin/bot-error-notice";
 import {
@@ -57,7 +59,7 @@ export default async function PartyPage({ searchParams }: { searchParams: Promis
 
   // El pool es el core de la guild: quienes tienen el rol [SD] Core, con el
   // job de su ficha (ver syncCorePlayers).
-  const [{ players, syncError }, permanentTemplates, nextEvents, channels, settings, templateToEdit] =
+  const [{ players, syncError }, permanentTemplates, nextEvents, channels, settings, templateToEdit, draftList] =
     await Promise.all([
       loadCorePlayers({ sync: true }),
       prisma.partyTemplate.findMany({ where: { permanent: true }, orderBy: { updatedAt: "desc" } }),
@@ -77,7 +79,16 @@ export default async function PartyPage({ searchParams }: { searchParams: Promis
       editingTemplateId
         ? prisma.partyTemplate.findUnique({ where: { id: editingTemplateId } })
         : Promise.resolve(null),
+      // El borrador compartido que editan los oficiales; quien solo mira ve
+      // la composición publicada.
+      permissions.canManageParty ? Promise.all(CATEGORIES.map((category) => loadDraft(category))) : Promise.resolve(null),
     ]);
+  const drafts = draftList
+    ? (Object.fromEntries(CATEGORIES.map((category, index) => [category, draftList[index]])) as Record<
+        PlannerEventType,
+        DraftPayload
+      >)
+    : null;
 
   const members: PlannerMember[] = players
     .filter((player) => player.inCore)
@@ -131,6 +142,7 @@ export default async function PartyPage({ searchParams }: { searchParams: Promis
         canManage={permissions.canManageParty}
         members={members}
         compositions={compositions}
+        drafts={drafts}
         attendance={attendance}
         channels={channels}
         defaultChannelId={settings?.defaultChannelId ?? null}

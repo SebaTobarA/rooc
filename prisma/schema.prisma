@@ -518,6 +518,41 @@ model PartyTemplate {
   @@index([event, permanent])
 }
 
+// Borrador compartido de la composición permanente de un tipo de evento:
+// los oficiales lo editan a la vez desde el Party Builder con operaciones
+// pequeñas (mover un jugador, crear una party...) que se aplican sobre el
+// tablero vigente, así nadie pisa el trabajo de otro (ver
+// src/lib/party/draft-ops.ts). "Guardar composición" lo publica como la
+// PartyTemplate permanente; mientras version != publishedVersion hay
+// cambios sin publicar.
+model PartyDraft {
+  // "GUILD_LEAGUE" | "EMPERIUM_OVERRUN": un borrador por tipo de evento.
+  event            String    @id
+  // Tablero: parties, raids y quién va en cada party (ver DraftBoard).
+  board            Json
+  // Sube en cada cambio: los clientes la usan para saber si hay novedades
+  // y para no pisar una escritura concurrente (control optimista).
+  version          Int       @default(1)
+  publishedVersion Int       @default(0)
+  publishedAt      DateTime?
+  publishedByName  String?
+  updatedByName    String?
+  updatedAt        DateTime  @updatedAt
+}
+
+// Presencia en el Party Builder: cada oficial con la página abierta
+// actualiza su fila en cada consulta del borrador, y se muestra a los demás
+// quién la vio en los últimos segundos.
+model PartyDraftEditor {
+  discordId  String   @id
+  name       String
+  // Tipo de evento que tiene a la vista.
+  event      String
+  lastSeenAt DateTime
+
+  @@index([lastSeenAt])
+}
+
 // ---------------------------------------------------------------------------
 // Asistencia a eventos (Guild League / Emperium Overrun): se crean en
 // /panel/eventos (gestión de guild, permiso canManageParty) y, al enviarse,

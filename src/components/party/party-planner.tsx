@@ -1,16 +1,39 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { EventAttendanceMode, EventSignupStatus } from "@prisma/client";
-import { ArrowDown, ArrowDownAZ, CornerDownRight, Plus, Settings, Sparkles, Trash2, Users, X } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowDownAZ,
+  CloudCheck,
+  CloudUpload,
+  CornerDownRight,
+  Plus,
+  Settings,
+  Sparkles,
+  Trash2,
+  Users,
+  WifiOff,
+  X,
+} from "lucide-react";
 import { savePermanentComposition } from "@/lib/actions/party-templates";
 import { ATTENDANCE_DOT_CLASS, ATTENDANCE_TEXT_CLASS, attendanceMark } from "@/lib/party/attendance";
 import type { EventChannelOption } from "@/lib/discord-guild-channels";
 import { inferRole, normalizeClass } from "@/lib/party/infer-role";
+import {
+  MAX_PARTIES_PER_RAID,
+  PARTY_SIZE,
+  boardFromSnapshot,
+  emptyBoard,
+  type DraftBoard,
+  type DraftEditor,
+  type DraftPayload,
+} from "@/lib/party/draft-ops";
+import { DraftChannel } from "@/lib/party/draft-sync";
 import type { PartyTemplateSnapshot } from "@/lib/party/template-snapshot";
 import { fillPartiesFromPool } from "@/lib/party/use-campo";
-import type { CampoSide, Party, Player, Raid, SlotLabel } from "@/types/party";
+import type { CampoSide, Party, Player, SlotLabel } from "@/types/party";
 
 export type PlannerEventType = "GUILD_LEAGUE" | "EMPERIUM_OVERRUN";
 type EventType = PlannerEventType;
@@ -41,13 +64,6 @@ export interface PlannerAttendance {
   statuses: Record<string, EventSignupStatus>;
 }
 
-interface Board {
-  parties: Party[];
-  raids: Raid[];
-  /** id de party -> discordIds de sus jugadores, en el orden en que se ven. */
-  members: Record<string, string[]>;
-}
-
 const EVENT_LABEL: Record<EventType, string> = {
   GUILD_LEAGUE: "Guild League",
   EMPERIUM_OVERRUN: "Emperium Overrun",
@@ -55,9 +71,8 @@ const EVENT_LABEL: Record<EventType, string> = {
 const CAMPO_LABEL: Record<CampoSide, string> = { principal: "Campo Primario", secundario: "Campo Secundario" };
 const SLOT_OPTIONS: SlotLabel[] = ["Tanque", "Soporte", "Daño", "Flexible"];
 const DEFAULT_COMPOSITION: SlotLabel[] = ["Tanque", "Soporte", "Daño", "Daño", "Daño"];
-// Igual que en el juego: una party son 5 jugadores y un raid, hasta 8 parties.
-const PARTY_SIZE = 5;
-const MAX_PARTIES_PER_RAID = 8;
+// Cada cuánto se consulta el borrador compartido con la pestaña visible.
+const POLL_INTERVAL_MS = 2500;
 
 // Paleta por defecto de cada job; quien arma la puede cambiar con la rueda
 // de configuración (se guarda en su navegador, no en el servidor).
@@ -88,28 +103,21 @@ const SAVED_FORMATTER = new Intl.DateTimeFormat("es-CL", {
 });
 const COLORS_STORAGE_KEY = "sd-party-job-colors";
 
-function emptyBoard(): Board {
-  return { parties: [], raids: [], members: {} };
-}
-
 function newId(prefix: string): string {
   return `${prefix}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function boardFromSnapshot(snapshot: PartyTemplateSnapshot): Board {
-  // El orden dentro de cada party es el de la lista de jugadores guardada.
-  const members: Record<string, string[]> = {};
-  for (const player of snapshot.players) {
-    if (player.partyId) (members[player.partyId] ??= []).push(player.id);
-  }
-  return { parties: snapshot.parties, raids: snapshot.raids, members };
-}
-
-/** Saca a un jugador de la party en la que esté. */
-function withoutPlayer(members: Record<string, string[]>, playerId: string): Record<string, string[]> {
-  return Object.fromEntries(
-    Object.entries(members).map(([partyId, ids]) => [partyId, ids.filter((id) => id !== playerId)])
-  );
+/** Borrador "de lectura" armado con la composición publicada, para quien no puede editar. */
+function payloadFromComposition(composition: PlannerComposition | null): DraftPayload {
+  return {
+    version: 0,
+    publishedVersion: 0,
+    board: composition ? boardFromSnapshot(composition.data) : emptyBoard(),
+    updatedByName: null,
+    updatedAt: composition?.updatedAt ?? new Date(0).toISOString(),
+    publishedAt: composition?.updatedAt ?? null,
+    publishedByName: null,
+  };
 }
 
 interface PartyPlannerProps {
@@ -117,6 +125,8 @@ interface PartyPlannerProps {
   members: PlannerMember[];
   /** La composición permanente vigente de cada tipo de evento. */
   compositions: Record<EventType, PlannerComposition | null>;
+  /** Borrador compartido de cada tipo de evento; null para quien no puede editar. */
+  drafts: Record<EventType, DraftPayload> | null;
   /** Quién avisó que juega el próximo evento de cada tipo. */
   attendance: Record<EventType, PlannerAttendance | null>;
   /** Canales de Discord donde se puede informar la composición. */
@@ -134,11 +144,17 @@ interface PartyPlannerProps {
  * que necesite la guild y de ella sale el roster que ve cada jugador en el
  * inicio del panel. La asistencia del próximo evento solo se cruza para
  * controlar quién de la composición avisó que juega.
+ *
+ * Los oficiales editan a la vez un borrador compartido que se guarda solo
+ * en el servidor con cada cambio (ver src/lib/party/draft-sync.ts) y se
+ * consulta cada pocos segundos para ver lo que hacen los demás. "Guardar
+ * composición" publica ese borrador: es lo que ven los jugadores.
  */
 export function PartyPlanner({
   canManage,
   members,
   compositions: savedCompositions,
+  drafts,
   attendance,
   channels,
   defaultChannelId,
@@ -147,16 +163,25 @@ export function PartyPlanner({
   const router = useRouter();
   const [eventType, setEventType] = useState<EventType | null>(editing?.category ?? "GUILD_LEAGUE");
   const [campo, setCampo] = useState<CampoSide>("principal");
-  // Cada tablero arranca con la composición vigente (o la del historial que
-  // se abrió con "Editar").
-  const [boards, setBoards] = useState<Record<EventType, Board>>(() => {
-    const initial = (type: EventType): Board => {
-      if (editing?.category === type) return boardFromSnapshot(editing.data);
-      const saved = savedCompositions[type];
-      return saved ? boardFromSnapshot(saved.data) : emptyBoard();
-    };
-    return { GUILD_LEAGUE: initial("GUILD_LEAGUE"), EMPERIUM_OVERRUN: initial("EMPERIUM_OVERRUN") };
+  const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+  const live = canManage && drafts !== null;
+  // Un canal de sincronización por tipo de evento, con su borrador compartido
+  // (o, para quien solo mira, la composición publicada).
+  const [syncChannels] = useState<Record<EventType, DraftChannel>>(() => {
+    const create = (type: EventType) =>
+      new DraftChannel(
+        type,
+        drafts?.[type] ?? payloadFromComposition(savedCompositions[type]),
+        (text) => setMessage({ kind: "error", text }),
+        live
+      );
+    return { GUILD_LEAGUE: create("GUILD_LEAGUE"), EMPERIUM_OVERRUN: create("EMPERIUM_OVERRUN") };
   });
+  const [editors, setEditors] = useState<DraftEditor[]>([]);
+  const [offline, setOffline] = useState(false);
+  // La plantilla del historial abierta con "Editar" no se carga sola: pisaría
+  // el borrador de todos. Se ofrece cargarla.
+  const [editingPending, setEditingPending] = useState(Boolean(editing && live));
   const [notify, setNotify] = useState(false);
   const [notifyChannel, setNotifyChannel] = useState<Record<EventType, string>>(() => {
     const fallback = defaultChannelId ?? channels[0]?.id ?? "";
@@ -171,7 +196,6 @@ export function PartyPlanner({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [compositions, setCompositions] = useState<SlotLabel[][]>([DEFAULT_COMPOSITION]);
   const [suggestRaidId, setSuggestRaidId] = useState("");
-  const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const [isSaving, startSaving] = useTransition();
   // true mientras la sección de equipos está fuera de pantalla: ahí aparece
   // el resumen flotante para seguir asignando sin bajar.
@@ -212,7 +236,54 @@ export function PartyPlanner({
     setColors(DEFAULT_JOB_COLORS);
   }
 
-  const board = eventType ? boards[eventType] : null;
+  const channel = syncChannels[eventType ?? "GUILD_LEAGUE"];
+  const draft = useSyncExternalStore(channel.subscribe, channel.getSnapshot, channel.getSnapshot);
+  const board = eventType ? draft.board : null;
+
+  // Consulta periódica del borrador del tipo a la vista (y de quién más está
+  // editando), solo con la pestaña visible.
+  useEffect(() => {
+    if (!live || !eventType) return;
+    let stopped = false;
+    let running = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const schedule = () => {
+      if (!stopped) timer = setTimeout(poll, POLL_INTERVAL_MS);
+    };
+    const poll = async () => {
+      if (running || stopped) return;
+      if (document.visibilityState !== "visible") return schedule();
+      running = true;
+      try {
+        const response = await fetch(`/panel/party/draft?event=${eventType}&v=${channel.version}`, {
+          cache: "no-store",
+        });
+        if (!response.ok) throw new Error(String(response.status));
+        const result = (await response.json()) as { draft: DraftPayload | null; editors: DraftEditor[] };
+        if (stopped) return;
+        if (result.draft) channel.receive(result.draft);
+        setEditors(result.editors);
+        setOffline(false);
+      } catch {
+        if (!stopped) setOffline(true);
+      } finally {
+        running = false;
+      }
+      schedule();
+    };
+    const onVisibility = () => {
+      if (document.visibilityState !== "visible") return;
+      clearTimeout(timer);
+      void poll();
+    };
+    void poll();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [live, eventType, channel]);
 
   // discordId -> party donde va, derivado del tablero.
   const partyOf = useMemo(() => {
@@ -235,8 +306,12 @@ export function PartyPlanner({
     for (const player of editing?.data.players ?? []) {
       if (!byId.has(player.id)) byId.set(player.id, { id: player.id, nickname: player.nickname, clase: player.clase });
     }
+    // Quien otro oficial dejó en el borrador sin estar en el core.
+    for (const [id, person] of Object.entries(draft.board.extras ?? {})) {
+      if (!byId.has(id)) byId.set(id, { id, ...person });
+    }
     return [...byId.values()];
-  }, [members, savedCompositions, editing]);
+  }, [members, savedCompositions, editing, draft.board.extras]);
   const memberById = useMemo(() => new Map(roster.map((member) => [member.id, member])), [roster]);
   const coreIds = useMemo(() => new Set(members.map((member) => member.id)), [members]);
 
@@ -250,35 +325,20 @@ export function PartyPlanner({
   }, [roster, coreIds, partyOf, sortBy]);
   const jobs = useMemo(() => [...new Set(roster.map((member) => member.clase))].sort(), [roster]);
 
-  function patchBoard(update: (current: Board) => Board) {
-    if (!eventType) return;
-    setBoards((prev) => ({ ...prev, [eventType]: update(prev[eventType]) }));
-  }
 
   // Lo que se ve del tablero: en Guild League, solo el campo elegido.
   const scopeCampo: CampoSide | null = eventType === "GUILD_LEAGUE" ? campo : null;
   const scopeRaids = board?.raids.filter((raid) => (raid.campo ?? null) === scopeCampo) ?? [];
   const scopeParties = board?.parties.filter((party) => party.campo === scopeCampo) ?? [];
   const partyById = new Map(board?.parties.map((party) => [party.id, party]) ?? []);
-  const membersOf = (partyId: string) =>
-    (board?.members[partyId] ?? [])
+  const membersOf = (partyId: string, source: DraftBoard | null = board) =>
+    (source?.members[partyId] ?? [])
       .map((playerId) => memberById.get(playerId))
       .filter((member): member is PlannerMember => Boolean(member));
   const partiesInRaid = (raidId: string | null) => scopeParties.filter((party) => (party.raidId ?? null) === raidId);
 
   function addRaid() {
-    patchBoard((current) => ({
-      ...current,
-      raids: [
-        ...current.raids,
-        {
-          id: newId("raid"),
-          name: `Raid ${current.raids.filter((raid) => (raid.campo ?? null) === scopeCampo).length + 1}`,
-          compositions: [],
-          campo: scopeCampo,
-        },
-      ],
-    }));
+    channel.push({ kind: "addRaid", id: newId("raid"), campo: scopeCampo });
   }
 
   function addParty(raidId: string | null) {
@@ -287,39 +347,15 @@ export function PartyPlanner({
       setMessage({ kind: "error", text: `Un raid admite hasta ${MAX_PARTIES_PER_RAID} parties. Agrega otro raid.` });
       return;
     }
-    patchBoard((current) => ({
-      ...current,
-      parties: [
-        ...current.parties,
-        {
-          id: newId("party"),
-          name: `Party ${current.parties.filter((party) => party.campo === scopeCampo && (party.raidId ?? null) === raidId).length + 1}`,
-          capacity: PARTY_SIZE,
-          campo: scopeCampo,
-          raidId,
-        },
-      ],
-    }));
+    channel.push({ kind: "addParty", id: newId("party"), campo: scopeCampo, raidId });
   }
 
   function removeParty(partyId: string) {
-    patchBoard((current) => {
-      const members = { ...current.members };
-      delete members[partyId];
-      return { ...current, parties: current.parties.filter((party) => party.id !== partyId), members };
-    });
+    channel.push({ kind: "removeParty", id: partyId });
   }
 
   function removeRaid(raidId: string) {
-    patchBoard((current) => {
-      const gone = new Set(current.parties.filter((party) => party.raidId === raidId).map((party) => party.id));
-      return {
-        ...current,
-        raids: current.raids.filter((raid) => raid.id !== raidId),
-        parties: current.parties.filter((party) => !gone.has(party.id)),
-        members: Object.fromEntries(Object.entries(current.members).filter(([partyId]) => !gone.has(partyId))),
-      };
-    });
+    channel.push({ kind: "removeRaid", id: raidId });
   }
 
   /**
@@ -337,17 +373,7 @@ export function PartyPlanner({
         return;
       }
     }
-    patchBoard((current) => {
-      const members = withoutPlayer(current.members, playerId);
-      if (partyId) {
-        const list = [...(members[partyId] ?? [])];
-        const index = beforeId ? list.indexOf(beforeId) : -1;
-        if (index === -1) list.push(playerId);
-        else list.splice(index, 0, playerId);
-        members[partyId] = list;
-      }
-      return { ...current, members };
-    });
+    channel.push({ kind: "move", playerId, partyId, beforeId: beforeId ?? null });
     setSelectedId(null);
   }
 
@@ -393,27 +419,13 @@ export function PartyPlanner({
     }
 
     // Los ids que genera el algoritmo pueden repetirse con los de una
-    // composición cargada: se reemplazan por ids propios.
-    const idMap = new Map(result.parties.map((party) => [party.id, newId("party")]));
-    const suggested: Record<string, string[]> = {};
-    for (const player of pool) {
-      const partyId = idMap.get(result.assignments[player.id] ?? "");
-      if (partyId) (suggested[partyId] ??= []).push(player.id);
-    }
-    patchBoard((current) => ({
-      ...current,
-      parties: [
-        ...current.parties,
-        ...result.parties.map((party) => ({
-          ...party,
-          id: idMap.get(party.id) ?? party.id,
-          capacity: PARTY_SIZE,
-          campo: scopeCampo,
-          raidId,
-        })),
-      ],
-      members: { ...current.members, ...suggested },
+    // composición cargada: se reemplazan por ids propios. El nombre de cada
+    // party lo pone el borrador al aplicarla, según las que ya haya.
+    const suggested = result.parties.map((party) => ({
+      id: newId("party"),
+      playerIds: pool.filter((player) => result.assignments[player.id] === party.id).map((player) => player.id),
     }));
+    channel.push({ kind: "suggest", campo: scopeCampo, raidId, parties: suggested });
 
     const left = pool.length - Object.keys(result.assignments).length;
     const full = partiesInRaid(raidId).length + result.parties.length >= MAX_PARTIES_PER_RAID;
@@ -434,21 +446,7 @@ export function PartyPlanner({
       setMessage({ kind: "error", text: `Un raid admite hasta ${MAX_PARTIES_PER_RAID} parties. Agrega otro raid.` });
       return;
     }
-    const partyId = newId("party");
-    patchBoard((current) => ({
-      ...current,
-      parties: [
-        ...current.parties,
-        {
-          id: partyId,
-          name: `Party ${current.parties.filter((party) => party.campo === scopeCampo && (party.raidId ?? null) === raidId).length + 1}`,
-          capacity: PARTY_SIZE,
-          campo: scopeCampo,
-          raidId,
-        },
-      ],
-      members: { ...withoutPlayer(current.members, playerId), [partyId]: [playerId] },
-    }));
+    channel.push({ kind: "addParty", id: newId("party"), campo: scopeCampo, raidId, playerId });
     setSelectedId(null);
   }
 
@@ -464,21 +462,36 @@ export function PartyPlanner({
       const clase = normalizeClass(member.clase);
       return { id: member.id, nickname: member.nickname, clase, rol: inferRole(clase), partyId };
     };
-    // Primero los asignados, party por party y en el orden que se les dio:
-    // el roster del inicio respeta el orden de esta lista.
-    const players: Player[] = [
-      ...board.parties.flatMap((party) => membersOf(party.id).map((member) => toPlayer(member, party.id))),
-      ...roster
-        .filter((member) => coreIds.has(member.id) && !partyOf.has(member.id))
-        .map((member) => toPlayer(member, null)),
-    ];
-    const data: PartyTemplateSnapshot = { players, parties: board.parties, raids: board.raids };
     const label = EVENT_LABEL[eventType];
+    const target = channel;
 
     setMessage(null);
     startSaving(async () => {
       try {
-        const result = await savePermanentComposition(eventType, data, channelId);
+        // Se publica el borrador tal como lo confirmó el servidor, con los
+        // cambios propios que todavía estaban en camino ya incluidos.
+        await target.idle();
+        const { confirmed } = target.getSnapshot();
+        const published = confirmed.board;
+        const assigned = new Set(Object.values(published.members).flat());
+        // Primero los asignados, party por party y en el orden que se les dio:
+        // el roster del inicio respeta el orden de esta lista.
+        const players: Player[] = [
+          ...published.parties.flatMap((party) =>
+            membersOf(party.id, published).map((member) => toPlayer(member, party.id))
+          ),
+          ...roster
+            .filter((member) => coreIds.has(member.id) && !assigned.has(member.id))
+            .map((member) => toPlayer(member, null)),
+        ];
+        const data: PartyTemplateSnapshot = { players, parties: published.parties, raids: published.raids };
+        const result = await savePermanentComposition(
+          eventType,
+          data,
+          channelId,
+          live ? confirmed.version : undefined
+        );
+        if (live) target.markPublished(confirmed.version);
         setMessage(
           result.notifyError
             ? {
@@ -495,6 +508,26 @@ export function PartyPlanner({
       } catch (err) {
         setMessage({ kind: "error", text: err instanceof Error ? err.message : "No se pudo guardar." });
       }
+    });
+  }
+
+  /** Reemplaza el borrador de ese tipo de evento por la plantilla abierta con "Editar". */
+  function loadEditing() {
+    if (!editing) return;
+    const replaced = boardFromSnapshot(editing.data);
+    // Quien no esté en el core viaja con su nombre y job para que los demás
+    // oficiales lo vean.
+    const extras = Object.fromEntries(
+      editing.data.players
+        .filter((player) => player.partyId && !coreIds.has(player.id))
+        .map((player) => [player.id, { nickname: player.nickname, clase: player.clase }])
+    );
+    syncChannels[editing.category].push({ kind: "replace", board: { ...replaced, extras } });
+    setEditingPending(false);
+    setEventType(editing.category);
+    setMessage({
+      kind: "ok",
+      text: `Se cargó la composición en el borrador de ${EVENT_LABEL[editing.category]}. Guárdala para publicarla.`,
     });
   }
 
@@ -680,12 +713,7 @@ export function PartyPlanner({
             value={party.name}
             disabled={!canManage}
             onClick={(event) => event.stopPropagation()}
-            onChange={(event) =>
-              patchBoard((current) => ({
-                ...current,
-                parties: current.parties.map((p) => (p.id === party.id ? { ...p, name: event.target.value } : p)),
-              }))
-            }
+            onChange={(event) => channel.push({ kind: "renameParty", id: party.id, name: event.target.value })}
             aria-label="Nombre de la party"
             className="min-w-0 flex-1 bg-transparent text-xs font-semibold text-foreground outline-none focus:text-accent"
           />
@@ -753,7 +781,73 @@ export function PartyPlanner({
       <p className="mt-1 text-sm text-muted">
         Arma la composición permanente de cada evento con los miembros del core. Toca un jugador para enviarlo a una
         party o raid, o arrástralo a su party. Dentro de una party, arrástralo sobre otro jugador para cambiar el orden.
+        {live && " Cada cambio se guarda solo en un borrador compartido con los demás oficiales."}
       </p>
+
+      {/* ---- Estado del borrador compartido y quién más está editando ---- */}
+      {live && eventType && (
+        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-[10px] border border-border bg-surface px-4 py-2.5 text-xs">
+          {offline || draft.status === "retrying" ? (
+            <span className="flex items-center gap-1.5 text-amber-400">
+              <WifiOff size={14} />
+              Sin conexión con el servidor, reintentando…
+            </span>
+          ) : draft.status === "saving" ? (
+            <span className="flex items-center gap-1.5 text-muted">
+              <CloudUpload size={14} />
+              Guardando en el borrador…
+            </span>
+          ) : (
+            <span className="flex items-center gap-1.5 text-emerald-400">
+              <CloudCheck size={14} />
+              Borrador guardado
+            </span>
+          )}
+          {draft.unpublished ? (
+            <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 font-semibold text-amber-400">
+              Cambios sin publicar en {EVENT_LABEL[eventType]}
+            </span>
+          ) : (
+            <span className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 font-semibold text-emerald-400">
+              {EVENT_LABEL[eventType]}: lo publicado está al día
+            </span>
+          )}
+          {draft.confirmed.updatedByName && (
+            <span className="text-muted">
+              Último cambio: {draft.confirmed.updatedByName},{" "}
+              {SAVED_FORMATTER.format(new Date(draft.confirmed.updatedAt))}
+            </span>
+          )}
+          <span className="flex items-center gap-1.5 text-muted sm:ml-auto">
+            <Users size={14} />
+            {editors.length === 0
+              ? "Nadie más editando ahora"
+              : `También editando: ${editors
+                  .map((editor) => `${editor.name}${editor.event !== eventType ? ` (en ${EVENT_LABEL[editor.event]})` : ""}`)
+                  .join(", ")}`}
+          </span>
+        </div>
+      )}
+
+      {/* ---- Plantilla del historial abierta con "Editar" ---- */}
+      {editing && editingPending && (
+        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-[10px] border border-accent/50 bg-accent/10 px-4 py-3 text-sm">
+          <p className="min-w-0 flex-1 text-foreground">
+            Abriste una composición del historial de {EVENT_LABEL[editing.category]}. Cargarla reemplaza el borrador
+            compartido de ese evento para todos los oficiales (lo publicado no cambia hasta guardar).
+          </p>
+          <button type="button" onClick={loadEditing} className="btn-brand px-3 py-2 text-xs">
+            Cargar en el borrador
+          </button>
+          <button
+            type="button"
+            onClick={() => setEditingPending(false)}
+            className="text-xs text-muted hover:text-foreground"
+          >
+            No cargarla
+          </button>
+        </div>
+      )}
 
       {/* ============ 1. CORE SPECIAL DELIVERY ============ */}
       <section
@@ -1040,12 +1134,7 @@ export function PartyPlanner({
                     <input
                       value={raid.name}
                       disabled={!canManage}
-                      onChange={(event) =>
-                        patchBoard((current) => ({
-                          ...current,
-                          raids: current.raids.map((r) => (r.id === raid.id ? { ...r, name: event.target.value } : r)),
-                        }))
-                      }
+                      onChange={(event) => channel.push({ kind: "renameRaid", id: raid.id, name: event.target.value })}
                       aria-label="Nombre del raid"
                       className="min-w-0 flex-1 bg-transparent font-semibold text-foreground outline-none focus:text-accent"
                     />
@@ -1105,11 +1194,23 @@ export function PartyPlanner({
               <div className="mt-6 flex flex-col gap-3 border-t border-border pt-4">
                 <p className="text-xs text-muted">
                   La composición de {EVENT_LABEL[eventType]} es permanente: no va atada a un día, se modifica cuando
-                  la guild lo necesite y cada jugador ve su party en el inicio del panel.
-                  {savedCompositions[eventType]
-                    ? ` Última vez guardada: ${SAVED_FORMATTER.format(new Date(savedCompositions[eventType].updatedAt))}.`
-                    : " Todavía no se ha guardado ninguna."}
+                  la guild lo necesite y cada jugador ve su party en el inicio del panel. Lo que armas aquí queda en el
+                  borrador compartido; «Guardar composición» lo publica.
+                  {draft.confirmed.publishedAt
+                    ? ` Última vez publicada: ${SAVED_FORMATTER.format(new Date(draft.confirmed.publishedAt))}${
+                        draft.confirmed.publishedByName ? ` por ${draft.confirmed.publishedByName}` : ""
+                      }.`
+                    : " Todavía no se ha publicado ninguna."}
                 </p>
+                {live && (
+                  <p
+                    className={`text-xs font-semibold ${draft.unpublished ? "text-amber-400" : "text-emerald-400"}`}
+                  >
+                    {draft.unpublished
+                      ? "El borrador tiene cambios sin publicar: los jugadores todavía ven la versión anterior."
+                      : "Lo publicado coincide con el borrador."}
+                  </p>
+                )}
                 <div className="flex flex-wrap items-center gap-3">
                   <label className="flex items-center gap-2 text-sm text-foreground">
                     <input

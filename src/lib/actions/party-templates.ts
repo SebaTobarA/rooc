@@ -9,6 +9,8 @@ import { buildPartyRosterEmbed, eventCategoryLabel } from "@/lib/discord-party-e
 import { loadJobRoleEmojis } from "@/lib/discord-job-emojis";
 import type { Player, Party } from "@/types/party";
 import { readSnapshot, type PartyTemplateSnapshot } from "@/lib/party/template-snapshot";
+import { DRAFT_EVENT_TYPES, readDraftOps, type DraftEventType, type DraftPayload } from "@/lib/party/draft-ops";
+import { applyDraftOpsToDb, editorDisplayName, markDraftPublished } from "@/lib/party/draft";
 
 // Canal de asistencia (mismo donde se publican los eventos) y rol "[SD]
 // Core" a mencionar — fijos a pedido, no configurables desde el panel.
@@ -183,12 +185,14 @@ export async function communicatePartyTemplate(templateId: string): Promise<void
  * se va modificando según lo que necesite la guild. Hay una sola por tipo de
  * evento, así que si ya existe se actualiza. Con `notifyChannelId` además se
  * informa por Discord en ese canal; si eso falla la composición igual queda
- * guardada y se devuelve el motivo para mostrarlo.
+ * guardada y se devuelve el motivo para mostrarlo. Con `draftVersion`, esa
+ * versión del borrador compartido queda marcada como la publicada.
  */
 export async function savePermanentComposition(
   category: "GUILD_LEAGUE" | "EMPERIUM_OVERRUN",
   data: PartyTemplateSnapshot,
-  notifyChannelId: string | null
+  notifyChannelId: string | null,
+  draftVersion?: number
 ): Promise<{ id: string; notifyError?: string }> {
   const session = await getSession();
   if (!session?.discordId) throw new Error("No autenticado.");
@@ -211,6 +215,9 @@ export async function savePermanentComposition(
     : await prisma.partyTemplate.create({
         data: { event: category, name, data: data as object, createdById: user.id, permanent: true },
       });
+  if (typeof draftVersion === "number" && Number.isInteger(draftVersion)) {
+    await markDraftPublished(category, draftVersion, user.globalName || user.username);
+  }
 
   let notifyError: string | undefined;
   if (notifyChannelId) {
@@ -224,4 +231,27 @@ export async function savePermanentComposition(
   revalidatePath("/panel/party");
   revalidatePath("/panel");
   return { id: template.id, notifyError };
+}
+
+/**
+ * Aplica cambios del Party Builder al borrador compartido de ese tipo de
+ * evento (ver src/lib/party/draft-ops.ts). Se llama sola a medida que se
+ * edita; no revalida la página para no recargar el core en cada cambio: los
+ * demás oficiales ven el cambio por la consulta periódica del borrador.
+ */
+export async function applyPartyDraftOps(
+  category: DraftEventType,
+  ops: unknown
+): Promise<{ draft: DraftPayload; errors: string[] }> {
+  const session = await getSession();
+  if (!session?.discordId) throw new Error("No autenticado.");
+
+  const permissions = await getEffectivePermissions(session);
+  if (!permissions.canManageParty) {
+    throw new Error("Tu rol no tiene permiso para armar composiciones.");
+  }
+  if (!DRAFT_EVENT_TYPES.includes(category)) throw new Error("Tipo de evento inválido.");
+
+  const parsed = readDraftOps(ops);
+  return applyDraftOpsToDb(category, parsed, await editorDisplayName(session.discordId));
 }
