@@ -183,22 +183,18 @@ export async function submitMySheetUpdate(formData: FormData): Promise<void> {
   const sheet = await prisma.coreCharacterSheet.findUnique({ where: { discordId } });
   if (!sheet?.inCore) throw new Error("Solo los miembros [SD] Core pueden actualizar su ficha.");
 
-  // La captura del personaje es obligatoria: el Power sale de lo que se leyó
-  // en ella (no de lo que se tipee) y el job y el nombre leídos quedan para
-  // que el moderador los compare con la ficha.
+  // La captura del personaje es obligatoria y sirve para comprobar el Power:
+  // el que escribe el jugador tiene que ser el que se leyó en ella.
   const proof = readScreenshotProof(String(formData.get("screenshotProof") ?? ""), discordId);
   if (!proof) {
     throw new Error("Falta la captura de tu personaje, o pasó más de una hora desde que la subiste. Vuelve a subirla.");
   }
 
   const parsed = submissionSchema.parse({ ...readSheetValues(formData), note: formData.get("note") ?? "" });
-  const data = {
-    ...parsed,
-    power: proof.power ?? parsed.power,
-    screenshotJob: proof.job,
-    screenshotName: proof.characterName,
-    screenshotPower: proof.power,
-  };
+  if (parsed.power !== proof.power) {
+    throw new Error(`El Power que escribiste no coincide con el de la captura (${proof.power}). Corrígelo y vuelve a enviar.`);
+  }
+  const data = { ...parsed, screenshotPower: proof.power };
 
   const pending = await prisma.coreSheetSubmission.findFirst({ where: { discordId, status: "PENDING" } });
   if (pending) {

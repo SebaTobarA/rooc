@@ -2,18 +2,14 @@
 
 /**
  * Análisis de la captura de personaje que pide /panel/ficha antes de enviar
- * una actualización. La imagen llega en el FormData, se lee con OCR en
+ * una actualización: solo se lee el Power, para comprobar el que escribió el
+ * jugador. La imagen llega en el FormData, se lee con OCR en
  * memoria y se descarta: nunca se escribe en disco, en el blob ni en la base.
  */
 
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import {
-  ScreenshotAnalysisError,
-  createScreenshotProof,
-  readCharacterScreenshot,
-  sameName,
-} from "@/lib/core-census/screenshot";
+import { ScreenshotAnalysisError, createScreenshotProof, readCharacterScreenshot } from "@/lib/core-census/screenshot";
 
 const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 // El navegador la achica antes de mandarla (ver CharacterScreenshotField);
@@ -24,15 +20,8 @@ export type ScreenshotAnalysis =
   | { ok: false; error: string }
   | {
       ok: true;
-      job: string | null;
-      jobAsShown: string | null;
-      characterName: string | null;
-      power: number | null;
-      /** Lo que dice la ficha, para mostrar contra qué se comparó. */
-      expectedJob: string | null;
-      expectedName: string;
-      jobMatches: boolean;
-      nameMatches: boolean;
+      /** El Power leído en la captura: el que escriba el jugador tiene que coincidir. */
+      power: number;
       /** Comprobante firmado que viaja con el formulario (ver submitMySheetUpdate). */
       proof: string;
     };
@@ -47,22 +36,14 @@ export async function analyzeMyCharacterScreenshot(formData: FormData): Promise<
 
   const file = formData.get("screenshot");
   if (!(file instanceof File) || file.size === 0) return { ok: false, error: "Elige la captura de tu personaje." };
-  const mediaType = ACCEPTED_TYPES.find((type) => type === file.type);
-  if (!mediaType) return { ok: false, error: "La captura tiene que ser JPG, PNG o WEBP." };
+  if (!ACCEPTED_TYPES.some((type) => type === file.type)) {
+    return { ok: false, error: "La captura tiene que ser JPG, PNG o WEBP." };
+  }
   if (file.size > MAX_BYTES) return { ok: false, error: "La captura es demasiado pesada (máximo 4 MB)." };
-
-  const registration = await prisma.memberRegistration.findUnique({
-    where: { discordId },
-    select: { nickname: true },
-  });
-  const expectedName = sheet.characterName || registration?.nickname || sheet.displayName || sheet.username;
 
   let reading;
   try {
-    reading = await readCharacterScreenshot(Buffer.from(await file.arrayBuffer()), {
-      name: expectedName,
-      job: sheet.jobName,
-    });
+    reading = await readCharacterScreenshot(Buffer.from(await file.arrayBuffer()));
   } catch (err) {
     if (err instanceof ScreenshotAnalysisError) return { ok: false, error: err.message };
     console.error("analyzeMyCharacterScreenshot", err);
@@ -72,28 +53,12 @@ export async function analyzeMyCharacterScreenshot(formData: FormData): Promise<
   if (!reading.isCharacterWindow) {
     return {
       ok: false,
-      error: "Esa imagen no parece la ventana de tu personaje. Sube la pestaña básica de «Character / Personaje», donde se ven tu nombre, job y Power.",
+      error: "En esa imagen no aparece tu Power. Sube la pestaña básica de la ventana «Character / Personaje», completa y sin recortar.",
     };
   }
   if (reading.power === null) {
     return { ok: false, error: "No se alcanza a leer tu Power en la captura. Prueba con una más nítida, sin recortar." };
   }
 
-  return {
-    ok: true,
-    job: reading.job,
-    jobAsShown: reading.jobAsShown,
-    characterName: reading.characterName,
-    power: reading.power,
-    expectedJob: sheet.jobName,
-    expectedName,
-    jobMatches: Boolean(reading.job && sheet.jobName && reading.job === sheet.jobName),
-    nameMatches: sameName(reading.characterName, expectedName),
-    proof: createScreenshotProof({
-      discordId,
-      job: reading.job ?? reading.jobAsShown,
-      characterName: reading.characterName,
-      power: reading.power,
-    }),
-  };
+  return { ok: true, power: reading.power, proof: createScreenshotProof({ discordId, power: reading.power }) };
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { CheckCircle2, ImageUp, Loader2, XCircle } from "lucide-react";
 import { analyzeMyCharacterScreenshot, type ScreenshotAnalysis } from "@/lib/actions/character-screenshot";
 
@@ -23,31 +23,41 @@ async function shrink(file: File): Promise<Blob> {
 
 const POWER_FORMATTER = new Intl.NumberFormat("es-CL");
 
-function Check({ ok, label, detail }: { ok: boolean; label: string; detail: string }) {
-  return (
-    <li className="flex items-start gap-2">
-      {ok ? (
-        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
-      ) : (
-        <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
-      )}
-      <span>
-        <span className="font-semibold text-foreground">{label}:</span> <span className="text-muted">{detail}</span>
-      </span>
-    </li>
-  );
+/** Lo que hay escrito en el campo de Power, como número (null si está vacío o no es un número). */
+function readTypedPower(input: HTMLInputElement | null): number | null {
+  const value = input?.value.trim() ?? "";
+  return value === "" || Number.isNaN(Number(value)) ? null : Number(value);
 }
 
 /**
- * Paso obligatorio de /panel/ficha: el jugador sube la captura de la ventana
- * "Character" del juego (en español, portugués o inglés) y se lee su job,
- * nombre y Power. El Power leído reemplaza el del formulario, y el botón de
- * enviar recién se habilita con una captura analizada. La imagen no se guarda.
+ * Paso obligatorio de /panel/ficha: el jugador escribe su Power en el
+ * formulario y sube la captura de la ventana "Character" del juego (en
+ * español, portugués o inglés) para comprobarlo. Solo se lee el Power: si no
+ * coincide con el escrito, no se puede enviar. La imagen no se guarda.
  */
 export function CharacterScreenshotField() {
   const [result, setResult] = useState<ScreenshotAnalysis | null>(null);
+  const [typedPower, setTypedPower] = useState<number | null>(null);
   const [isAnalyzing, startAnalyzing] = useTransition();
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // El campo de Power vive en el formulario (SheetFields), fuera de este
+  // componente: se escucha para comparar en vivo con lo leído en la captura.
+  useEffect(() => {
+    const input = containerRef.current?.closest("form")?.elements.namedItem("power");
+    if (!(input instanceof HTMLInputElement)) return;
+    const update = () => setTypedPower(readTypedPower(input));
+    update();
+    input.addEventListener("input", update);
+    return () => input.removeEventListener("input", update);
+  }, []);
+
+  function applyScreenshotPower(power: number) {
+    const input = containerRef.current?.closest("form")?.elements.namedItem("power");
+    if (!(input instanceof HTMLInputElement)) return;
+    input.value = String(power);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  }
 
   function analyze(file: File | undefined) {
     if (!file) return;
@@ -56,27 +66,22 @@ export function CharacterScreenshotField() {
       try {
         const formData = new FormData();
         formData.set("screenshot", await shrink(file), "captura.jpg");
-        const analysis = await analyzeMyCharacterScreenshot(formData);
-        setResult(analysis);
-        // El Power del formulario pasa a ser el leído en la captura.
-        const power = containerRef.current?.closest("form")?.elements.namedItem("power");
-        if (analysis.ok && power instanceof HTMLInputElement && analysis.power !== null) {
-          power.value = String(analysis.power);
-          power.readOnly = true;
-        }
+        setResult(await analyzeMyCharacterScreenshot(formData));
       } catch {
         setResult({ ok: false, error: "No se pudo subir la captura. Vuelve a intentar." });
       }
     });
   }
 
+  const matches = result?.ok === true && typedPower === result.power;
+
   return (
     <div ref={containerRef} className="mt-5 rounded-[10px] border border-border bg-background-elevated p-4">
       <p className="text-sm font-semibold text-foreground">Captura de tu personaje (obligatoria)</p>
       <p className="mt-0.5 text-xs text-muted">
-        Abre la ventana «Character / Personaje» del juego, pestaña básica, y sube la captura completa: se confirman tu
-        job, tu nombre y tu Power. Sirve en español, portugués o inglés. La imagen solo se analiza y se descarta, no
-        queda guardada.
+        Sirve para comprobar tu Power. Abre la ventana «Character / Personaje» del juego, pestaña básica, y sube la
+        captura completa: el Power que se lea tiene que ser el mismo que escribiste arriba. Sirve en español, portugués
+        o inglés. La imagen solo se analiza y se descarta, no queda guardada.
       </p>
 
       <label className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-[10px] border border-border px-3 py-2 text-xs font-semibold uppercase tracking-wide text-foreground hover:bg-surface-hover">
@@ -104,36 +109,28 @@ export function CharacterScreenshotField() {
 
       {result?.ok && (
         <>
-          <ul className="mt-3 flex flex-col gap-1.5 text-sm">
-            <Check
-              ok={result.jobMatches}
-              label="Job"
-              detail={
-                result.jobMatches
-                  ? `${result.job} (coincide con tu ficha)`
-                  : `en la captura dice «${result.jobAsShown ?? "no se lee"}»; tu ficha dice «${result.expectedJob ?? "sin job"}»`
-              }
-            />
-            <Check
-              ok={result.nameMatches}
-              label="Nombre"
-              detail={
-                result.nameMatches
-                  ? `${result.characterName} (coincide con tu ficha)`
-                  : `no se encontró «${result.expectedName}» (el nombre de tu ficha) en la captura`
-              }
-            />
-            <Check
-              ok
-              label="Power"
-              detail={`${POWER_FORMATTER.format(result.power ?? 0)} (se usa este valor en tu actualización)`}
-            />
-          </ul>
-          {(!result.jobMatches || !result.nameMatches) && (
-            <p className="mt-2 text-xs text-amber-400">
-              Puedes enviarla igual: el moderador verá la diferencia al validarla. Si cambiaste de job o de nombre,
-              explícalo en el comentario.
-            </p>
+          <p role="status" className="mt-3 flex items-start gap-2 text-sm">
+            {matches ? (
+              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+            ) : (
+              <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-400" />
+            )}
+            <span className={matches ? "text-emerald-400" : "text-rose-400"}>
+              {matches
+                ? `Power ${POWER_FORMATTER.format(result.power)} comprobado: coincide con la captura.`
+                : typedPower === null
+                  ? `En la captura se lee Power ${POWER_FORMATTER.format(result.power)}. Escríbelo arriba en «Poder».`
+                  : `El Power que escribiste (${POWER_FORMATTER.format(typedPower)}) no coincide con el de la captura (${POWER_FORMATTER.format(result.power)}).`}
+            </span>
+          </p>
+          {!matches && (
+            <button
+              type="button"
+              onClick={() => applyScreenshotPower(result.power)}
+              className="mt-2 text-xs font-semibold text-accent hover:underline"
+            >
+              Usar {POWER_FORMATTER.format(result.power)}
+            </button>
           )}
           <input type="hidden" name="screenshotProof" value={result.proof} />
         </>
@@ -141,12 +138,16 @@ export function CharacterScreenshotField() {
 
       <button
         type="submit"
-        disabled={!result?.ok || isAnalyzing}
+        disabled={!matches || isAnalyzing}
         className="btn-brand mt-4 block px-4 py-2 text-sm disabled:opacity-50"
       >
         Enviar a validación
       </button>
-      {!result?.ok && <p className="mt-1 text-xs text-muted">Sube la captura para poder enviar.</p>}
+      {!matches && (
+        <p className="mt-1 text-xs text-muted">
+          {result?.ok ? "El Power tiene que coincidir con la captura para poder enviar." : "Sube la captura para poder enviar."}
+        </p>
+      )}
     </div>
   );
 }
