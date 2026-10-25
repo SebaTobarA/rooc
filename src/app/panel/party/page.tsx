@@ -4,6 +4,7 @@ import { getEffectivePermissions } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { loadCorePlayers } from "@/lib/core-census/data";
 import { readSnapshot } from "@/lib/party/template-snapshot";
+import { readSavedPartyPlayers, type SavedPartyView } from "@/lib/party/saved-parties";
 import { loadDraft } from "@/lib/party/draft";
 import type { DraftPayload } from "@/lib/party/draft-ops";
 import { loadEventChannelOptions } from "@/lib/discord-guild-channels";
@@ -59,8 +60,16 @@ export default async function PartyPage({ searchParams }: { searchParams: Promis
 
   // El pool es el core de la guild: quienes tienen el rol [SD] Core, con el
   // job de su ficha (ver syncCorePlayers).
-  const [{ players, syncError }, permanentTemplates, nextEvents, channels, settings, templateToEdit, draftList] =
-    await Promise.all([
+  const [
+    { players, syncError },
+    permanentTemplates,
+    nextEvents,
+    channels,
+    settings,
+    templateToEdit,
+    draftList,
+    savedPartyRows,
+  ] = await Promise.all([
       loadCorePlayers({ sync: true }),
       prisma.partyTemplate.findMany({ where: { permanent: true }, orderBy: { updatedAt: "desc" } }),
       // El próximo evento de cada tipo, para cruzar la composición con quién
@@ -82,7 +91,18 @@ export default async function PartyPage({ searchParams }: { searchParams: Promis
       // El borrador compartido que editan los oficiales; quien solo mira ve
       // la composición publicada.
       permissions.canManageParty ? Promise.all(CATEGORIES.map((category) => loadDraft(category))) : Promise.resolve(null),
+      // Parties guardadas, compartidas por los dos tipos de evento.
+      permissions.canManageParty
+        ? prisma.savedParty.findMany({ orderBy: { name: "asc" } })
+        : Promise.resolve([]),
     ]);
+  const savedParties: SavedPartyView[] = savedPartyRows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    players: readSavedPartyPlayers(row.players),
+    updatedByName: row.updatedByName,
+    updatedAt: row.updatedAt.toISOString(),
+  }));
   const drafts = draftList
     ? (Object.fromEntries(CATEGORIES.map((category, index) => [category, draftList[index]])) as Record<
         PlannerEventType,
@@ -143,6 +163,7 @@ export default async function PartyPage({ searchParams }: { searchParams: Promis
         members={members}
         compositions={compositions}
         drafts={drafts}
+        savedParties={savedParties}
         attendance={attendance}
         channels={channels}
         defaultChannelId={settings?.defaultChannelId ?? null}

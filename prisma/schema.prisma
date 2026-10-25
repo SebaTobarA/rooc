@@ -540,6 +540,23 @@ model PartyDraft {
   updatedAt        DateTime  @updatedAt
 }
 
+// Party guardada del Party Builder ("Guardar party"): un grupo de jugadores
+// que juegan bien juntos (afinidad) y se reutiliza al armar una composición
+// nueva o un campo, en Guild League y en Emperium Overrun. En el tablero, la
+// party que sale de acá lleva candado (Party.locked) y su savedPartyId.
+model SavedParty {
+  id      String @id @default(cuid())
+  name    String
+  // [{ id: discordId, nickname, clase }] en el orden de la party: el nombre
+  // y el job quedan para mostrarla aunque alguien deje el core.
+  players Json
+
+  createdByName String?
+  updatedByName String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
 // Presencia en el Party Builder: cada oficial con la página abierta
 // actualiza su fila en cada consulta del borrador, y se muestra a los demás
 // quién la vio en los últimos segundos.

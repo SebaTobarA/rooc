@@ -30,6 +30,12 @@ export interface Party {
   // sin asignar a un raid) — ver Raid más abajo. Guild League no usa raids,
   // así que sus parties quedan siempre en null acá.
   raidId: string | null;
+  // Party con candado en el Party Builder: no se le pueden sacar ni meter
+  // jugadores hasta desbloquearla. Ausente = sin candado.
+  locked?: boolean;
+  // Party guardada (SavedParty) de la que sale o en la que se guardó, para
+  // que "Guardar party" actualice esa misma en vez de crear otra.
+  savedPartyId?: string | null;
 }
 
 // Un raid de Emperium Overrun: entre 1 y 8 parties (reforzado en

@@ -61,6 +61,28 @@ export type DraftOp =
   | { kind: "addParty"; id: string; campo: CampoSide | null; raidId: string | null; playerId?: string | null }
   | { kind: "removeParty"; id: string }
   | { kind: "renameParty"; id: string; name: string }
+  /**
+   * Mueve la party completa (con sus jugadores) a un raid o a "sin raid",
+   * antes de `beforeId` o al final: así se cambia de raid y se ordena.
+   */
+  | { kind: "moveParty"; id: string; campo: CampoSide | null; raidId: string | null; beforeId?: string | null }
+  /** Pone o saca el candado; con `savedPartyId` la enlaza a su party guardada. */
+  | { kind: "lockParty"; id: string; locked: boolean; savedPartyId?: string | null }
+  /**
+   * Agrega una party guardada (SavedParty) con sus jugadores y con candado.
+   * Quien ya esté en otra party con candado se queda donde está.
+   */
+  | {
+      kind: "addSavedParty";
+      id: string;
+      savedPartyId: string;
+      name: string;
+      campo: CampoSide | null;
+      raidId: string | null;
+      playerIds: string[];
+      /** Nombre y job de quien no esté en el core, para que todos lo vean. */
+      people?: Record<string, DraftPerson>;
+    }
   | { kind: "addRaid"; id: string; campo: CampoSide | null }
   | { kind: "removeRaid"; id: string }
   | { kind: "renameRaid"; id: string; name: string }
@@ -129,9 +151,15 @@ export interface ApplyResult {
 export function applyDraftOp(board: DraftBoard, op: DraftOp): ApplyResult {
   switch (op.kind) {
     case "move": {
+      // Una party con candado no suelta ni recibe jugadores.
+      const fromId = Object.entries(board.members).find(([, ids]) => ids.includes(op.playerId))?.[0];
+      const from = fromId ? board.parties.find((party) => party.id === fromId) : undefined;
+      const lockedError = (party: Party) => `${party.name} tiene candado: desbloquéala para cambiar sus jugadores.`;
+      if (from?.locked && from.id !== op.partyId) return { board, error: lockedError(from) };
       if (op.partyId) {
         const party = board.parties.find((candidate) => candidate.id === op.partyId);
         if (!party) return { board, error: "Esa party ya no existe: alguien más la eliminó." };
+        if (party.locked && from?.id !== party.id) return { board, error: lockedError(party) };
         const others = (board.members[party.id] ?? []).filter((id) => id !== op.playerId).length;
         if (others >= party.capacity) {
           return { board, error: `${party.name} ya está completa (${party.capacity}/${party.capacity}).` };
@@ -176,6 +204,87 @@ export function applyDraftOp(board: DraftBoard, op: DraftOp): ApplyResult {
       const members = { ...board.members };
       delete members[op.id];
       return { board: pruneExtras({ ...board, parties: board.parties.filter((party) => party.id !== op.id), members }) };
+    }
+
+    case "moveParty": {
+      const party = board.parties.find((candidate) => candidate.id === op.id);
+      if (!party) return { board, error: "Esa party ya no existe: alguien más la eliminó." };
+      const raid = op.raidId ? board.raids.find((candidate) => candidate.id === op.raidId) : undefined;
+      if (op.raidId && !raid) return { board, error: "Ese raid ya no existe: alguien más lo eliminó." };
+      // En un raid, la party toma el campo del raid; en "sin raid", el pedido.
+      const campo = raid ? (raid.campo ?? null) : op.campo;
+      const raidId = op.raidId ?? null;
+      const sameGroup = party.campo === campo && (party.raidId ?? null) === raidId;
+      if (!sameGroup && partiesInGroup(board, campo, raidId).length >= MAX_PARTIES_PER_RAID) {
+        return {
+          board,
+          error: `${raid?.name ?? "«Sin raid»"} ya tiene ${MAX_PARTIES_PER_RAID} parties: saca una antes de mover otra.`,
+        };
+      }
+      if (op.beforeId === op.id) return { board };
+      const moved: Party = { ...party, campo, raidId };
+      const rest = board.parties.filter((candidate) => candidate.id !== op.id);
+      const index = op.beforeId ? rest.findIndex((candidate) => candidate.id === op.beforeId) : -1;
+      const parties = index === -1 ? [...rest, moved] : [...rest.slice(0, index), moved, ...rest.slice(index)];
+      return { board: { ...board, parties } };
+    }
+
+    case "lockParty":
+      return {
+        board: {
+          ...board,
+          parties: board.parties.map((party) =>
+            party.id === op.id
+              ? {
+                  ...party,
+                  locked: op.locked || undefined,
+                  savedPartyId: op.savedPartyId === undefined ? party.savedPartyId : op.savedPartyId,
+                }
+              : party
+          ),
+        },
+      };
+
+    case "addSavedParty": {
+      if (board.parties.some((party) => party.id === op.id)) return { board };
+      if (op.raidId && !board.raids.some((raid) => raid.id === op.raidId)) {
+        return { board, error: "Ese raid ya no existe: alguien más lo eliminó." };
+      }
+      if (partiesInGroup(board, op.campo, op.raidId).length >= MAX_PARTIES_PER_RAID) {
+        return { board, error: `Un raid admite hasta ${MAX_PARTIES_PER_RAID} parties. Agrega otro raid.` };
+      }
+      if (board.parties.length >= MAX_PARTIES) return { board, error: "Hay demasiadas parties." };
+      // Quien ya va en otra party con candado se queda ahí.
+      const lockedIds = new Set(
+        board.parties.filter((party) => party.locked).flatMap((party) => board.members[party.id] ?? [])
+      );
+      const playerIds = op.playerIds.filter((id) => !lockedIds.has(id)).slice(0, PARTY_SIZE);
+      let members = board.members;
+      for (const id of playerIds) members = withoutPlayer(members, id);
+      const party: Party = {
+        id: op.id,
+        name: op.name || defaultPartyName(board, op.campo, op.raidId),
+        capacity: PARTY_SIZE,
+        campo: op.campo,
+        raidId: op.raidId,
+        locked: true,
+        savedPartyId: op.savedPartyId,
+      };
+      const people = Object.fromEntries(Object.entries(op.people ?? {}).filter(([id]) => playerIds.includes(id)));
+      const extras = Object.keys(people).length > 0 ? { ...board.extras, ...people } : board.extras;
+      const next = pruneExtras({
+        ...board,
+        parties: [...board.parties, party],
+        members: { ...members, [op.id]: playerIds },
+        extras,
+      });
+      const skipped = op.playerIds.length - playerIds.length;
+      return skipped > 0
+        ? {
+            board: next,
+            error: `${skipped} jugador(es) de «${party.name}» ya están en otra party con candado y se quedaron ahí.`,
+          }
+        : { board: next };
     }
 
     case "renameParty":
@@ -342,7 +451,16 @@ export function readBoard(data: unknown): DraftBoard | null {
       typeof party.capacity === "number" && Number.isInteger(party.capacity)
         ? Math.min(Math.max(party.capacity, 1), 10)
         : PARTY_SIZE;
-    parties.push({ id: party.id, name, capacity, campo, raidId });
+    const savedPartyId = readOptionalId(party.savedPartyId);
+    parties.push({
+      id: party.id,
+      name,
+      capacity,
+      campo,
+      raidId,
+      ...(party.locked === true ? { locked: true } : {}),
+      ...(savedPartyId ? { savedPartyId } : {}),
+    });
   }
 
   const members: Record<string, string[]> = {};
@@ -403,6 +521,38 @@ export function readDraftOps(data: unknown): DraftOp[] {
         const campo = readCampo(op.campo);
         if (!isId(op.id) || campo === undefined) throw invalid();
         return { kind: "addRaid", id: op.id, campo };
+      }
+      case "moveParty": {
+        const campo = readCampo(op.campo);
+        const raidId = readOptionalId(op.raidId);
+        const beforeId = readOptionalId(op.beforeId);
+        if (!isId(op.id) || campo === undefined || raidId === undefined || beforeId === undefined) throw invalid();
+        return { kind: "moveParty", id: op.id, campo, raidId, beforeId };
+      }
+      case "lockParty": {
+        const savedPartyId = op.savedPartyId === undefined ? undefined : readOptionalId(op.savedPartyId);
+        if (!isId(op.id) || typeof op.locked !== "boolean") throw invalid();
+        if (op.savedPartyId !== undefined && savedPartyId === undefined) throw invalid();
+        return { kind: "lockParty", id: op.id, locked: op.locked, savedPartyId };
+      }
+      case "addSavedParty": {
+        const campo = readCampo(op.campo);
+        const raidId = readOptionalId(op.raidId);
+        const name = readName(op.name);
+        const playerIds = readPlayerIds(op.playerIds, PARTY_SIZE);
+        if (!isId(op.id) || !isId(op.savedPartyId) || campo === undefined || raidId === undefined) throw invalid();
+        if (name === null || !playerIds) throw invalid();
+        let people: Record<string, DraftPerson> | undefined;
+        if (op.people && typeof op.people === "object") {
+          people = {};
+          for (const [id, person] of Object.entries(op.people as Record<string, unknown>)) {
+            const data = person as Record<string, unknown> | null;
+            const nickname = readName(data?.nickname);
+            const clase = readName(data?.clase);
+            if (isId(id) && playerIds.includes(id) && nickname !== null && clase !== null) people[id] = { nickname, clase };
+          }
+        }
+        return { kind: "addSavedParty", id: op.id, savedPartyId: op.savedPartyId, name, campo, raidId, playerIds, people };
       }
       case "suggest": {
         const campo = readCampo(op.campo);

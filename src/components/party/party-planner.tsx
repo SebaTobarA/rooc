@@ -6,10 +6,17 @@ import type { EventAttendanceMode, EventSignupStatus } from "@prisma/client";
 import {
   ArrowDown,
   ArrowDownAZ,
+  Bookmark,
+  ChevronLeft,
+  ChevronRight,
   CloudCheck,
   CloudUpload,
   CornerDownRight,
+  GripVertical,
+  Lock,
+  LockOpen,
   Plus,
+  RotateCcw,
   Settings,
   Sparkles,
   Trash2,
@@ -17,7 +24,8 @@ import {
   WifiOff,
   X,
 } from "lucide-react";
-import { savePermanentComposition } from "@/lib/actions/party-templates";
+import { deleteSavedParty, savePermanentComposition, saveSavedParty } from "@/lib/actions/party-templates";
+import type { SavedPartyView } from "@/lib/party/saved-parties";
 import { ATTENDANCE_DOT_CLASS, ATTENDANCE_TEXT_CLASS, attendanceMark } from "@/lib/party/attendance";
 import type { EventChannelOption } from "@/lib/discord-guild-channels";
 import { inferRole, normalizeClass } from "@/lib/party/infer-role";
@@ -71,6 +79,8 @@ const EVENT_LABEL: Record<EventType, string> = {
 const CAMPO_LABEL: Record<CampoSide, string> = { principal: "Campo Primario", secundario: "Campo Secundario" };
 const SLOT_OPTIONS: SlotLabel[] = ["Tanque", "Soporte", "Daño", "Flexible"];
 const DEFAULT_COMPOSITION: SlotLabel[] = ["Tanque", "Soporte", "Daño", "Daño", "Daño"];
+// Tipo de dato del arrastre de una party completa (los jugadores usan text/plain).
+const PARTY_DRAG_TYPE = "application/x-sd-party";
 // Cada cuánto se consulta el borrador compartido con la pestaña visible.
 const POLL_INTERVAL_MS = 2500;
 
@@ -127,6 +137,8 @@ interface PartyPlannerProps {
   compositions: Record<EventType, PlannerComposition | null>;
   /** Borrador compartido de cada tipo de evento; null para quien no puede editar. */
   drafts: Record<EventType, DraftPayload> | null;
+  /** Parties guardadas ("Guardar party"), compartidas por los dos tipos de evento. */
+  savedParties: SavedPartyView[];
   /** Quién avisó que juega el próximo evento de cada tipo. */
   attendance: Record<EventType, PlannerAttendance | null>;
   /** Canales de Discord donde se puede informar la composición. */
@@ -155,6 +167,7 @@ export function PartyPlanner({
   members,
   compositions: savedCompositions,
   drafts,
+  savedParties,
   attendance,
   channels,
   defaultChannelId,
@@ -197,6 +210,13 @@ export function PartyPlanner({
   const [compositions, setCompositions] = useState<SlotLabel[][]>([DEFAULT_COMPOSITION]);
   const [suggestRaidId, setSuggestRaidId] = useState("");
   const [isSaving, startSaving] = useTransition();
+  const [isSavingParty, startSavingParty] = useTransition();
+  // Party que se está arrastrando completa, para marcar dónde se puede soltar.
+  const [draggedPartyId, setDraggedPartyId] = useState<string | null>(null);
+  // Dónde se agregan las parties guardadas: id de raid o "" para "sin raid".
+  const [libraryTarget, setLibraryTarget] = useState("");
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [preloadSaved, setPreloadSaved] = useState(true);
   // true mientras la sección de equipos está fuera de pantalla: ahí aparece
   // el resumen flotante para seguir asignando sin bajar.
   const [teamsOffscreen, setTeamsOffscreen] = useState(false);
@@ -365,6 +385,13 @@ export function PartyPlanner({
   function placePlayer(playerId: string, partyId: string | null, beforeId?: string) {
     if (!board || playerId === beforeId) return;
     setMessage(null);
+    const from = partyById.get(partyOf.get(playerId) ?? "");
+    const to = partyId ? partyById.get(partyId) : undefined;
+    const locked = from?.locked && from.id !== partyId ? from : to?.locked && to.id !== from?.id ? to : undefined;
+    if (locked) {
+      setMessage({ kind: "error", text: `${locked.name} tiene candado: desbloquéala para cambiar sus jugadores.` });
+      return;
+    }
     if (partyId) {
       const party = partyById.get(partyId);
       const others = (board.members[partyId] ?? []).filter((id) => id !== playerId).length;
@@ -380,8 +407,182 @@ export function PartyPlanner({
   function handleDrop(event: React.DragEvent, partyId: string | null, beforeId?: string) {
     event.preventDefault();
     event.stopPropagation();
+    // Una party completa soltada sobre otra (o sobre uno de sus jugadores)
+    // queda justo antes de esa, en su mismo raid.
+    const draggedParty = event.dataTransfer.getData(PARTY_DRAG_TYPE);
+    if (draggedParty) {
+      setDraggedPartyId(null);
+      const target = partyId ? partyById.get(partyId) : undefined;
+      if (target) moveParty(draggedParty, target.raidId ?? null, target.id);
+      return;
+    }
     const playerId = event.dataTransfer.getData("text/plain");
     if (playerId) placePlayer(playerId, partyId, beforeId);
+  }
+
+  /** Soltar una party en el espacio de un raid (o de "sin raid"): va al final de ese grupo. */
+  function handleGroupDrop(event: React.DragEvent, raidId: string | null) {
+    const draggedParty = event.dataTransfer.getData(PARTY_DRAG_TYPE);
+    if (!draggedParty) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setDraggedPartyId(null);
+    moveParty(draggedParty, raidId, null);
+  }
+
+  /** Mueve una party completa a un raid (o a "sin raid"), antes de `beforeId` o al final. */
+  function moveParty(partyId: string, raidId: string | null, beforeId: string | null) {
+    const party = partyById.get(partyId);
+    if (!party || partyId === beforeId) return;
+    setMessage(null);
+    const changesGroup = (party.raidId ?? null) !== raidId || party.campo !== scopeCampo;
+    if (changesGroup && partiesInRaid(raidId).length >= MAX_PARTIES_PER_RAID) {
+      const where = raidId ? (scopeRaids.find((raid) => raid.id === raidId)?.name ?? "Ese raid") : "«Sin raid»";
+      setMessage({ kind: "error", text: `${where} ya tiene ${MAX_PARTIES_PER_RAID} parties: saca una antes de mover otra.` });
+      return;
+    }
+    channel.push({ kind: "moveParty", id: partyId, campo: scopeCampo, raidId, beforeId });
+  }
+
+  /** Corre la party un lugar a la izquierda o a la derecha dentro de su raid. */
+  function shiftParty(party: Party, direction: -1 | 1) {
+    const group = partiesInRaid(party.raidId ?? null);
+    const index = group.findIndex((candidate) => candidate.id === party.id);
+    const target = index + direction;
+    if (index === -1 || target < 0 || target >= group.length) return;
+    // A la izquierda: antes de la anterior. A la derecha: antes de la que
+    // sigue a la siguiente (o al final del grupo).
+    const beforeId = direction === -1 ? group[target].id : (group[target + 1]?.id ?? null);
+    if (beforeId === null) {
+      // Al final del grupo: antes de la party que siga al grupo en el tablero.
+      const all = board?.parties ?? [];
+      const lastIndex = all.findIndex((candidate) => candidate.id === group[group.length - 1].id);
+      channel.push({
+        kind: "moveParty",
+        id: party.id,
+        campo: party.campo,
+        raidId: party.raidId ?? null,
+        beforeId: all[lastIndex + 1]?.id ?? null,
+      });
+      return;
+    }
+    channel.push({ kind: "moveParty", id: party.id, campo: party.campo, raidId: party.raidId ?? null, beforeId });
+  }
+
+  function toggleLock(party: Party) {
+    setMessage(null);
+    channel.push({ kind: "lockParty", id: party.id, locked: !party.locked });
+  }
+
+  /** Guarda la party en la biblioteca (o actualiza la suya) y le pone candado. */
+  function saveParty(party: Party) {
+    const players = membersOf(party.id).map((member) => ({ id: member.id, nickname: member.nickname, clase: member.clase }));
+    if (players.length === 0) {
+      setMessage({ kind: "error", text: `${party.name} está vacía: agrégale jugadores antes de guardarla.` });
+      return;
+    }
+    setMessage(null);
+    startSavingParty(async () => {
+      try {
+        const { id } = await saveSavedParty({ id: party.savedPartyId ?? null, name: party.name, players });
+        channel.push({ kind: "lockParty", id: party.id, locked: true, savedPartyId: id });
+        setMessage({
+          kind: "ok",
+          text: `«${party.name}» quedó guardada con candado: aparece en «Parties guardadas» para usarla en otras composiciones.`,
+        });
+        router.refresh();
+      } catch (err) {
+        setMessage({ kind: "error", text: err instanceof Error ? err.message : "No se pudo guardar la party." });
+      }
+    });
+  }
+
+  /** Agrega una party guardada al tablero, con candado, en el raid elegido. */
+  function addSavedParty(saved: SavedPartyView) {
+    const raidId = libraryTarget && scopeRaids.some((raid) => raid.id === libraryTarget) ? libraryTarget : null;
+    if (partiesInRaid(raidId).length >= MAX_PARTIES_PER_RAID) {
+      setMessage({ kind: "error", text: `Ese raid ya tiene ${MAX_PARTIES_PER_RAID} parties. Elige otro en «Agregar en».` });
+      return;
+    }
+    setMessage(null);
+    channel.push({
+      kind: "addSavedParty",
+      id: newId("party"),
+      savedPartyId: saved.id,
+      name: saved.name,
+      campo: scopeCampo,
+      raidId,
+      playerIds: saved.players.map((player) => player.id),
+      people: Object.fromEntries(
+        saved.players
+          .filter((player) => !coreIds.has(player.id))
+          .map((player) => [player.id, { nickname: player.nickname, clase: player.clase }])
+      ),
+    });
+  }
+
+  function removeSavedParty(saved: SavedPartyView) {
+    if (!window.confirm(`¿Sacar «${saved.name}» de las parties guardadas? Las composiciones que ya la usan no cambian.`)) {
+      return;
+    }
+    startSavingParty(async () => {
+      try {
+        await deleteSavedParty(saved.id);
+        router.refresh();
+      } catch (err) {
+        setMessage({ kind: "error", text: err instanceof Error ? err.message : "No se pudo borrar la party guardada." });
+      }
+    });
+  }
+
+  /**
+   * Empieza una composición nueva en el borrador de este evento: se vacía el
+   * tablero y, si se pide, se precargan las parties guardadas con candado,
+   * de a 8 por raid (en Guild League, en el campo a la vista).
+   */
+  function startNewComposition() {
+    if (!eventType) return;
+    const next: DraftBoard = { parties: [], raids: [], members: {}, extras: {} };
+    if (preloadSaved) {
+      const used = new Set<string>();
+      savedParties.forEach((saved, index) => {
+        if (index % MAX_PARTIES_PER_RAID === 0) {
+          next.raids.push({
+            id: newId("raid"),
+            name: `Raid ${next.raids.length + 1}`,
+            compositions: [],
+            campo: scopeCampo,
+          });
+        }
+        const raid = next.raids[next.raids.length - 1];
+        const partyId = newId("party");
+        // Un jugador que figure en dos parties guardadas va solo en la primera.
+        const players = saved.players.filter((player) => !used.has(player.id));
+        players.forEach((player) => used.add(player.id));
+        next.parties.push({
+          id: partyId,
+          name: saved.name,
+          capacity: PARTY_SIZE,
+          campo: scopeCampo,
+          raidId: raid.id,
+          locked: true,
+          savedPartyId: saved.id,
+        });
+        next.members[partyId] = players.map((player) => player.id);
+        for (const player of players) {
+          if (!coreIds.has(player.id)) next.extras![player.id] = { nickname: player.nickname, clase: player.clase };
+        }
+      });
+    }
+    channel.push({ kind: "replace", board: next });
+    setConfirmReset(false);
+    setSelectedId(null);
+    setMessage({
+      kind: "ok",
+      text: `Composición nueva de ${EVENT_LABEL[eventType]} en el borrador${
+        preloadSaved && savedParties.length > 0 ? ` con ${savedParties.length} party(s) guardada(s) precargadas` : ""
+      }. Lo publicado no cambia hasta «Guardar composición».`,
+    });
   }
 
   function suggestParties() {
@@ -551,24 +752,33 @@ export function PartyPlanner({
     // En el pool, quien ya tiene party queda atenuado con el nombre de su party.
     const assignedTo = inParty ? undefined : partyById.get(partyOf.get(member.id) ?? "");
     const mark = markOf(member.id);
+    // Quien va en una party con candado no se mueve hasta desbloquearla.
+    const lockedIn = (inParty ?? assignedTo)?.locked ? (inParty ?? assignedTo) : undefined;
+    const movable = interactive && !lockedIn;
     // Tocar un jugador del core abre un menú para mandarlo directo a una
     // party o raid, sin tener que bajar hasta la sección de equipos.
-    const showMenu = !inParty && interactive && selectedId === member.id;
+    const showMenu = !inParty && movable && selectedId === member.id;
     return (
       <div key={member.id} className="relative min-w-0">
       <div
-        draggable={interactive}
+        draggable={movable}
         onDragStart={(event) => event.dataTransfer.setData("text/plain", member.id)}
         onDragOver={inParty ? (event) => event.preventDefault() : undefined}
         onDrop={inParty ? (event) => handleDrop(event, inParty.id, member.id) : undefined}
         onClick={(event) => {
           event.stopPropagation();
-          if (interactive) setSelectedId((prev) => (prev === member.id ? null : member.id));
+          if (movable) setSelectedId((prev) => (prev === member.id ? null : member.id));
         }}
-        title={assignedTo ? `Ya va en ${assignedTo.name}` : undefined}
+        title={
+          lockedIn
+            ? `Va en ${lockedIn.name}, que tiene candado`
+            : assignedTo
+              ? `Ya va en ${assignedTo.name}`
+              : undefined
+        }
         style={{ borderColor: color, backgroundColor: `color-mix(in srgb, ${color} 18%, transparent)` }}
         className={`flex min-w-0 items-center gap-1 rounded-lg border-2 px-2 py-1.5 ${
-          interactive ? "cursor-grab active:cursor-grabbing" : ""
+          movable ? "cursor-grab active:cursor-grabbing" : ""
         } ${selectedId === member.id ? "ring-2 ring-accent ring-offset-2 ring-offset-background" : ""} ${
           assignedTo ? "opacity-40" : ""
         }`}
@@ -589,7 +799,8 @@ export function PartyPlanner({
             {assignedTo ? ` · ${assignedTo.name}` : ""}
           </span>
         </span>
-        {inParty && canManage && (
+        {lockedIn && !inParty && <Lock size={12} className="shrink-0 text-muted" aria-label="Con candado" />}
+        {inParty && canManage && !inParty.locked && (
           <button
             type="button"
             onClick={(event) => {
@@ -655,7 +866,8 @@ export function PartyPlanner({
                     key={party.id}
                     type="button"
                     role="menuitem"
-                    disabled={isFull || isHere}
+                    disabled={isFull || isHere || party.locked}
+                    title={party.locked ? "Tiene candado" : undefined}
                     onClick={() => placePlayer(member.id, party.id)}
                     className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-xs text-foreground hover:bg-accent/10 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent"
                   >
@@ -663,7 +875,10 @@ export function PartyPlanner({
                       <CornerDownRight size={12} className="shrink-0 text-muted" />
                       <span className="truncate">{party.name}</span>
                     </span>
-                    <span className="shrink-0 text-muted">{isHere ? "Aquí" : `${count}/${party.capacity}`}</span>
+                    <span className="flex shrink-0 items-center gap-1 text-muted">
+                      {party.locked && <Lock size={11} aria-label="Con candado" />}
+                      {isHere ? "Aquí" : `${count}/${party.capacity}`}
+                    </span>
                   </button>
                 );
               })}
@@ -698,17 +913,52 @@ export function PartyPlanner({
 
   function renderParty(party: Party) {
     const occupants = membersOf(party.id);
+    const group = partiesInRaid(party.raidId ?? null);
+    const position = group.findIndex((candidate) => candidate.id === party.id);
+    const acceptsPlayer = Boolean(selectedId) && !party.locked;
+    // Destinos de "Mover a": cada raid del campo a la vista y "sin raid".
+    const destinations = [
+      ...scopeRaids.map((raid) => ({ value: raid.id, label: raid.name })),
+      { value: "", label: "Sin raid" },
+    ];
     return (
       <div
         key={party.id}
         onDragOver={(event) => event.preventDefault()}
         onDrop={(event) => handleDrop(event, party.id)}
-        onClick={() => selectedId && placePlayer(selectedId, party.id)}
+        onClick={() => acceptsPlayer && selectedId && placePlayer(selectedId, party.id)}
         className={`flex min-w-0 flex-col gap-1.5 rounded-xl border bg-background-elevated p-2 ${
-          selectedId ? "cursor-pointer border-accent/60" : "border-border"
+          draggedPartyId === party.id ? "opacity-40" : ""
+        } ${
+          draggedPartyId && draggedPartyId !== party.id
+            ? "border-dashed border-accent"
+            : party.locked
+              ? "border-amber-500/60"
+              : acceptsPlayer
+                ? "cursor-pointer border-accent/60"
+                : "border-border"
         }`}
       >
         <div className="flex items-center gap-1">
+          {canManage && (
+            // Asa para arrastrar la party completa a otro lugar o raid.
+            <span
+              draggable
+              onDragStart={(event) => {
+                event.stopPropagation();
+                event.dataTransfer.setData(PARTY_DRAG_TYPE, party.id);
+                event.dataTransfer.effectAllowed = "move";
+                setDraggedPartyId(party.id);
+              }}
+              onDragEnd={() => setDraggedPartyId(null)}
+              onClick={(event) => event.stopPropagation()}
+              title="Arrastra para mover la party completa (a otro lugar o a otro raid)"
+              aria-label={`Mover ${party.name}`}
+              className="shrink-0 cursor-grab text-muted hover:text-foreground active:cursor-grabbing"
+            >
+              <GripVertical size={14} />
+            </span>
+          )}
           <input
             value={party.name}
             disabled={!canManage}
@@ -720,6 +970,20 @@ export function PartyPlanner({
           <span className="shrink-0 text-xs text-muted">
             {occupants.length}/{party.capacity}
           </span>
+          {canManage && (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                toggleLock(party);
+              }}
+              aria-label={party.locked ? `Quitar el candado de ${party.name}` : `Poner candado a ${party.name}`}
+              title={party.locked ? "Con candado: tócalo para desbloquear y cambiar jugadores" : "Poner candado"}
+              className={`shrink-0 ${party.locked ? "text-amber-400" : "text-muted hover:text-foreground"}`}
+            >
+              {party.locked ? <Lock size={13} /> : <LockOpen size={13} />}
+            </button>
+          )}
           {canManage && (
             <button
               type="button"
@@ -739,6 +1003,59 @@ export function PartyPlanner({
         {Array.from({ length: Math.max(0, party.capacity - occupants.length) }, (_, index) => (
           <div key={index} className="h-11 rounded-lg border border-dashed border-border" aria-hidden="true" />
         ))}
+        {canManage && (
+          <div className="flex items-center gap-1 border-t border-border pt-1.5" onClick={(event) => event.stopPropagation()}>
+            <button
+              type="button"
+              onClick={() => shiftParty(party, -1)}
+              disabled={position <= 0}
+              aria-label={`Correr ${party.name} a la izquierda`}
+              title="Correr a la izquierda"
+              className="shrink-0 rounded text-muted hover:text-foreground disabled:opacity-30"
+            >
+              <ChevronLeft size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={() => shiftParty(party, 1)}
+              disabled={position === -1 || position >= group.length - 1}
+              aria-label={`Correr ${party.name} a la derecha`}
+              title="Correr a la derecha"
+              className="shrink-0 rounded text-muted hover:text-foreground disabled:opacity-30"
+            >
+              <ChevronRight size={14} />
+            </button>
+            <select
+              value={party.raidId ?? ""}
+              onChange={(event) => moveParty(party.id, event.target.value || null, null)}
+              aria-label={`Mover ${party.name} a otro raid`}
+              title="Mover la party completa a otro raid"
+              className="min-w-0 flex-1 rounded border border-border bg-surface px-1 py-0.5 text-[11px] text-foreground"
+            >
+              {destinations.map((destination) => (
+                <option key={destination.value || "none"} value={destination.value}>
+                  {destination.label}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => saveParty(party)}
+              disabled={isSavingParty}
+              aria-label={`Guardar ${party.name}`}
+              title={
+                party.savedPartyId
+                  ? "Actualizar la party guardada con estos jugadores"
+                  : "Guardar party: queda con candado y disponible para otras composiciones"
+              }
+              className={`shrink-0 rounded disabled:opacity-40 ${
+                party.savedPartyId ? "text-accent" : "text-muted hover:text-accent"
+              }`}
+            >
+              <Bookmark size={13} fill={party.savedPartyId ? "currentColor" : "none"} />
+            </button>
+          </div>
+        )}
       </div>
     );
   }
@@ -781,6 +1098,7 @@ export function PartyPlanner({
       <p className="mt-1 text-sm text-muted">
         Arma la composición permanente de cada evento con los miembros del core. Toca un jugador para enviarlo a una
         party o raid, o arrástralo a su party. Dentro de una party, arrástralo sobre otro jugador para cambiar el orden.
+        Arrastra una party completa desde su asa para moverla a otro lugar o raid.
         {live && " Cada cambio se guarda solo en un borrador compartido con los demás oficiales."}
       </p>
 
@@ -1029,6 +1347,128 @@ export function PartyPlanner({
                 <span className="text-xs text-muted">
                   Cada raid admite hasta {MAX_PARTIES_PER_RAID} parties de {PARTY_SIZE}.
                 </span>
+                {live && (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmReset((prev) => !prev)}
+                    className="flex items-center gap-2 rounded-[10px] border border-border px-3 py-2 text-xs font-semibold uppercase tracking-wide text-foreground hover:bg-surface-hover sm:ml-auto"
+                  >
+                    <RotateCcw size={14} />
+                    Nueva composición
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* ---- Empezar una composición nueva ---- */}
+            {live && confirmReset && (
+              <div className="mt-3 rounded-[10px] border border-amber-500/50 bg-amber-500/10 p-4 text-sm">
+                <p className="text-foreground">
+                  Se vacía el borrador de {EVENT_LABEL[eventType]} para todos los oficiales: raids, parties y campos. Lo
+                  publicado no cambia hasta «Guardar composición».
+                </p>
+                <label className="mt-2 flex items-center gap-2 text-xs text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={preloadSaved}
+                    onChange={(event) => setPreloadSaved(event.target.checked)}
+                    disabled={savedParties.length === 0}
+                    className="h-4 w-4 accent-[var(--color-accent)]"
+                  />
+                  {savedParties.length > 0
+                    ? `Precargar las ${savedParties.length} party(s) guardadas, con candado${
+                        eventType === "GUILD_LEAGUE" ? ` (en ${CAMPO_LABEL[campo]})` : ""
+                      }`
+                    : "Todavía no hay parties guardadas para precargar"}
+                </label>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button type="button" onClick={startNewComposition} className="btn-brand px-3 py-2 text-xs">
+                    Empezar composición nueva
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmReset(false)}
+                    className="text-xs text-muted hover:text-foreground"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ---- Parties guardadas (afinidad) ---- */}
+            {canManage && (
+              <div className="mt-4 rounded-[10px] border border-border bg-background-elevated p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+                    <Bookmark size={14} className="text-accent" />
+                    Parties guardadas
+                  </p>
+                  {savedParties.length > 0 && (
+                    <label className="flex items-center gap-2 text-xs text-muted sm:ml-auto">
+                      Agregar en
+                      <select
+                        value={libraryTarget}
+                        onChange={(event) => setLibraryTarget(event.target.value)}
+                        className="rounded-md border border-border bg-surface px-2 py-1 text-xs text-foreground"
+                      >
+                        <option value="">Sin raid</option>
+                        {scopeRaids.map((raid) => (
+                          <option key={raid.id} value={raid.id}>
+                            {raid.name} ({partiesInRaid(raid.id).length}/{MAX_PARTIES_PER_RAID})
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                </div>
+                <p className="mt-0.5 text-xs text-muted">
+                  Grupos que juegan bien juntos, para Guild League y Emperium Overrun. Guarda una party con el ícono{" "}
+                  <Bookmark size={11} className="inline" /> de su tarjeta: queda con candado (no se cambian sus jugadores
+                  hasta desbloquearla) y aparece aquí para agregarla a otra composición o campo.
+                </p>
+                {savedParties.length === 0 ? (
+                  <p className="mt-3 text-xs text-muted">Todavía no hay parties guardadas.</p>
+                ) : (
+                  <div className="mt-3 grid grid-cols-[repeat(auto-fill,minmax(13rem,1fr))] gap-2">
+                    {savedParties.map((saved) => {
+                      const onBoard = board.parties.some((party) => party.savedPartyId === saved.id);
+                      return (
+                        <div key={saved.id} className="flex flex-col gap-1 rounded-lg border border-border bg-surface p-2">
+                          <div className="flex items-center gap-1">
+                            <Lock size={12} className="shrink-0 text-amber-400" />
+                            <span className="min-w-0 flex-1 truncate text-xs font-semibold text-foreground">{saved.name}</span>
+                            <button
+                              type="button"
+                              onClick={() => removeSavedParty(saved)}
+                              disabled={isSavingParty}
+                              aria-label={`Sacar ${saved.name} de las parties guardadas`}
+                              title="Sacar de las parties guardadas"
+                              className="shrink-0 text-muted hover:text-rose-400 disabled:opacity-40"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                          <p className="text-[11px] leading-snug text-muted">
+                            {saved.players.map((player) => `${player.nickname} (${player.clase})`).join(" · ")}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => addSavedParty(saved)}
+                            className={`mt-auto flex items-center justify-center gap-1 rounded-md border px-2 py-1 text-[11px] font-semibold ${
+                              onBoard
+                                ? "border-border text-muted hover:text-foreground"
+                                : "border-accent/60 text-accent hover:bg-accent/10"
+                            }`}
+                          >
+                            <Plus size={12} />
+                            {onBoard ? "Ya está en el tablero · agregar otra vez" : "Agregar al tablero"}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
 
@@ -1129,7 +1569,12 @@ export function PartyPlanner({
             {scopeRaids.map((raid) => {
               const raidParties = partiesInRaid(raid.id);
               return (
-                <div key={raid.id} className="mt-4 rounded-xl border border-border p-3">
+                <div
+                  key={raid.id}
+                  onDragOver={(event) => draggedPartyId && event.preventDefault()}
+                  onDrop={(event) => handleGroupDrop(event, raid.id)}
+                  className={`mt-4 rounded-xl border p-3 ${draggedPartyId ? "border-dashed border-accent/60" : "border-border"}`}
+                >
                   <div className="mb-3 flex flex-wrap items-center gap-2">
                     <input
                       value={raid.name}
@@ -1165,7 +1610,9 @@ export function PartyPlanner({
                     )}
                   </div>
                   {raidParties.length === 0 ? (
-                    <p className="text-xs text-muted">Este raid todavía no tiene parties.</p>
+                    <p className="text-xs text-muted">
+                      Este raid todavía no tiene parties.{draggedPartyId ? " Suelta aquí la party." : ""}
+                    </p>
                   ) : (
                     <div className={partyGrid}>{raidParties.map(renderParty)}</div>
                   )}
@@ -1173,12 +1620,20 @@ export function PartyPlanner({
               );
             })}
 
-            {partiesInRaid(null).length > 0 && (
-              <div className="mt-4">
+            {(partiesInRaid(null).length > 0 || (draggedPartyId && scopeRaids.length > 0)) && (
+              <div
+                className={`mt-4 ${draggedPartyId ? "rounded-xl border border-dashed border-accent/60 p-3" : ""}`}
+                onDragOver={(event) => draggedPartyId && event.preventDefault()}
+                onDrop={(event) => handleGroupDrop(event, null)}
+              >
                 {scopeRaids.length > 0 && (
                   <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Parties sin raid</p>
                 )}
-                <div className={partyGrid}>{partiesInRaid(null).map(renderParty)}</div>
+                {partiesInRaid(null).length > 0 ? (
+                  <div className={partyGrid}>{partiesInRaid(null).map(renderParty)}</div>
+                ) : (
+                  <p className="text-xs text-muted">Suelta aquí la party para sacarla de su raid.</p>
+                )}
               </div>
             )}
 

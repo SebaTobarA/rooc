@@ -11,6 +11,7 @@ import type { Player, Party } from "@/types/party";
 import { readSnapshot, type PartyTemplateSnapshot } from "@/lib/party/template-snapshot";
 import { DRAFT_EVENT_TYPES, readDraftOps, type DraftEventType, type DraftPayload } from "@/lib/party/draft-ops";
 import { applyDraftOpsToDb, editorDisplayName, markDraftPublished } from "@/lib/party/draft";
+import { readSavedPartyPlayers, type SavedPartyPlayer } from "@/lib/party/saved-parties";
 
 // Canal de asistencia (mismo donde se publican los eventos) y rol "[SD]
 // Core" a mencionar — fijos a pedido, no configurables desde el panel.
@@ -254,4 +255,52 @@ export async function applyPartyDraftOps(
 
   const parsed = readDraftOps(ops);
   return applyDraftOpsToDb(category, parsed, await editorDisplayName(session.discordId));
+}
+
+// ---------------------------------------------------------------------------
+// Parties guardadas ("Guardar party"): grupos con afinidad que se reutilizan
+// al armar composiciones nuevas o campos, en los dos tipos de evento.
+// ---------------------------------------------------------------------------
+
+async function requirePartyManager(): Promise<string> {
+  const session = await getSession();
+  if (!session?.discordId) throw new Error("No autenticado.");
+  const permissions = await getEffectivePermissions(session);
+  if (!permissions.canManageParty) throw new Error("Tu rol no tiene permiso para guardar parties.");
+  return editorDisplayName(session.discordId);
+}
+
+/**
+ * Guarda una party del tablero en la biblioteca, o actualiza la misma si ya
+ * venía de ahí (`id`). Devuelve el id para enlazarla a la party del tablero.
+ */
+export async function saveSavedParty(input: {
+  id?: string | null;
+  name: string;
+  players: SavedPartyPlayer[];
+}): Promise<{ id: string }> {
+  const editorName = await requirePartyManager();
+  const name = String(input.name ?? "").trim().slice(0, 40) || "Party guardada";
+  const players = readSavedPartyPlayers(input.players);
+  if (players.length === 0) throw new Error("La party está vacía: agrégale jugadores antes de guardarla.");
+
+  const existing = input.id ? await prisma.savedParty.findUnique({ where: { id: input.id } }) : null;
+  const saved = existing
+    ? await prisma.savedParty.update({
+        where: { id: existing.id },
+        data: { name, players: players as object[], updatedByName: editorName },
+      })
+    : await prisma.savedParty.create({
+        data: { name, players: players as object[], createdByName: editorName, updatedByName: editorName },
+      });
+
+  revalidatePath("/panel/party");
+  return { id: saved.id };
+}
+
+/** Saca una party de la biblioteca. Las parties del tablero que salieron de ella quedan como están. */
+export async function deleteSavedParty(id: string): Promise<void> {
+  await requirePartyManager();
+  await prisma.savedParty.deleteMany({ where: { id } });
+  revalidatePath("/panel/party");
 }
