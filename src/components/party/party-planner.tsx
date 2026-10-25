@@ -396,7 +396,17 @@ export function PartyPlanner({
       const party = partyById.get(partyId);
       const others = (board.members[partyId] ?? []).filter((id) => id !== playerId).length;
       if (party && others >= party.capacity) {
-        setMessage({ kind: "error", text: `${party.name} ya está completa (${party.capacity}/${party.capacity}).` });
+        // Soltado encima de un jugador de una party llena: se intercambian
+        // (el de encima pasa al lugar del que llega, o al core si venía de ahí).
+        if (beforeId && from?.id !== partyId) {
+          channel.push({ kind: "swap", playerId, withId: beforeId });
+          setSelectedId(null);
+          return;
+        }
+        setMessage({
+          kind: "error",
+          text: `${party.name} ya está completa (${party.capacity}/${party.capacity}). Suelta al jugador encima de otro para intercambiarlos.`,
+        });
         return;
       }
     }
@@ -1097,7 +1107,8 @@ export function PartyPlanner({
       <h1 className="heading-gradient text-2xl font-extrabold sm:text-3xl">Party Builder</h1>
       <p className="mt-1 text-sm text-muted">
         Arma la composición permanente de cada evento con los miembros del core. Toca un jugador para enviarlo a una
-        party o raid, o arrástralo a su party. Dentro de una party, arrástralo sobre otro jugador para cambiar el orden.
+        party o raid, o arrástralo a su party. Dentro de una party, arrástralo sobre otro jugador para cambiar el orden;
+        sobre un jugador de una party llena, los intercambia.
         Arrastra una party completa desde su asa para moverla a otro lugar o raid.
         {live && " Cada cambio se guarda solo en un borrador compartido con los demás oficiales."}
       </p>

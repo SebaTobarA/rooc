@@ -57,6 +57,12 @@ export interface DraftEditor {
 export type DraftOp =
   /** A una party (al final, o antes de `beforeId`) o, con partyId null, al pool. */
   | { kind: "move"; playerId: string; partyId: string | null; beforeId?: string | null }
+  /**
+   * Intercambia a `playerId` con `withId`: cada uno queda en el lugar del
+   * otro. Si `playerId` no tenía party, `withId` vuelve al pool. Sirve para
+   * cambiar jugadores entre parties llenas.
+   */
+  | { kind: "swap"; playerId: string; withId: string }
   /** Party nueva; con `playerId`, además mete ahí a ese jugador. */
   | { kind: "addParty"; id: string; campo: CampoSide | null; raidId: string | null; playerId?: string | null }
   | { kind: "removeParty"; id: string }
@@ -173,6 +179,30 @@ export function applyDraftOp(board: DraftBoard, op: DraftOp): ApplyResult {
         if (index === -1) list.push(op.playerId);
         else list.splice(index, 0, op.playerId);
         members[op.partyId] = list;
+      }
+      return { board: pruneExtras({ ...board, members }) };
+    }
+
+    case "swap": {
+      if (op.playerId === op.withId) return { board };
+      const partyIdOf = (playerId: string) =>
+        Object.entries(board.members).find(([, ids]) => ids.includes(playerId))?.[0] ?? null;
+      const fromId = partyIdOf(op.playerId);
+      const toId = partyIdOf(op.withId);
+      if (!toId) return { board, error: "Ese jugador ya no está en una party: alguien más lo movió." };
+      for (const partyId of [fromId, toId]) {
+        const party = partyId ? board.parties.find((candidate) => candidate.id === partyId) : undefined;
+        if (party?.locked) return { board, error: `${party.name} tiene candado: desbloquéala para cambiar sus jugadores.` };
+      }
+      const members = { ...board.members };
+      if (fromId === toId) {
+        // En la misma party: solo se intercambian los lugares.
+        members[toId] = members[toId].map((id) =>
+          id === op.playerId ? op.withId : id === op.withId ? op.playerId : id
+        );
+      } else {
+        members[toId] = members[toId].map((id) => (id === op.withId ? op.playerId : id));
+        if (fromId) members[fromId] = members[fromId].map((id) => (id === op.playerId ? op.withId : id));
       }
       return { board: pruneExtras({ ...board, members }) };
     }
@@ -500,6 +530,9 @@ export function readDraftOps(data: unknown): DraftOp[] {
         if (!isId(op.playerId) || partyId === undefined || beforeId === undefined) throw invalid();
         return { kind: "move", playerId: op.playerId, partyId, beforeId };
       }
+      case "swap":
+        if (!isId(op.playerId) || !isId(op.withId)) throw invalid();
+        return { kind: "swap", playerId: op.playerId, withId: op.withId };
       case "addParty": {
         const campo = readCampo(op.campo);
         const raidId = readOptionalId(op.raidId);
