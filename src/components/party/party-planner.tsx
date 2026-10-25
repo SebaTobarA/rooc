@@ -24,7 +24,8 @@ import {
   WifiOff,
   X,
 } from "lucide-react";
-import { deleteSavedParty, savePermanentComposition, saveSavedParty } from "@/lib/actions/party-templates";
+import { deleteSavedParty, saveJobColors, savePermanentComposition, saveSavedParty } from "@/lib/actions/party-templates";
+import { DEFAULT_JOB_COLORS, jobColor, type JobColors } from "@/lib/party/job-colors";
 import type { SavedPartyView } from "@/lib/party/saved-parties";
 import { ATTENDANCE_DOT_CLASS, ATTENDANCE_TEXT_CLASS, attendanceMark } from "@/lib/party/attendance";
 import type { EventChannelOption } from "@/lib/discord-guild-channels";
@@ -84,26 +85,6 @@ const PARTY_DRAG_TYPE = "application/x-sd-party";
 // Cada cuánto se consulta el borrador compartido con la pestaña visible.
 const POLL_INTERVAL_MS = 2500;
 
-// Paleta por defecto de cada job; quien arma la puede cambiar con la rueda
-// de configuración (se guarda en su navegador, no en el servidor).
-const DEFAULT_JOB_COLORS: Record<string, string> = {
-  "Lord Knight": "#e5484d",
-  Paladín: "#f2c94c",
-  Gypsy: "#f06292",
-  Clown: "#ff9f43",
-  Stalker: "#8e7cc3",
-  Champion: "#d08770",
-  "High Priest": "#f5f5f5",
-  Creator: "#7bd88f",
-  Whitesmith: "#b0bec5",
-  "Assassin Cross": "#9b59b6",
-  Sniper: "#2ecc71",
-  Gunslinger: "#c0a16b",
-  Professor: "#5dade2",
-  "High Wizard": "#3d7eff",
-  Doram: "#6fe0f5",
-};
-const FALLBACK_COLOR = "#7a8794";
 const SAVED_FORMATTER = new Intl.DateTimeFormat("es-CL", {
   day: "2-digit",
   month: "2-digit",
@@ -111,7 +92,8 @@ const SAVED_FORMATTER = new Intl.DateTimeFormat("es-CL", {
   minute: "2-digit",
   timeZone: "America/Santiago",
 });
-const COLORS_STORAGE_KEY = "sd-party-job-colors";
+// Espera desde el último cambio de color antes de guardar la paleta.
+const COLORS_SAVE_DELAY_MS = 800;
 
 function newId(prefix: string): string {
   return `${prefix}_${Math.random().toString(36).slice(2, 10)}`;
@@ -139,6 +121,8 @@ interface PartyPlannerProps {
   drafts: Record<EventType, DraftPayload> | null;
   /** Parties guardadas ("Guardar party"), compartidas por los dos tipos de evento. */
   savedParties: SavedPartyView[];
+  /** Color de cada job, el mismo para toda la guild (ver src/lib/party/job-colors.ts). */
+  jobColors: JobColors;
   /** Quién avisó que juega el próximo evento de cada tipo. */
   attendance: Record<EventType, PlannerAttendance | null>;
   /** Canales de Discord donde se puede informar la composición. */
@@ -168,6 +152,7 @@ export function PartyPlanner({
   compositions: savedCompositions,
   drafts,
   savedParties,
+  jobColors,
   attendance,
   channels,
   defaultChannelId,
@@ -204,7 +189,9 @@ export function PartyPlanner({
     };
   });
   const [sortBy, setSortBy] = useState<"name" | "job">("job");
-  const [colors, setColors] = useState<Record<string, string>>(DEFAULT_JOB_COLORS);
+  const [colors, setColors] = useState<JobColors>(jobColors);
+  const [colorsStatus, setColorsStatus] = useState<"saved" | "saving" | "error">("saved");
+  const colorsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showColors, setShowColors] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [compositions, setCompositions] = useState<SlotLabel[][]>([DEFAULT_COMPOSITION]);
@@ -222,17 +209,6 @@ export function PartyPlanner({
   const [teamsOffscreen, setTeamsOffscreen] = useState(false);
   const teamsRef = useRef<HTMLElement>(null);
 
-  // La paleta personalizada vive en el navegador de quien arma.
-  useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem(COLORS_STORAGE_KEY);
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- lectura única de localStorage al montar
-      if (stored) setColors({ ...DEFAULT_JOB_COLORS, ...(JSON.parse(stored) as Record<string, string>) });
-    } catch {
-      // Paleta guardada ilegible: se queda la de por defecto.
-    }
-  }, []);
-
   useEffect(() => {
     const node = teamsRef.current;
     if (!node) return;
@@ -243,17 +219,27 @@ export function PartyPlanner({
     return () => observer.disconnect();
   }, []);
 
+  // La paleta es de toda la guild: cada cambio se guarda en el servidor (con
+  // una pequeña espera, para no guardar cada paso del selector de color).
+  function persistColors(next: JobColors) {
+    if (colorsTimer.current) clearTimeout(colorsTimer.current);
+    setColorsStatus("saving");
+    colorsTimer.current = setTimeout(() => {
+      saveJobColors(next)
+        .then(() => setColorsStatus("saved"))
+        .catch(() => setColorsStatus("error"));
+    }, COLORS_SAVE_DELAY_MS);
+  }
+
   function updateColor(job: string, color: string) {
-    setColors((prev) => {
-      const next = { ...prev, [job]: color };
-      window.localStorage.setItem(COLORS_STORAGE_KEY, JSON.stringify(next));
-      return next;
-    });
+    const next = { ...colors, [job]: color };
+    setColors(next);
+    persistColors(next);
   }
 
   function resetColors() {
-    window.localStorage.removeItem(COLORS_STORAGE_KEY);
     setColors(DEFAULT_JOB_COLORS);
+    persistColors(DEFAULT_JOB_COLORS);
   }
 
   const channel = syncChannels[eventType ?? "GUILD_LEAGUE"];
@@ -758,7 +744,7 @@ export function PartyPlanner({
   const interactive = Boolean(board) && canManage;
 
   function renderChip(member: PlannerMember, inParty: Party | null) {
-    const color = colors[member.clase] ?? FALLBACK_COLOR;
+    const color = jobColor(colors, member.clase);
     // En el pool, quien ya tiene party queda atenuado con el nombre de su party.
     const assignedTo = inParty ? undefined : partyById.get(partyOf.get(member.id) ?? "");
     const mark = markOf(member.id);
@@ -1223,16 +1209,19 @@ export function PartyPlanner({
           <div className="mt-4 rounded-[10px] border border-border bg-background-elevated p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm font-semibold text-foreground">Color de cada job</p>
-              <button type="button" onClick={resetColors} className="text-xs text-accent hover:underline">
-                Volver a los colores por defecto
-              </button>
+              {canManage && (
+                <button type="button" onClick={resetColors} className="text-xs text-accent hover:underline">
+                  Volver a los colores por defecto
+                </button>
+              )}
             </div>
             <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
               {jobs.map((job) => (
                 <label key={job} className="flex items-center gap-2 text-xs text-foreground">
                   <input
                     type="color"
-                    value={colors[job] ?? FALLBACK_COLOR}
+                    value={jobColor(colors, job)}
+                    disabled={!canManage}
                     onChange={(event) => updateColor(job, event.target.value)}
                     className="h-7 w-9 shrink-0 cursor-pointer rounded border border-border bg-transparent"
                   />
@@ -1240,7 +1229,15 @@ export function PartyPlanner({
                 </label>
               ))}
             </div>
-            <p className="mt-2 text-xs text-muted">La paleta se guarda en este navegador, solo para ti.</p>
+            <p className="mt-2 text-xs text-muted">
+              La paleta es la misma para toda la guild: se usa aquí y en «Mi composición» del inicio de cada jugador.
+              {canManage &&
+                (colorsStatus === "saving"
+                  ? " Guardando…"
+                  : colorsStatus === "error"
+                    ? " No se pudo guardar el último cambio: vuelve a intentarlo."
+                    : " Cada cambio se guarda solo.")}
+            </p>
           </div>
         )}
 

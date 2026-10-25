@@ -540,6 +540,16 @@ model PartyDraft {
   updatedAt        DateTime  @updatedAt
 }
 
+// Fila única: el color de cada job en el Party Builder y en "Mi composición"
+// del inicio, el mismo para toda la guild (ver src/lib/party/job-colors.ts).
+// `colors` solo guarda lo que difiere de la paleta por defecto.
+model PartyJobColors {
+  id            String   @id @default(cuid())
+  colors        Json
+  updatedByName String?
+  updatedAt     DateTime @updatedAt
+}
+
 // Party guardada del Party Builder ("Guardar party"): un grupo de jugadores
 // que juegan bien juntos (afinidad) y se reutiliza al armar una composición
 // nueva o un campo, en Guild League y en Emperium Overrun. En el tablero, la

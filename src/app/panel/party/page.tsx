@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { loadCorePlayers } from "@/lib/core-census/data";
 import { readSnapshot } from "@/lib/party/template-snapshot";
 import { readSavedPartyPlayers, type SavedPartyView } from "@/lib/party/saved-parties";
+import { loadJobColors } from "@/lib/party/job-colors-store";
 import { loadDraft } from "@/lib/party/draft";
 import type { DraftPayload } from "@/lib/party/draft-ops";
 import { loadEventChannelOptions } from "@/lib/discord-guild-channels";
@@ -69,6 +70,7 @@ export default async function PartyPage({ searchParams }: { searchParams: Promis
     templateToEdit,
     draftList,
     savedPartyRows,
+    jobColors,
   ] = await Promise.all([
       loadCorePlayers({ sync: true }),
       prisma.partyTemplate.findMany({ where: { permanent: true }, orderBy: { updatedAt: "desc" } }),
@@ -95,6 +97,7 @@ export default async function PartyPage({ searchParams }: { searchParams: Promis
       permissions.canManageParty
         ? prisma.savedParty.findMany({ orderBy: { name: "asc" } })
         : Promise.resolve([]),
+      loadJobColors(),
     ]);
   const savedParties: SavedPartyView[] = savedPartyRows.map((row) => ({
     id: row.id,
@@ -164,6 +167,7 @@ export default async function PartyPage({ searchParams }: { searchParams: Promis
         compositions={compositions}
         drafts={drafts}
         savedParties={savedParties}
+        jobColors={jobColors}
         attendance={attendance}
         channels={channels}
         defaultChannelId={settings?.defaultChannelId ?? null}

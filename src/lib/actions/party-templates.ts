@@ -12,6 +12,7 @@ import { readSnapshot, type PartyTemplateSnapshot } from "@/lib/party/template-s
 import { DRAFT_EVENT_TYPES, readDraftOps, type DraftEventType, type DraftPayload } from "@/lib/party/draft-ops";
 import { applyDraftOpsToDb, editorDisplayName, markDraftPublished } from "@/lib/party/draft";
 import { readSavedPartyPlayers, type SavedPartyPlayer } from "@/lib/party/saved-parties";
+import { DEFAULT_JOB_COLORS, readJobColors } from "@/lib/party/job-colors";
 
 // Canal de asistencia (mismo donde se publican los eventos) y rol "[SD]
 // Core" a mencionar — fijos a pedido, no configurables desde el panel.
@@ -327,5 +328,26 @@ export async function saveSavedParty(input: {
 export async function deleteSavedParty(id: string): Promise<void> {
   await requirePartyManager();
   await prisma.savedParty.deleteMany({ where: { id } });
+  revalidatePath("/panel/party");
+}
+
+/**
+ * Guarda la paleta de colores por job para toda la guild: la ven igual el
+ * Party Builder y "Mi composición" de cada jugador. Solo se guarda lo que
+ * difiere de la paleta por defecto.
+ */
+export async function saveJobColors(colors: Record<string, string>): Promise<void> {
+  const editorName = await requirePartyManager();
+  const merged = readJobColors(colors);
+  const diff = Object.fromEntries(Object.entries(merged).filter(([job, color]) => DEFAULT_JOB_COLORS[job] !== color));
+
+  const existing = await prisma.partyJobColors.findFirst();
+  if (existing) {
+    await prisma.partyJobColors.update({ where: { id: existing.id }, data: { colors: diff, updatedByName: editorName } });
+  } else {
+    await prisma.partyJobColors.create({ data: { colors: diff, updatedByName: editorName } });
+  }
+
+  revalidatePath("/panel");
   revalidatePath("/panel/party");
 }

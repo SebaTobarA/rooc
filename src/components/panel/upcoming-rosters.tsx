@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { EVENT_CATEGORY_LABEL } from "@/lib/labels";
 import { readSnapshot } from "@/lib/party/template-snapshot";
 import { ATTENDANCE_TEXT_CLASS, attendanceMark } from "@/lib/party/attendance";
+import { jobColor, type JobColors } from "@/lib/party/job-colors";
+import { loadJobColors } from "@/lib/party/job-colors-store";
 import type { Party, Player } from "@/types/party";
 
 const DATE_FORMATTER = new Intl.DateTimeFormat("es-CL", {
@@ -54,7 +56,17 @@ function groupParties(parties: Party[], raidNameById: Map<string, string>): Rost
   return unassigned ? [...assigned, unassigned] : assigned;
 }
 
-function PartyColumn({ party, members, discordId }: { party: Party; members: Player[]; discordId: string }) {
+function PartyColumn({
+  party,
+  members,
+  discordId,
+  colors,
+}: {
+  party: Party;
+  members: Player[];
+  discordId: string;
+  colors: JobColors;
+}) {
   const isMine = members.some((member) => member.id === discordId);
   const slots = Math.max(party.capacity, members.length);
 
@@ -78,13 +90,18 @@ function PartyColumn({ party, members, discordId }: { party: Party; members: Pla
           return <div key={index} className="h-12 rounded-lg border border-dashed border-border" aria-hidden="true" />;
         }
         const isMe = member.id === discordId;
+        // Cada compañero con el color de su job (el mismo del Party Builder),
+        // para ver de un vistazo qué tipo de party es. El jugador sigue
+        // destacado con el color de acento.
+        const color = jobColor(colors, member.clase);
         return (
           <div
             key={member.id}
-            className={`flex h-12 flex-col justify-center rounded-lg border px-2 ${
-              isMe
-                ? "roster-me border-accent bg-accent text-accent-foreground"
-                : "border-border bg-background-elevated"
+            style={
+              isMe ? undefined : { borderColor: color, backgroundColor: `color-mix(in srgb, ${color} 18%, transparent)` }
+            }
+            className={`flex h-12 flex-col justify-center rounded-lg px-2 ${
+              isMe ? "roster-me border-2 border-accent bg-accent text-accent-foreground" : "border-2"
             }`}
           >
             <span className={`truncate text-sm font-semibold ${isMe ? "" : "text-foreground"}`}>
@@ -107,7 +124,7 @@ function PartyColumn({ party, members, discordId }: { party: Party; members: Pla
  * para que vea si figura como que juega.
  */
 export async function UpcomingRosters({ discordId }: { discordId: string }) {
-  const [templates, nextEvents] = await Promise.all([
+  const [templates, nextEvents, colors] = await Promise.all([
     prisma.partyTemplate.findMany({ where: { permanent: true }, orderBy: { updatedAt: "desc" } }),
     Promise.all(
       CATEGORIES.map((category) =>
@@ -118,6 +135,7 @@ export async function UpcomingRosters({ discordId }: { discordId: string }) {
         })
       )
     ),
+    loadJobColors(),
   ]);
 
   const rosters = CATEGORIES.flatMap((category, index) => {
@@ -190,6 +208,7 @@ export async function UpcomingRosters({ discordId }: { discordId: string }) {
                       party={party}
                       members={membersByParty.get(party.id) ?? []}
                       discordId={discordId}
+                      colors={colors}
                     />
                   ))}
                 </div>
