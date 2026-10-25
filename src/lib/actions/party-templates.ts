@@ -4,8 +4,8 @@ import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth";
 import { getEffectivePermissions } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
-import { postChannelMessage, editChannelMessage } from "@/lib/discord-bot";
-import { buildPartyRosterEmbed, eventCategoryLabel } from "@/lib/discord-party-embed";
+import { deleteChannelMessage, editChannelMessage, postChannelMessage } from "@/lib/discord-bot";
+import { buildPartyRosterMessages, eventCategoryLabel } from "@/lib/discord-party-embed";
 import { loadJobRoleEmojis } from "@/lib/discord-job-emojis";
 import type { Player, Party } from "@/types/party";
 import { readSnapshot, type PartyTemplateSnapshot } from "@/lib/party/template-snapshot";
@@ -143,23 +143,48 @@ async function publishTemplateRoster(templateId: string, channelId: string): Pro
   const label = eventCategoryLabel(template.event);
   const eventTitle = template.permanent ? "composición vigente" : (template.sourceEvent?.title ?? template.name);
   await loadJobRoleEmojis();
-  const embed = buildPartyRosterEmbed(eventTitle, template.event, snapshot.players, snapshot.parties);
+  const messages = buildPartyRosterMessages(
+    eventTitle,
+    template.event,
+    snapshot.players,
+    snapshot.parties,
+    snapshot.raids
+  );
   const content = template.permanent
     ? `<@&${PARTY_COMMS_ROLE_ID}> se actualizó la composición de ${label}. También puedes ver tu party en el inicio del panel.`
     : `<@&${PARTY_COMMS_ROLE_ID}> te comunicamos que el roster para ${label} será el siguiente:`;
+  // La mención va solo en el primer mensaje; los siguientes son continuación.
+  const bodies = messages.map((embeds, index) => ({ content: index === 0 ? content : "", embeds }));
 
-  if (template.channelId === channelId && template.messageId) {
-    const edited = await editChannelMessage(channelId, template.messageId, { content, embeds: [embed] });
+  // Una composición grande se publica en varios mensajes: sus ids quedan en
+  // messageId separados por coma, para editarlos la próxima vez.
+  const previousIds = template.channelId === channelId && template.messageId ? template.messageId.split(",") : [];
+  if (previousIds.length === bodies.length) {
+    let edited = true;
+    for (const [index, body] of bodies.entries()) {
+      if (!(await editChannelMessage(channelId, previousIds[index], body))) {
+        edited = false;
+        break;
+      }
+    }
     if (edited) {
       await prisma.partyTemplate.update({ where: { id: templateId }, data: { communicatedAt: new Date() } });
       return;
     }
   }
 
-  const message = await postChannelMessage(channelId, { content, embeds: [embed] });
+  // Si cambió la cantidad de mensajes (o alguien borró uno), se borran los
+  // anteriores de ese canal y se publica todo de nuevo, en orden.
+  for (const id of previousIds) {
+    await deleteChannelMessage(channelId, id).catch(() => undefined);
+  }
+  const ids: string[] = [];
+  for (const body of bodies) {
+    ids.push((await postChannelMessage(channelId, body)).id);
+  }
   await prisma.partyTemplate.update({
     where: { id: templateId },
-    data: { channelId, messageId: message.id, communicatedAt: new Date() },
+    data: { channelId, messageId: ids.join(","), communicatedAt: new Date() },
   });
 }
 
